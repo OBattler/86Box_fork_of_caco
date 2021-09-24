@@ -14,7 +14,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt5 REQUIRED COMPONENTS Widgets Gui REQUIRED)
-add_library(plat STATIC ${PLAT_SOURCES} unix_file.c unix_timer.c)
+add_library(plat STATIC ${PLAT_SOURCES} unix_file.c unix_timer.c unix_thread.c)
 add_library(ui STATIC unix.cpp unix_sdl.c unix_cdrom.c)
 target_compile_definitions(ui PUBLIC _FILE_OFFSET_BITS=64)
 target_link_libraries(ui dl uicommon)
