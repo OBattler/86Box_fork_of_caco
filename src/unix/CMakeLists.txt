@@ -22,3 +22,7 @@ target_link_libraries(ui Qt5::Widgets Qt5::Gui)
 if (ALSA_FOUND)
     target_link_libraries(plat ALSA::ALSA)
 endif()
+
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads REQUIRED)
+target_link_libraries(86Box Threads::Threads)
