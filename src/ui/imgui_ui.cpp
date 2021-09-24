@@ -5,9 +5,11 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <SDL2/SDL.h>
+#include <86box/qt5_ui.h>
 #include <SDL2/SDL_syswm.h>
 #else
 #include <SDL.h>
+#include <86box/qt5_ui.h>
 #include <SDL_syswm.h>
 #endif
 #define STB_IMAGE_IMPLEMENTATION
@@ -91,6 +93,7 @@ INCBIN(sound_icon, _INCBIN_DIR"/../unix/icons/sound.png");
 extern "C" SDL_Window* sdl_win;
 extern "C" SDL_Renderer	*sdl_render;
 extern "C" float menubarheight;
+extern SDLThread *sdlthread;
 
 static bool imrendererinit = false;
 static bool firstrender = true;
@@ -652,8 +655,9 @@ struct MOMenu : BaseMenu
 		filereq.id = moid;
 		filereq.wp = 0;
 		filereq.filefunc3params = mo_mount;
-		std::thread thr(file_open_request, filereq);
-		thr.detach();
+		emit sdlthread->fileopendialog(filereq);
+		//std::thread thr(file_open_request, filereq);
+		//thr.detach();
 	}
 	if (ImGui::MenuItem("Image... (write-protected)"))
 	{

@@ -5,6 +5,8 @@
 
 #include <SDL.h>
 #include <86box/qt5_ui.h>
+#include <QFileDialog>
+
 #include <SDL_syswm.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -62,6 +64,7 @@ SDL_threadID eventthread;
 static int exit_event = 0;
 int fullscreen_pending = 0;
 extern float menubarheight;
+QWindow* sdlwindow = nullptr;
 
 extern const uint16_t sdl_to_xt[0x200];
 
@@ -295,7 +298,34 @@ extern void sdl_reinit_texture();
 }
 
 extern SDL_Window* sdl_win;
-static int sdl_main(int argc, char** argv)
+static FileDlgClass* fdlg;
+void FileDlgClass::filedialog(FileOpenSaveRequest req)
+{
+    QString finalfilterstr;
+    if (sdlwindow)
+    {
+        for (auto& curfilter : req.filters)
+        {
+            finalfilterstr.append(std::get<0>(curfilter).c_str());
+            finalfilterstr.append(";;");
+        }
+        finalfilterstr.resize(finalfilterstr.size() - 2);
+        finalfilterstr.push_back(QChar(0));
+
+    }
+}
+SDLThread::SDLThread(int argc, char** argv)
+: QThread()
+{
+    pass_argc = argc;
+    pass_argv = argv;
+}
+void SDLThread::run()
+{
+    connect(this, SIGNAL(fileopendialog(FileOpenSaveRequest)), fdlg, SLOT(filedialog(FileOpenSaveRequest)));
+    exit(sdl_main(pass_argc, pass_argv));
+}
+int SDLThread::sdl_main(int argc, char** argv)
 {
     SDL_Event event;
 
@@ -323,6 +353,7 @@ static int sdl_main(int argc, char** argv)
             initok = sdl_initho();
             break;
     }
+    if (initok == -1) { fprintf(stderr, "SDL init failed"); exit(-1); }
     SDL_UnlockMutex(mousemutex);
 
     if (start_in_fullscreen)
@@ -547,8 +578,8 @@ static int sdl_main(int argc, char** argv)
     QApplication::quit();
     return 0;
 }
-QWindow* sdlwindow = nullptr;
-int main(int argc, char** argv)
+
+int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
     pc_init(argc, argv);
@@ -557,15 +588,16 @@ int main(int argc, char** argv)
         return 6;
     }
 
-    SDL_Init(0);
 #ifdef __unix__
     if (app.platformName() == "xcb") setenv("SDL_VIDEODRIVER", "x11", 1);
     else if (app.platformName().contains("wayland")) setenv("SDL_VIDEODRIVER", "wayland", 1);
 #endif
+    SDL_Init(0);
+
     
     mousemutex = SDL_CreateMutex();
-    std::thread sdlthr(sdl_main, argc, argv);
-    sdlthr.detach();
+    SDLThread sdlthr(argc, argv);
+    sdlthr.start();
     while(1)
     {
         SDL_LockMutex(mousemutex);
@@ -575,13 +607,19 @@ int main(int argc, char** argv)
     SDL_SysWMinfo wminfo;
     SDL_VERSION(&wminfo.version);
     SDL_GetWindowWMInfo(sdl_win, &wminfo);
+#ifdef __APPLE__
+    sdlwindow = QWindow::fromWinId(wminfo.info.cocoa.window);
+#else
     if (wminfo.subsystem == SDL_SYSWM_X11)
     {
         sdlwindow = QWindow::fromWinId(wminfo.info.x11.window);
     }
+#endif
 
     
-    return app.exec();
+    app.exec();
+    if (sdlwindow) delete sdlwindow;
+    return 0;
 }
 char* plat_vidapi_name(int i)
 {
