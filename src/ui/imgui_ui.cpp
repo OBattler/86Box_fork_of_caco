@@ -1239,6 +1239,10 @@ extern "C" void RenderImGui()
 		//extern int resize_w, resize_h;
 	    //SDL_SetWindowSize(sdl_win, resize_w, resize_h + menubarheight + (hide_status_bar ? 0 : menubarheight * 2));
 	    media_menu_reset();
+		if (vid_resize & 2)
+		{
+			SDL_SetWindowSize(sdl_win, fixed_size_x, fixed_size_y + menubarheight + (hide_status_bar ? 0 : menubarheight * 2));
+		}		
 	}
 	if (ImGui::BeginMenu("Action"))
 	{
@@ -1284,9 +1288,14 @@ extern "C" void RenderImGui()
 	{
 		if (ImGui::MenuItem("Hide status bar", NULL, hide_status_bar))
 		{
+			int windowwidth = 0, windowheight = 0;
+			int cur_hide_status_bar = hide_status_bar;
 			hide_status_bar ^= 1;
 			config_save();
-			SDL_SetWindowSize(sdl_win, scrnsz_x, scrnsz_y + menubarheight + (hide_status_bar ? menubarheight * 2 : 0));
+			SDL_GetWindowSize(sdl_win, &windowwidth, &windowheight);
+			if (!hide_status_bar) windowheight += menubarheight * 2;
+			else windowheight -= menubarheight * 2;
+			SDL_SetWindowSize(sdl_win, windowwidth, windowheight);
 		}
 		ImGui::Separator();
 	    if (ImGui::MenuItem("Resizable window", NULL, vid_resize == 1, vid_resize < 2))
