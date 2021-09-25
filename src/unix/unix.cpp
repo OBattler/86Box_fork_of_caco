@@ -4,8 +4,9 @@
 #endif
 
 #include <SDL.h>
-#include <86box/qt5_ui.h>
+#include <86box/unix.h>
 #include <QFileDialog>
+#include <QLayout>
 
 #include <SDL_syswm.h>
 #include <stdlib.h>
@@ -298,6 +299,7 @@ extern void sdl_reinit_texture();
 }
 
 extern SDL_Window* sdl_win;
+#if 0
 static FileDlgClass* fdlg;
 void FileDlgClass::filedialog(FileOpenSaveRequest req)
 {
@@ -314,15 +316,20 @@ void FileDlgClass::filedialog(FileOpenSaveRequest req)
 
     }
 }
+#endif
 SDLThread::SDLThread(int argc, char** argv)
-: QThread()
+: QThread(nullptr)
 {
     pass_argc = argc;
     pass_argv = argv;
 }
+SDLThread::~SDLThread()
+{
+
+}
 void SDLThread::run()
 {
-    connect(this, SIGNAL(fileopendialog(FileOpenSaveRequest)), fdlg, SLOT(filedialog(FileOpenSaveRequest)));
+    //connect(this, SIGNAL(fileopendialog(FileOpenSaveRequest)), fdlg, SLOT(filedialog(FileOpenSaveRequest)));
     exit(sdl_main(pass_argc, pass_argv));
 }
 int SDLThread::sdl_main(int argc, char** argv)
@@ -579,6 +586,34 @@ int SDLThread::sdl_main(int argc, char** argv)
     return 0;
 }
 
+EmuMainWindow::EmuMainWindow(QWidget* parent, QWindow* child)
+: QMainWindow(parent)
+{
+    setWindowTitle("86Box");
+    resize(640, 480);
+}
+
+class main_window : public QWidget
+{
+public:
+    explicit main_window(const uint32_t wid)
+    {
+        QWindow* window = QWindow::fromWinId((WId)wid);
+        window->setFlags(Qt::FramelessWindowHint);
+
+        QWidget* widget = QWidget::createWindowContainer(window);
+        widget->setParent(this);
+
+        auto* layout = new QVBoxLayout();
+        layout->addWidget(widget);
+        setLayout(layout);
+        widget->setFocus();
+        widget->setFocusPolicy(Qt::StrongFocus);
+        this->setFocusProxy(widget);
+    }
+};
+
+
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
@@ -607,18 +642,21 @@ int main(int argc, char* argv[])
     SDL_SysWMinfo wminfo;
     SDL_VERSION(&wminfo.version);
     SDL_GetWindowWMInfo(sdl_win, &wminfo);
+    WId windowid;
 #ifdef __APPLE__
-    sdlwindow = QWindow::fromWinId(wminfo.info.cocoa.window);
+    windowid = wminfo.info.cocoa.window;
 #else
     if (wminfo.subsystem == SDL_SYSWM_X11)
     {
-        sdlwindow = QWindow::fromWinId(wminfo.info.x11.window);
+        windowid = wminfo.info.x11.window;
     }
 #endif
+    sleep(1);
+    main_window* mwin = new main_window(windowid);
+    mwin->show();
+    mwin->setFocus();
 
-    
     app.exec();
-    if (sdlwindow) delete sdlwindow;
     return 0;
 }
 char* plat_vidapi_name(int i)

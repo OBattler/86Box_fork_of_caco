@@ -22,6 +22,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED 14)
 
+
 project(86Box
 	VERSION 3.0
 	DESCRIPTION "Emulator of x86-based systems"

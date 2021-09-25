@@ -2,6 +2,7 @@
 #include <QTimer>
 #include <QWindow>
 #include <QThread>
+#include <QMainWindow>
 #include <string>
 #include <vector>
 #include <utility>
@@ -30,21 +31,15 @@ struct FileOpenSaveRequest
 	uint8_t id = 0;
 };
 
-class FileDlgClass : public QObject
-{
-	Q_OBJECT
-public slots:
-	void filedialog(FileOpenSaveRequest);
-};
-
 class SDLThread : public QThread
 {
     Q_OBJECT
 
 public:
 	SDLThread(int argc, char** argv);
-signals:
-    void fileopendialog(FileOpenSaveRequest);
+	virtual ~SDLThread();
+//signals:
+//    void fileopendialog(FileOpenSaveRequest);
 protected:
     void run() override;
 private:
@@ -52,3 +47,22 @@ private:
 	int pass_argc;
 	char** pass_argv;
 };
+
+class EmuMainWindow : public QMainWindow
+{
+	Q_OBJECT
+
+public:
+	EmuMainWindow(QWidget* parent = nullptr, QWindow* child = nullptr);
+//public slots:
+//	void resizeReq(int width, int height);
+	QWidget* child;
+};
+
+// This will be needed on Wayland.
+#if 0
+class WlWindow : QWindow
+{
+
+}
+#endif
