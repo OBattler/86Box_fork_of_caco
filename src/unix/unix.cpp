@@ -612,7 +612,7 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     sw = this->w = w;
     sh = this->h = h;
     QPainter painteronImage(&m_image);
-    painteronImage.drawImage(QRect(x, y, w, h), QImage((uchar*)&(buffer32->line[y][x]), 2048, h, (2048 + 64) * 4, QImage::Format_RGB32));
+    painteronImage.drawImage(QRect(x, y, w, h), QImage((uchar*)&(buffer32->line[y][x]), 2048 + 64, h, (2048 + 64) * 4, QImage::Format_RGB32));
     video_blit_complete();
     painteronImage.end();
     renderNow();  
@@ -662,8 +662,17 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
     this->childContainer = createWindowContainer(this->child, this);
     this->setCentralWidget(childContainer);
     connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
+    connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
 }
 
+void EmuMainWindow::resizeSlot(int w, int h)
+{
+    resize(w, h);
+}
+extern "C" void plat_resize(int w, int h)
+{
+    emit mainwnd->resizeSig(w, h);
+}
 void qt5_blit(int x, int y, int w, int h)
 {
     emit mainwnd->qt_blit(x, y, w, h);

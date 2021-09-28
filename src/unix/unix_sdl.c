@@ -658,6 +658,7 @@ plat_mouse_capture(int on)
     SDL_UnlockMutex(sdl_mutex);
 }
 
+#if 0
 void plat_resize(int w, int h)
 {
     if (vid_resize)
@@ -670,6 +671,7 @@ void plat_resize(int w, int h)
     resize_pending = 1;
     SDL_UnlockMutex(sdl_mutex);
 }
+#endif
 
 wchar_t sdl_win_title[512] = { L'8', L'6', L'B', L'o', L'x', 0 };
 SDL_mutex* titlemtx = NULL;

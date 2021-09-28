@@ -87,8 +87,11 @@ public:
 //public slots:
 //	void resizeReq(int width, int height);
 	EmuRenderWindow* child;
+public slots:
+	void resizeSlot(int w, int h);
 signals:
 	void qt_blit(int x, int y, int w, int h);
+	void resizeSig(int w, int h);
 
 private:
 	QWidget* childContainer;
