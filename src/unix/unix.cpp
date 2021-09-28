@@ -40,6 +40,7 @@ extern "C"
 #include <86box/timer.h>
 #include <86box/nvr.h>
 #include <86box/ui.h>
+#include <86box/video.h>
 }
 #include <86box/gameport.h>
 
@@ -317,6 +318,7 @@ void FileDlgClass::filedialog(FileOpenSaveRequest req)
     }
 }
 #endif
+static EmuMainWindow* mainwnd;
 SDLThread::SDLThread(int argc, char** argv)
 : QThread(nullptr)
 {
@@ -379,17 +381,18 @@ int SDLThread::sdl_main(int argc, char** argv)
     do_start();
 
     SDL_AddTimer(1000, timer_onesec, NULL);
-    InitImGui();
+    //InitImGui();
     while (!is_quit)
     {
         static int mouse_inside = 0;
         while (SDL_PollEvent(&event))
 	    {
-            if (!mouse_capture) ImGui_ImplSDL2_ProcessEvent(&event);
+            //if (!mouse_capture) ImGui_ImplSDL2_ProcessEvent(&event);
             switch(event.type)
             {
                 case SDL_QUIT:
                 {
+                    #if 0
                     if (IsFileDlgOpen())
                     {
                         int curdopause = dopause;
@@ -399,13 +402,12 @@ int SDLThread::sdl_main(int argc, char** argv)
                         plat_pause(curdopause);
                         break;
                     }
-                  
+                    #endif
                 	exit_event = 1;
                 	break;
                 }
                 case SDL_MOUSEWHEEL:
                 {
-                    if (ImGuiWantsMouseCapture()) break;
                     if (mouse_capture)
                     {
                         if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
@@ -434,7 +436,6 @@ int SDLThread::sdl_main(int argc, char** argv)
                 case SDL_MOUSEBUTTONDOWN:
                 case SDL_MOUSEBUTTONUP:
                 {
-                    if (ImGuiWantsMouseCapture()) break;
                     if ((event.button.button == SDL_BUTTON_LEFT)
                     && !(mouse_capture)
                     && event.button.state == SDL_RELEASED
@@ -484,7 +485,6 @@ int SDLThread::sdl_main(int argc, char** argv)
                 case SDL_KEYDOWN:
                 case SDL_KEYUP:
                 {
-                    if (ImGuiWantsKeyboardCapture()) break;
                     if (kbd_req_capture && !mouse_capture) break;
                     uint16_t xtkey = 0;
                     switch(event.key.keysym.scancode)
@@ -580,39 +580,94 @@ int SDLThread::sdl_main(int argc, char** argv)
     printf("\n");
     SDL_DestroyMutex(blitmtx);
     SDL_DestroyMutex(mousemutex);
-    ImGui_ImplSDL2_Shutdown();
     SDL_Quit();
     QApplication::quit();
     return 0;
 }
 
-EmuMainWindow::EmuMainWindow(QWidget* parent, QWindow* child)
-: QMainWindow(parent)
+void EmuRenderWindow::exposeEvent(QExposeEvent *event)
 {
-    setWindowTitle("86Box");
-    resize(640, 480);
+    if (isExposed())
+    {
+        renderNow();
+    }
 }
 
-class main_window : public QWidget
+EmuRenderWindow::EmuRenderWindow(QWindow* parent)
+: QRasterWindow(parent), m_backingStore(new QBackingStore(this)), m_image(2048, 2048, QImage::Format_ARGB32)
 {
-public:
-    explicit main_window(const uint32_t wid)
+    setGeometry(0, 0, 640, 480);
+}
+
+void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
+{
+    //printf("Offpainter thread ID: %X\n", SDL_ThreadID());
+    if ((w <= 0) || (h <= 0) || (w > 2048) || (h > 2048) || (buffer32 == NULL))
     {
-        QWindow* window = QWindow::fromWinId((WId)wid);
-        window->setFlags(Qt::FramelessWindowHint);
-
-        QWidget* widget = QWidget::createWindowContainer(window);
-        widget->setParent(this);
-
-        auto* layout = new QVBoxLayout();
-        layout->addWidget(widget);
-        setLayout(layout);
-        widget->setFocus();
-        widget->setFocusPolicy(Qt::StrongFocus);
-        this->setFocusProxy(widget);
+        video_blit_complete();
+        return;
     }
-};
+    sx = x;
+    sy = y;
+    sw = this->w = w;
+    sh = this->h = h;
+    QPainter painteronImage(&m_image);
+    painteronImage.drawImage(QRect(x, y, w, h), QImage((uchar*)&(buffer32->line[y][x]), 2048, h, (2048 + 64) * 4, QImage::Format_RGB32));
+    video_blit_complete();
+    painteronImage.end();
+    renderNow();  
+}
 
+void EmuRenderWindow::renderNow()
+{
+    if (!isExposed())
+        return;
+
+    QRect rect(0, 0, width(), height());
+    m_backingStore->beginPaint(rect);
+
+    QPaintDevice *device = m_backingStore->paintDevice();
+    QPainter painter(device);
+    painter.drawImage(QRect(0, 0, w, h), m_image, QRect(sx, sy, sw, sh));
+    //painter.fillRect(rect, Qt::GlobalColor::red);
+    painter.end();
+    m_backingStore->endPaint();
+    m_backingStore->flush(rect);
+    requestUpdate();
+}
+
+bool EmuRenderWindow::event(QEvent* event)
+{
+    if (event->type() == QEvent::UpdateRequest) { renderNow(); return true; }
+    return QWindow::event(event);
+}
+
+void EmuRenderWindow::renderLater()
+{
+    requestUpdate();
+}
+
+void EmuRenderWindow::resizeEvent(QResizeEvent* evnt)
+{
+    m_backingStore->resize(evnt->size());
+}
+
+EmuMainWindow::EmuMainWindow(QWidget* parent)
+: QMainWindow(parent)
+{
+    setGeometry(0, 0, 640, 480);
+    setWindowTitle("86Box");
+
+    this->child = new EmuRenderWindow(this->windowHandle());
+    this->childContainer = createWindowContainer(this->child, this);
+    this->setCentralWidget(childContainer);
+    connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
+}
+
+void qt5_blit(int x, int y, int w, int h)
+{
+    emit mainwnd->qt_blit(x, y, w, h);
+}
 
 int main(int argc, char* argv[])
 {
@@ -628,9 +683,11 @@ int main(int argc, char* argv[])
     else if (app.platformName().contains("wayland")) setenv("SDL_VIDEODRIVER", "wayland", 1);
 #endif
     SDL_Init(0);
-
+    printf("Main thread ID: 0x%X\n", SDL_ThreadID());
+    blitmtx = SDL_CreateMutex();
     
     mousemutex = SDL_CreateMutex();
+#if 0
     SDLThread sdlthr(argc, argv);
     sdlthr.start();
     while(1)
@@ -651,12 +708,15 @@ int main(int argc, char* argv[])
         windowid = wminfo.info.x11.window;
     }
 #endif
-    sleep(1);
-    main_window* mwin = new main_window(windowid);
-    mwin->show();
-    mwin->setFocus();
-
+#endif
+    mainwnd = new EmuMainWindow(nullptr);
+    video_setblit(qt5_blit);
+    mainwnd->show();
+    pc_reset_hard_init();
+    do_start();
     app.exec();
+    delete mainwnd;
+    SDL_Quit();
     return 0;
 }
 char* plat_vidapi_name(int i)

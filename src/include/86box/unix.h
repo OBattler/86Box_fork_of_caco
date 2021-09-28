@@ -3,6 +3,11 @@
 #include <QWindow>
 #include <QThread>
 #include <QMainWindow>
+#include <QRasterWindow>
+#include <QBackingStore>
+#include <QEvent>
+#include <QResizeEvent>
+#include <QPainter>
 #include <string>
 #include <vector>
 #include <utility>
@@ -48,21 +53,43 @@ private:
 	char** pass_argv;
 };
 
+class EmuRenderWindow : public QRasterWindow
+{
+    Q_OBJECT
+
+public:
+    EmuRenderWindow(QWindow* parent = nullptr);
+    virtual void render(QPainter *painter) { painter->drawText(0, 0, "hello"); };
+
+public slots:
+    void renderNow();
+    void renderLater();
+	void qt_real_blit(int x, int y, int w, int h);
+
+protected:
+    bool event(QEvent *event) override;
+
+    void resizeEvent(QResizeEvent *event) override;
+    void exposeEvent(QExposeEvent *event) override;
+
+private:
+    QBackingStore *m_backingStore;
+	QImage m_image;
+	int w, h, sx, sy, sw, sh;
+};
+
 class EmuMainWindow : public QMainWindow
 {
 	Q_OBJECT
 
 public:
-	EmuMainWindow(QWidget* parent = nullptr, QWindow* child = nullptr);
+	EmuMainWindow(QWidget* parent = nullptr);
 //public slots:
 //	void resizeReq(int width, int height);
-	QWidget* child;
+	EmuRenderWindow* child;
+signals:
+	void qt_blit(int x, int y, int w, int h);
+
+private:
+	QWidget* childContainer;
 };
-
-// This will be needed on Wayland.
-#if 0
-class WlWindow : QWindow
-{
-
-}
-#endif
