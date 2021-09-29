@@ -595,7 +595,7 @@ void EmuRenderWindow::exposeEvent(QExposeEvent *event)
 }
 
 EmuRenderWindow::EmuRenderWindow(QWindow* parent)
-: QRasterWindow(parent), m_backingStore(new QBackingStore(this)), m_image(2048, 2048, QImage::Format_ARGB32)
+: QRasterWindow(parent), m_backingStore(new QBackingStore(this)), m_image(2048 + 64, 2048 + 64, QImage::Format_RGB32)
 {
     setGeometry(0, 0, 640, 480);
 }
@@ -612,11 +612,13 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     sy = y;
     sw = this->w = w;
     sh = this->h = h;
-    //this->m_backingStore->resize(QSize(w, h));
-    QPainter painteronImage(&m_image);
-    painteronImage.drawImage(QRect(x, y, (w - 48) * 4, h), QImage((uchar*)&(buffer32->line[y][x]), 2048, h, (2048 + 64) * 4, QImage::Format_RGB32));
+    auto imagebits = m_image.bits();
+    for (int y1 = y; y1 < (y + h - 1); y1++)
+    {
+        auto scanline = imagebits + (y1 * (2048 + 64) * 4);
+        memcpy(scanline + (x * 4), &(buffer32->line[y1][x]), w * 4);
+    }
     video_blit_complete();
-    painteronImage.end();
     renderNow();  
 }
 
@@ -625,17 +627,15 @@ void EmuRenderWindow::renderNow()
     if (!isExposed())
         return;
 
-    QRect rect(0, 0, w, h);
+    QRect rect(0, 0, width(), height());
     m_backingStore->beginPaint(rect);
 
     QPaintDevice *device = m_backingStore->paintDevice();
     QPainter painter(device);
-    painter.drawImage(QRect(0, 0, w, h), m_image, QRect(sx, sy, sw, sh));
-    //painter.fillRect(rect, Qt::GlobalColor::red);
+    painter.drawImage(QRect(0, 0, width(), height()), m_image, QRect(sx, sy, sw, sh));
     painter.end();
     m_backingStore->endPaint();
     m_backingStore->flush(rect);
-    requestUpdate();
 }
 
 bool EmuRenderWindow::event(QEvent* event)
