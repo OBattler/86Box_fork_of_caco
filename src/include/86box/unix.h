@@ -4,6 +4,8 @@
 #include <QThread>
 #include <QMainWindow>
 #include <QRasterWindow>
+#include <QOpenGLWindow>
+#include <QSizePolicy>
 #include <QBackingStore>
 #include <QEvent>
 #include <QResizeEvent>
@@ -81,6 +83,8 @@ private:
 class EmuMainWindow : public QMainWindow
 {
 	Q_OBJECT
+protected:
+	void resizeEvent(QResizeEvent* event) override;
 
 public:
 	EmuMainWindow(QWidget* parent = nullptr);
@@ -89,9 +93,11 @@ public:
 	EmuRenderWindow* child;
 public slots:
 	void resizeSlot(int w, int h);
+	void windowTitleReal(const wchar_t* str);
 signals:
 	void qt_blit(int x, int y, int w, int h);
 	void resizeSig(int w, int h);
+	void windowTitleSig(const wchar_t* str);
 
 private:
 	QWidget* childContainer;

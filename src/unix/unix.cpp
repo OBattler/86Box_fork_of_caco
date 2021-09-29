@@ -7,6 +7,7 @@
 #include <86box/unix.h>
 #include <QFileDialog>
 #include <QLayout>
+#include <QOpenGLWidget>
 
 #include <SDL_syswm.h>
 #include <stdlib.h>
@@ -611,8 +612,9 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     sy = y;
     sw = this->w = w;
     sh = this->h = h;
+    //this->m_backingStore->resize(QSize(w, h));
     QPainter painteronImage(&m_image);
-    painteronImage.drawImage(QRect(x, y, w, h), QImage((uchar*)&(buffer32->line[y][x]), 2048 + 64, h, (2048 + 64) * 4, QImage::Format_RGB32));
+    painteronImage.drawImage(QRect(x, y, (w - 48) * 4, h), QImage((uchar*)&(buffer32->line[y][x]), 2048, h, (2048 + 64) * 4, QImage::Format_RGB32));
     video_blit_complete();
     painteronImage.end();
     renderNow();  
@@ -623,7 +625,7 @@ void EmuRenderWindow::renderNow()
     if (!isExposed())
         return;
 
-    QRect rect(0, 0, width(), height());
+    QRect rect(0, 0, w, h);
     m_backingStore->beginPaint(rect);
 
     QPaintDevice *device = m_backingStore->paintDevice();
@@ -656,6 +658,7 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
 : QMainWindow(parent)
 {
     setGeometry(0, 0, 640, 480);
+    setFixedSize(640, 480);
     setWindowTitle("86Box");
 
     this->child = new EmuRenderWindow(this->windowHandle());
@@ -663,11 +666,37 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
     this->setCentralWidget(childContainer);
     connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
     connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
+    connect(this, SIGNAL(windowTitleSig(const wchar_t*)), this, SLOT(windowTitleReal(const wchar_t*)));
+}
+
+void EmuMainWindow::resizeEvent(QResizeEvent* event)
+{
+    childContainer->resize(event->size());
+}
+wchar_t sdl_win_title[512];
+extern "C" wchar_t* ui_window_title(wchar_t* str)
+{
+    if (!str) return sdl_win_title;
+    {
+        memset(sdl_win_title, 0, sizeof(sdl_win_title));
+        wcsncpy(sdl_win_title, str, 512);
+        emit mainwnd->windowTitleSig(sdl_win_title);
+        return str;
+    }
+
+    return str;
 }
 
 void EmuMainWindow::resizeSlot(int w, int h)
 {
-    resize(w, h);
+    //setFixedSize(-1, -1);
+    //setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    //resize(w, h);
+    setFixedSize(w, h);
+}
+void EmuMainWindow::windowTitleReal(const wchar_t* str)
+{
+    setWindowTitle(QString::fromWCharArray(str));
 }
 extern "C" void plat_resize(int w, int h)
 {
@@ -721,6 +750,10 @@ int main(int argc, char* argv[])
     mainwnd = new EmuMainWindow(nullptr);
     video_setblit(qt5_blit);
     mainwnd->show();
+    mainwnd->windowHandle()->setFlag(Qt::MSWindowsFixedSizeDialogHint, 1);
+    QTimer timer(&app);
+    timer.callOnTimeout(pc_onesec);
+    timer.start(1000);
     pc_reset_hard_init();
     do_start();
     app.exec();

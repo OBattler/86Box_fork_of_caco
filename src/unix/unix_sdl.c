@@ -673,27 +673,15 @@ void plat_resize(int w, int h)
 }
 #endif
 
-wchar_t sdl_win_title[512] = { L'8', L'6', L'B', L'o', L'x', 0 };
+//wchar_t sdl_win_title[512] = { L'8', L'6', L'B', L'o', L'x', 0 };
 SDL_mutex* titlemtx = NULL;
 
 void ui_window_title_real()
 {
-    char* res;
-    if (sizeof(wchar_t) == 1)
-    {
-        SDL_SetWindowTitle(sdl_win, (char*)sdl_win_title);
-        return;
-    }
-    res = SDL_iconv_string("UTF-8", sizeof(wchar_t) == 2 ? "UTF-16LE" : "UTF-32LE", (char*)sdl_win_title, wcslen(sdl_win_title) * sizeof(wchar_t) + sizeof(wchar_t));
-    if (res)
-    {
-        SDL_SetWindowTitle(sdl_win, res);
-        SDL_free((void*)res);
-    }
-    title_set = 0;
 }
 extern SDL_threadID eventthread;
 
+#if 0
 /* Only activate threading path on macOS, otherwise it will softlock Xorg.
    Wayland doesn't seem to have this issue. */
 wchar_t* ui_window_title(wchar_t* str)
@@ -715,7 +703,7 @@ wchar_t* ui_window_title(wchar_t* str)
 #endif
     return str;
 }
-
+#endif
 void
 plat_pause(int p)
 {
