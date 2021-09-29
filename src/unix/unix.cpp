@@ -612,6 +612,7 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     sy = y;
     sw = this->w = w;
     sh = this->h = h;
+    m_image.fill(0xFF000000);
     auto imagebits = m_image.bits();
     for (int y1 = y; y1 < (y + h - 1); y1++)
     {
@@ -632,8 +633,8 @@ void EmuRenderWindow::renderNow()
 
     QPaintDevice *device = m_backingStore->paintDevice();
     QPainter painter(device);
-    painter.fillRect(rect, Qt::GlobalColor::black);
-    painter.drawImage(QRect(0, 0, width(), height()), m_image, QRect(sx, sy, sw, sh));
+    painter.fillRect(rect, QColor(0, 0, 0));
+    painter.drawImage(QRect(0, 0, width(), height()), m_image.convertToFormat(QImage::Format_RGBA8888), QRect(sx, sy, sw, sh));
     painter.end();
     m_backingStore->endPaint();
     m_backingStore->flush(rect);
