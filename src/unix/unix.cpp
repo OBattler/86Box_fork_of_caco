@@ -632,6 +632,7 @@ void EmuRenderWindow::renderNow()
 
     QPaintDevice *device = m_backingStore->paintDevice();
     QPainter painter(device);
+    painter.fillRect(rect, Qt::GlobalColor::black);
     painter.drawImage(QRect(0, 0, width(), height()), m_image, QRect(sx, sy, sw, sh));
     painter.end();
     m_backingStore->endPaint();
