@@ -612,7 +612,6 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     sy = y;
     sw = this->w = w;
     sh = this->h = h;
-    m_image.fill(0xFF000000);
     auto imagebits = m_image.bits();
     for (int y1 = y; y1 < (y + h - 1); y1++)
     {
