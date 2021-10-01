@@ -85,6 +85,8 @@ class EmuMainWindow : public QMainWindow
 	Q_OBJECT
 protected:
 	void resizeEvent(QResizeEvent* event) override;
+	void keyPressEvent(QKeyEvent* event) override;
+	void keyReleaseEvent(QKeyEvent* event) override;
 
 public:
 	EmuMainWindow(QWidget* parent = nullptr);

@@ -5,6 +5,10 @@
 
 #include <SDL.h>
 #include <86box/unix.h>
+#include <unordered_map>
+#ifdef __unix__
+extern std::unordered_map<uint32_t, uint16_t> x11_to_xt;
+#endif
 #include <QFileDialog>
 #include <QLayout>
 #include <QOpenGLWidget>
@@ -658,7 +662,6 @@ void EmuRenderWindow::resizeEvent(QResizeEvent* evnt)
 EmuMainWindow::EmuMainWindow(QWidget* parent)
 : QMainWindow(parent)
 {
-    setGeometry(0, 0, 640, 480);
     setFixedSize(640, 480);
     setWindowTitle("86Box");
 
@@ -695,10 +698,34 @@ void EmuMainWindow::resizeSlot(int w, int h)
     //resize(w, h);
     setFixedSize(w, h);
 }
+
 void EmuMainWindow::windowTitleReal(const wchar_t* str)
 {
     setWindowTitle(QString::fromWCharArray(str));
 }
+#ifdef __unix__
+extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
+#endif
+void EmuMainWindow::keyPressEvent(QKeyEvent* event)
+{
+#ifdef __unix__
+    if (QApplication::platformName() == "xcb")
+    {
+        keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
+    }
+#endif
+}
+
+void EmuMainWindow::keyReleaseEvent(QKeyEvent* event)
+{
+#ifdef __unix__
+    if (QApplication::platformName() == "xcb")
+    {
+        keyboard_input(0, x11_keycode_to_keysym(event->nativeScanCode()));
+    }
+#endif
+}
+
 extern "C" void plat_resize(int w, int h)
 {
     emit mainwnd->resizeSig(w, h);
