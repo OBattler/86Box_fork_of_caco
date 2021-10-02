@@ -131,6 +131,8 @@ std::array<uint32_t, 256> x11_to_xt_base
     0,
     0,
     0,
+    0,
+    0,
     0x01,
     0x02,
     0x03,
@@ -252,6 +254,8 @@ std::array<uint32_t, 256> x11_to_xt_2
     0,
     0,
     0,
+    0,
+    0,
     0x01,
     0x02,
     0x03,
@@ -366,9 +370,16 @@ std::array<uint32_t, 256> x11_to_xt_2
 };
 
 static Display* x11display;
+static std::array<uint32_t, 256>& selected_keycode = x11_to_xt_base;
 uint16_t x11_keycode_to_keysym(uint32_t keycode)
 {
-    if (!x11display) x11display = XOpenDisplay(nullptr);
-    auto res = XKeycodeToKeysym(x11display, keycode, 0);
-    return x11_to_xt[XKeycodeToKeysym(x11display, keycode, 0)];
+    if (!x11display)
+    {
+        x11display = XOpenDisplay(nullptr);
+        if (XKeysymToKeycode(x11display, XK_Home) == 110)
+        {
+            selected_keycode = x11_to_xt_2;
+        }
+    }
+    return selected_keycode[keycode];
 }
