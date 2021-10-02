@@ -711,7 +711,6 @@ void EmuMainWindow::keyPressEvent(QKeyEvent* event)
 #ifdef __unix__
     if (QApplication::platformName() == "xcb")
     {
-        printf("keycode : %d, 0x%X\n", event->nativeScanCode(), event->nativeScanCode());
         keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
     }
 #endif
