@@ -1,3 +1,4 @@
+#include <QApplication>
 #include <X11/Xlib.h>
 #include <X11/Xdefs.h>
 #include <X11/keysym.h>
@@ -455,7 +456,11 @@ static Display* x11display;
 static std::array<uint32_t, 256>& selected_keycode = x11_to_xt_base;
 uint16_t x11_keycode_to_keysym(uint32_t keycode)
 {
-    if (!x11display)
+    if (QApplication::platformName().contains("wayland"))
+    {
+        selected_keycode = x11_to_xt_2;
+    }
+    else if (!x11display)
     {
         x11display = XOpenDisplay(nullptr);
         if (XKeysymToKeycode(x11display, XK_Home) == 110)

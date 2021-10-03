@@ -709,7 +709,7 @@ extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
 void EmuMainWindow::keyPressEvent(QKeyEvent* event)
 {
 #ifdef __unix__
-    if (QApplication::platformName() == "xcb")
+    if (QApplication::platformName() == "xcb" || QApplication::platformName().contains("wayland"))
     {
         keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
     }
@@ -719,7 +719,7 @@ void EmuMainWindow::keyPressEvent(QKeyEvent* event)
 void EmuMainWindow::keyReleaseEvent(QKeyEvent* event)
 {
 #ifdef __unix__
-    if (QApplication::platformName() == "xcb")
+    if (QApplication::platformName() == "xcb" || QApplication::platformName().contains("wayland"))
     {
         keyboard_input(0, x11_keycode_to_keysym(event->nativeScanCode()));
     }
