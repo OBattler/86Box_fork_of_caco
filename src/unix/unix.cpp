@@ -703,27 +703,16 @@ void EmuMainWindow::windowTitleReal(const wchar_t* str)
 {
     setWindowTitle(QString::fromWCharArray(str));
 }
-#ifdef __unix__
+
 extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
-#endif
 void EmuMainWindow::keyPressEvent(QKeyEvent* event)
 {
-#ifdef __unix__
-    if (QApplication::platformName() == "xcb" || QApplication::platformName().contains("wayland"))
-    {
-        keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
-    }
-#endif
+    keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
 }
 
 void EmuMainWindow::keyReleaseEvent(QKeyEvent* event)
 {
-#ifdef __unix__
-    if (QApplication::platformName() == "xcb" || QApplication::platformName().contains("wayland"))
-    {
-        keyboard_input(0, x11_keycode_to_keysym(event->nativeScanCode()));
-    }
-#endif
+    keyboard_input(0, x11_keycode_to_keysym(event->nativeScanCode()));
 }
 
 extern "C" void plat_resize(int w, int h)
