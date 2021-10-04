@@ -774,6 +774,16 @@ int main(int argc, char* argv[])
     pc_reset_hard_init();
     do_start();
     app.exec();
+    while(SDL_TryLockMutex(blitmtx) == SDL_MUTEX_TIMEDOUT)
+    {
+        if (blitreq)
+        {
+            blitreq = 0;
+            video_blit_complete();
+        }
+    }
+    startblit();
+    pc_close(thMain);
     delete mainwnd;
     SDL_Quit();
     return 0;
