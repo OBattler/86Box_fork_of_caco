@@ -5,6 +5,7 @@
 #include <X11/keysym.h>
 #endif
 #include <unordered_map>
+#include <array>
 #include <cstdlib>
 #include <cinttypes>
 #include <stdio.h>
