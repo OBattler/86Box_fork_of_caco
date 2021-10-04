@@ -707,12 +707,20 @@ void EmuMainWindow::windowTitleReal(const wchar_t* str)
 extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
 void EmuMainWindow::keyPressEvent(QKeyEvent* event)
 {
+#ifdef __APPLE__
+    keyboard_input(1, x11_keycode_to_keysym(event->nativeVirtualKey()));
+#else
     keyboard_input(1, x11_keycode_to_keysym(event->nativeScanCode()));
+#endif
 }
 
 void EmuMainWindow::keyReleaseEvent(QKeyEvent* event)
 {
+#ifdef __APPLE__
+    keyboard_input(0, x11_keycode_to_keysym(event->nativeVirtualKey()));
+#else
     keyboard_input(0, x11_keycode_to_keysym(event->nativeScanCode()));
+#endif
 }
 
 extern "C" void plat_resize(int w, int h)
