@@ -11,7 +11,6 @@ extern std::unordered_map<uint32_t, uint16_t> x11_to_xt;
 #endif
 #include <QFileDialog>
 #include <QLayout>
-#include <QOpenGLWidget>
 
 #include <SDL_syswm.h>
 #include <stdlib.h>

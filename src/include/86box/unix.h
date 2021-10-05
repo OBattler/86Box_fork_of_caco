@@ -4,7 +4,6 @@
 #include <QThread>
 #include <QMainWindow>
 #include <QRasterWindow>
-#include <QOpenGLWindow>
 #include <QSizePolicy>
 #include <QBackingStore>
 #include <QEvent>
