@@ -12,7 +12,6 @@ extern std::unordered_map<uint32_t, uint16_t> x11_to_xt;
 #include <QFileDialog>
 #include <QLayout>
 
-#include <SDL_syswm.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -671,6 +670,7 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
     this->child = new EmuRenderWindow(this->windowHandle());
     this->childContainer = createWindowContainer(this->child, this);
     this->setCentralWidget(childContainer);
+    this->childContainer->setFocusPolicy(Qt::FocusPolicy::NoFocus);
     connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
     connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
     connect(this, SIGNAL(windowTitleSig(const wchar_t*)), this, SLOT(windowTitleReal(const wchar_t*)));
@@ -779,6 +779,7 @@ int main(int argc, char* argv[])
     video_setblit(qt5_blit);
     mainwnd->show();
     mainwnd->windowHandle()->setFlag(Qt::MSWindowsFixedSizeDialogHint, 1);
+    mainwnd->setFocusPolicy(Qt::FocusPolicy::StrongFocus);
     QTimer timer(&app);
     timer.callOnTimeout(pc_onesec);
     timer.start(1000);
