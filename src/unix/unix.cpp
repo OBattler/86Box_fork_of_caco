@@ -619,7 +619,11 @@ void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
     for (int y1 = y; y1 < (y + h - 1); y1++)
     {
         auto scanline = imagebits + (y1 * (2048 + 64) * 4);
-        memcpy(scanline + (x * 4), &(buffer32->line[y1][x]), w * 4);
+        video_copy(scanline + (x * 4), &(buffer32->line[y1][x]), w * 4);
+    }
+    if (screenshots)
+    {
+        video_screenshot((uint32_t*)imagebits, 0, 0, 2048 + 64);
     }
     video_blit_complete();
     renderNow();  

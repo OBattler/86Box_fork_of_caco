@@ -114,7 +114,7 @@ static const video_timings_t	*vid_timings;
 static uint32_t cga_2_table[16];
 static uint8_t	thread_run = 0;
 
-void * __cdecl	(*video_copy)(void *_Dst, const void *_Src, size_t _Size) = memcpy;
+void *	(*video_copy)(void *_Dst, const void *_Src, size_t _Size) = memcpy;
 
 
 PALETTE		cgapal = {
@@ -419,7 +419,7 @@ video_screenshot(uint32_t *buf, int start_x, int start_y, int row_len)
 }
 
 
-void * __cdecl
+void *
 video_transform_copy(void *_Dst, const void *_Src, size_t _Size)
 {
     int i;
