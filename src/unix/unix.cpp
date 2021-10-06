@@ -645,9 +645,18 @@ void EmuRenderWindow::renderNow()
     m_backingStore->flush(rect);
 }
 
+extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
 bool EmuRenderWindow::event(QEvent* event)
 {
     if (event->type() == QEvent::UpdateRequest) { renderNow(); return true; }
+    if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease)
+    {
+        QApplication::sendEvent(mainwnd, event);
+    }
+    if (event->type() == QEvent::FocusIn)
+    {
+        mainwnd->setFocus();
+    }
     return QWindow::event(event);
 }
 
@@ -670,7 +679,6 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
     this->child = new EmuRenderWindow(this->windowHandle());
     this->childContainer = createWindowContainer(this->child, this);
     this->setCentralWidget(childContainer);
-    this->childContainer->setFocusPolicy(Qt::FocusPolicy::NoFocus);
     connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
     connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
     connect(this, SIGNAL(windowTitleSig(const wchar_t*)), this, SLOT(windowTitleReal(const wchar_t*)));
@@ -788,11 +796,7 @@ int main(int argc, char* argv[])
     app.exec();
     while(SDL_TryLockMutex(blitmtx) == SDL_MUTEX_TIMEDOUT)
     {
-        if (blitreq)
-        {
-            blitreq = 0;
-            video_blit_complete();
-        }
+        video_blit_complete();
     }
     startblit();
     pc_close(thMain);
