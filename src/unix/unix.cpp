@@ -594,87 +594,8 @@ int SDLThread::sdl_main(int argc, char** argv)
     return 0;
 }
 
-void EmuRenderWindow::exposeEvent(QExposeEvent *event)
-{
-    if (isExposed())
-    {
-        renderNow();
-    }
-}
-
-EmuRenderWindow::EmuRenderWindow(QWindow* parent)
-: QRasterWindow(parent), m_backingStore(new QBackingStore(this)), m_image(2048 + 64, 2048 + 64, QImage::Format_RGB32)
-{
-    setGeometry(0, 0, 640, 480);
-}
-
-void EmuRenderWindow::qt_real_blit(int x, int y, int w, int h)
-{
-    //printf("Offpainter thread ID: %X\n", SDL_ThreadID());
-    if ((w <= 0) || (h <= 0) || (w > 2048) || (h > 2048) || (buffer32 == NULL))
-    {
-        video_blit_complete();
-        return;
-    }
-    sx = x;
-    sy = y;
-    sw = this->w = w;
-    sh = this->h = h;
-    auto imagebits = m_image.bits();
-    for (int y1 = y; y1 < (y + h - 1); y1++)
-    {
-        auto scanline = imagebits + (y1 * (2048 + 64) * 4);
-        video_copy(scanline + (x * 4), &(buffer32->line[y1][x]), w * 4);
-    }
-    if (screenshots)
-    {
-        video_screenshot((uint32_t*)imagebits, 0, 0, 2048 + 64);
-    }
-    video_blit_complete();
-    renderNow();  
-}
-
-void EmuRenderWindow::renderNow()
-{
-    if (!isExposed())
-        return;
-
-    QRect rect(0, 0, width(), height());
-    m_backingStore->beginPaint(rect);
-
-    QPaintDevice *device = m_backingStore->paintDevice();
-    QPainter painter(device);
-    painter.fillRect(rect, QColor(0, 0, 0));
-    painter.drawImage(QRect(0, 0, width(), height()), m_image.convertToFormat(QImage::Format_RGBA8888), QRect(sx, sy, sw, sh));
-    painter.end();
-    m_backingStore->endPaint();
-    m_backingStore->flush(rect);
-}
 
 extern uint16_t x11_keycode_to_keysym(uint32_t keycode);
-bool EmuRenderWindow::event(QEvent* event)
-{
-    if (event->type() == QEvent::UpdateRequest) { renderNow(); return true; }
-    if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease)
-    {
-        QApplication::sendEvent(mainwnd, event);
-    }
-    if (event->type() == QEvent::FocusIn)
-    {
-        mainwnd->setFocus();
-    }
-    return QWindow::event(event);
-}
-
-void EmuRenderWindow::renderLater()
-{
-    requestUpdate();
-}
-
-void EmuRenderWindow::resizeEvent(QResizeEvent* evnt)
-{
-    m_backingStore->resize(evnt->size());
-}
 
 void GLESWidget::qt_real_blit(int x, int y, int w, int h)
 {
@@ -744,6 +665,7 @@ void EmuMainWindow::resizeSlot(int w, int h)
     //setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     //resize(w, h);
     setFixedSize(w, h);
+    child2->resize(QSize(w, h));
 }
 
 void EmuMainWindow::windowTitleReal(const wchar_t* str)
