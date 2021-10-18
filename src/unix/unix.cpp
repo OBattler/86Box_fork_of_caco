@@ -113,9 +113,9 @@ wchar_t* plat_get_string_real(uintptr_t i)
         case IDS_2114:
             return L"Unable to initialize Ghostscript";
         case IDS_2063:
-            return L"Machine \"%hs\" is not available due to missing ROMs in th>
+            return L"Machine \"%hs\" is not available due to missing ROMs in the roms/machines directory. Switching to an available machine.";
         case IDS_2064:
-            return L"Video card \"%hs\" is not available due to missing ROMs in>
+            return L"Video card \"%hs\" is not available due to missing ROMs in the roms/video directory. Switching to an available video card.";
         case IDS_2128:
             return L"Hardware not available";
         case IDS_2142:
@@ -676,23 +676,53 @@ void EmuRenderWindow::resizeEvent(QResizeEvent* evnt)
     m_backingStore->resize(evnt->size());
 }
 
+void GLESWidget::qt_real_blit(int x, int y, int w, int h)
+{
+    // printf("Offpainter thread ID: %X\n", SDL_ThreadID());
+    if ((w <= 0) || (h <= 0) || (w > 2048) || (h > 2048) || (buffer32 == NULL))
+    {
+        video_blit_complete();
+        return;
+    }
+    sx = x;
+    sy = y;
+    sw = this->w = w;
+    sh = this->h = h;
+    auto imagebits = m_image.bits();
+    for (int y1 = y; y1 < (y + h - 1); y1++)
+    {
+        auto scanline = imagebits + (y1 * (2048 + 64) * 4);
+        video_copy(scanline + (x * 4), &(buffer32->line[y1][x]), w * 4);
+    }
+    if (screenshots)
+    {
+        video_screenshot((uint32_t *)imagebits, 0, 0, 2048 + 64);
+    }
+    video_blit_complete();
+}
+
 EmuMainWindow::EmuMainWindow(QWidget* parent)
 : QMainWindow(parent)
 {
     setFixedSize(640, 480);
     setWindowTitle("86Box");
 
-    this->child = new EmuRenderWindow(this->windowHandle());
-    this->childContainer = createWindowContainer(this->child, this);
-    this->setCentralWidget(childContainer);
-    connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child, SLOT(qt_real_blit(int, int, int, int)));
+    //this->child = new EmuRenderWindow(this->windowHandle());
+    //this->childContainer = createWindowContainer(this->child, this);
+    //this->setCentralWidget(childContainer);
+    this->child2 = new GLESWidget(this);
+    this->child2->setVisible(true);
+    //this->child2->setVisible(true);
+    this->setCentralWidget(child2);
+    connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child2, SLOT(qt_real_blit(int, int, int, int)));
+    //connect(this, &EmuMainWindow::qt_blit, child2, &GLESWidget::qt_real_blit);
     connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
     connect(this, SIGNAL(windowTitleSig(const wchar_t*)), this, SLOT(windowTitleReal(const wchar_t*)));
 }
 
 void EmuMainWindow::resizeEvent(QResizeEvent* event)
 {
-    childContainer->resize(event->size());
+    child2->resize(event->size());
 }
 wchar_t sdl_win_title[512];
 extern "C" wchar_t* ui_window_title(wchar_t* str)

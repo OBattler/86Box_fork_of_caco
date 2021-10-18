@@ -9,6 +9,13 @@
 #include <QEvent>
 #include <QResizeEvent>
 #include <QPainter>
+#include <QOpenGLWidget>
+#include <QOpenGLFunctions>
+#include <QOpenGLShader>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLTexture>
+#include <QOpenGLBuffer>
+#include <QOpenGLTextureBlitter>
 #include <string>
 #include <vector>
 #include <utility>
@@ -78,7 +85,63 @@ private:
 	QImage m_image;
 	int w, h, sx, sy, sw, sh;
 };
+#if 1
+class GLESWidget : public QOpenGLWidget, protected QOpenGLFunctions
+{
+	Q_OBJECT
 
+private:
+    QOpenGLShader* fragshader = nullptr;
+    QOpenGLShader* vertshader = nullptr;
+    QOpenGLShaderProgram* texshader = nullptr;
+    QOpenGLTexture* tex = nullptr;
+    QOpenGLBuffer vbo;
+    QOpenGLTextureBlitter blitter;
+    QImage m_image{QSize(2048 + 64, 2048 + 64), QImage::Format_RGB32};
+    int x, y, w, h, sx, sy, sw, sh;
+public:
+    void resizeGL(int w, int h) override {}
+    void initializeGL() override
+    {
+        initializeOpenGLFunctions();
+        blitter.create();
+        tex = new QOpenGLTexture(m_image);
+    }
+    void paintGL() override
+    {
+        tex->setData(QOpenGLTexture::PixelFormat::RGBA_Integer, QOpenGLTexture::PixelType::UInt32, m_image.convertToFormat(QImage::Format_RGBA8888).bits());
+        QRect targetRect(0, 0, width(), height());
+        QRect sourceRect(sx, sy, sw, sh);
+        blitter.bind();
+        auto sourceTransform = blitter.sourceTransform(sourceRect, QSize(2048 + 64, 2048 + 64), QOpenGLTextureBlitter::OriginTopLeft);
+        auto targetTransform = blitter.targetTransform(targetRect, targetRect);
+        blitter.blit(tex->textureId(), targetTransform, sourceTransform);
+        blitter.release();
+        update();
+    }
+    GLESWidget(QWidget* parent = nullptr)
+    : QOpenGLWidget(parent, 0)
+    {
+        //resize(640, 480);
+		setMinimumSize(640, 480);
+    }
+    ~GLESWidget()
+    {
+        blitter.destroy();
+        delete tex;
+    }
+    void keyPressEvent(QKeyEvent* event) override
+    {
+        event->ignore();
+    }
+    void keyReleaseEvent(QKeyEvent* event) override
+    {
+        event->ignore();
+    }
+public slots:
+	void qt_real_blit(int x, int y, int w, int h);
+};
+#endif
 class EmuMainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -87,6 +150,7 @@ public:
 	EmuMainWindow(QWidget* parent = nullptr);
 //public slots:
 //	void resizeReq(int width, int height);
+    GLESWidget* child2;
 	EmuRenderWindow* child;
 public slots:
 	void resizeSlot(int w, int h);
