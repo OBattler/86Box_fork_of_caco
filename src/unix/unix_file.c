@@ -12,6 +12,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -125,7 +126,7 @@ plat_get_basename(const char *path)
 
     while (c > 0) {
 	if (path[c] == '/')
-	   return((char *)&path[c]);
+	   return((char *)&path[c + 1]);
        c--;
     }
 
@@ -187,6 +188,19 @@ int
 plat_dir_create(char *path)
 {
     return mkdir(path, S_IRWXU);
+}
+
+void *
+plat_mmap(size_t size, uint8_t executable)
+{
+    void *ret = mmap(0, size, PROT_READ | PROT_WRITE | (executable ? PROT_EXEC : 0), MAP_ANON | MAP_PRIVATE, 0, 0);
+    return (ret < 0) ? NULL : ret;
+}
+
+void
+plat_munmap(void *ptr, size_t size)
+{
+    munmap(ptr, size);
 }
 
 void plat_remove(char* path)
