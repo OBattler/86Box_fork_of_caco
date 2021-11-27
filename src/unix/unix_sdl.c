@@ -88,7 +88,7 @@ static int		cur_w, cur_h;
 static int		cur_wx = 0, cur_wy = 0, cur_ww =0, cur_wh = 0;
 static volatile int	sdl_enabled = 1;
 static SDL_mutex*	sdl_mutex = NULL;
-int mouse_capture;
+int mouse_capture = 0;
 int title_set = 0;
 int resize_pending = 0;
 int resize_w = 0;
@@ -651,7 +651,7 @@ sdl_pause(void)
 {
     return(0);
 }
-
+#if 0
 void
 plat_mouse_capture(int on)
 {
@@ -661,7 +661,7 @@ plat_mouse_capture(int on)
     SDL_UnlockMutex(sdl_mutex);
 }
 
-#if 0
+
 void plat_resize(int w, int h)
 {
     if (vid_resize)

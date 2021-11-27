@@ -1126,7 +1126,7 @@ pc_run(void)
 
 	if (title_update) {
 		swprintf(temp, sizeof_w(temp), mouse_msg[!!mouse_capture], fps);
-#ifdef __APPLE__
+#if 0
 		/* Needed due to modifying the UI on the non-main thread is a big no-no. */
 		dispatch_async_f(dispatch_get_main_queue(), wcsdup((const wchar_t *) temp), _ui_window_title);
 #else

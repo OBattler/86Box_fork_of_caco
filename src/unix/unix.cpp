@@ -271,13 +271,8 @@ plat_power_off(void)
 
 extern "C" void     sdl_blit(int x, int y, int w, int h);
 
-typedef struct mouseinputdata
-{
-    int deltax, deltay, deltaz;
-    int mousebuttons;
-} mouseinputdata;
 SDL_mutex* mousemutex;
-static mouseinputdata mousedata;
+mouseinputdata mousedata;
 void mouse_poll()
 {
     SDL_LockMutex(mousemutex);
@@ -290,6 +285,61 @@ void mouse_poll()
 }
 
 void ui_sb_set_ready(int ready) {}
+// The events shouldn't ever reach here on macOS since they are pre-filtered.
+void GLESWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (this->geometry().contains(event->pos()) && event->button() == Qt::LeftButton)
+    {
+        plat_mouse_capture(1);
+        return;
+    }
+    if (mouse_capture && event->button() == Qt::MiddleButton)
+    {
+        plat_mouse_capture(0);
+        return;
+    }
+    if (mouse_capture)
+    {
+        SDL_LockMutex(mousemutex);
+        mousedata.mousebuttons &= ~event->button();
+        SDL_UnlockMutex(mousemutex);
+    }
+}
+void GLESWidget::mousePressEvent(QMouseEvent *event)
+{
+    if (mouse_capture)
+    {
+        SDL_LockMutex(mousemutex);
+        mousedata.mousebuttons |= event->button();
+        SDL_UnlockMutex(mousemutex);
+    }
+}
+void GLESWidget::wheelEvent(QWheelEvent *event)
+{
+    if (mouse_capture)
+    {
+        SDL_LockMutex(mousemutex);
+        mousedata.deltay += event->pixelDelta().y();
+        SDL_UnlockMutex(mousemutex);
+    }
+}
+void GLESWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!mouse_capture) { event->ignore(); return; }
+#ifdef __APPLE__
+    event->accept();
+    return;
+#endif
+    static QPoint oldPos = QCursor::pos();
+    SDL_LockMutex(mousemutex);
+    mousedata.deltax += event->pos().x() - oldPos.x();
+    mousedata.deltay += event->pos().y() - oldPos.y();
+    SDL_UnlockMutex(mousemutex);
+#ifndef __APPLE__
+    QCursor::setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
+#endif
+    oldPos = event->pos();
+}
 
 uint32_t timer_onesec(uint32_t interval, void* param)
 {
@@ -328,6 +378,25 @@ void FileDlgClass::filedialog(FileOpenSaveRequest req)
 }
 #endif
 static EmuMainWindow* mainwnd;
+void
+plat_mouse_capture(int on)
+{
+    if (!on)
+    {
+        mouse_capture = 0;
+        QApplication::setOverrideCursor(Qt::ArrowCursor);
+#ifdef __APPLE__
+        CGAssociateMouseAndMouseCursorPosition(true);
+#endif
+        return;
+    }
+    mouse_capture = 1;
+    QApplication::setOverrideCursor(Qt::BlankCursor);
+#ifdef __APPLE__
+    CGAssociateMouseAndMouseCursorPosition(false);
+#endif
+    return;
+}
 SDLThread::SDLThread(int argc, char** argv)
 : QThread(nullptr)
 {
@@ -628,15 +697,12 @@ EmuMainWindow::EmuMainWindow(QWidget* parent)
     setFixedSize(640, 480);
     setWindowTitle("86Box");
 
-    //this->child = new EmuRenderWindow(this->windowHandle());
-    //this->childContainer = createWindowContainer(this->child, this);
-    //this->setCentralWidget(childContainer);
     this->child2 = new GLESWidget(this);
     this->child2->setVisible(true);
-    //this->child2->setVisible(true);
+    this->child2->setMouseTracking(true);
+
     this->setCentralWidget(child2);
     connect(this, SIGNAL(qt_blit(int, int, int, int)), this->child2, SLOT(qt_real_blit(int, int, int, int)));
-    //connect(this, &EmuMainWindow::qt_blit, child2, &GLESWidget::qt_real_blit);
     connect(this, SIGNAL(resizeSig(int, int)), this, SLOT(resizeSlot(int, int)));
     connect(this, SIGNAL(windowTitleSig(const wchar_t*)), this, SLOT(windowTitleReal(const wchar_t*)));
 }
@@ -665,7 +731,11 @@ void EmuMainWindow::resizeSlot(int w, int h)
     //setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     //resize(w, h);
     setFixedSize(w, h);
-    child2->resize(QSize(w, h));
+    auto childgeom = child2->geometry();
+    childgeom.setWidth(w);
+    childgeom.setHeight(h);
+    child2->setGeometry(childgeom);
+
 }
 
 void EmuMainWindow::windowTitleReal(const wchar_t* str)
@@ -704,6 +774,10 @@ void qt5_blit(int x, int y, int w, int h)
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
+#ifdef __APPLE__
+    CocoaEventFilter cocoafilter;
+    app.installNativeEventFilter(&cocoafilter);
+#endif
     pc_init(argc, argv);
     if (! pc_init_modules()) {
         fprintf(stderr, "No ROMs found.\n");
@@ -715,40 +789,16 @@ int main(int argc, char* argv[])
     else if (app.platformName().contains("wayland")) setenv("SDL_VIDEODRIVER", "wayland", 1);
 #endif
     SDL_Init(0);
-    printf("Main thread ID: 0x%X\n", SDL_ThreadID());
+    printf("Main thread ID: 0x%lX\n", SDL_ThreadID());
     blitmtx = SDL_CreateMutex();
     
     mousemutex = SDL_CreateMutex();
-#if 0
-    SDLThread sdlthr(argc, argv);
-    sdlthr.start();
-    while(1)
-    {
-        SDL_LockMutex(mousemutex);
-        if (sdl_win != NULL) break;
-        SDL_UnlockMutex(mousemutex);
-    }
-    SDL_SysWMinfo wminfo;
-    SDL_VERSION(&wminfo.version);
-    SDL_GetWindowWMInfo(sdl_win, &wminfo);
-    WId windowid;
-#ifdef __APPLE__
-    windowid = wminfo.info.cocoa.window;
-#else
-    if (wminfo.subsystem == SDL_SYSWM_X11)
-    {
-        windowid = wminfo.info.x11.window;
-    }
-#endif
-#endif
     mainwnd = new EmuMainWindow(nullptr);
     video_setblit(qt5_blit);
     mainwnd->show();
     mainwnd->windowHandle()->setFlag(Qt::MSWindowsFixedSizeDialogHint, 1);
     mainwnd->setFocusPolicy(Qt::FocusPolicy::StrongFocus);
-    QTimer timer(&app);
-    timer.callOnTimeout(pc_onesec);
-    timer.start(1000);
+    SDL_AddTimer(1000, timer_onesec, NULL);
     pc_reset_hard_init();
     do_start();
     app.exec();

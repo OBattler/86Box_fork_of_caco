@@ -158,7 +158,9 @@ extern void     ioctl_close(uint8_t id);
 
 
 /* Thread support. */
+#ifndef _MACH_MACH_TYPES_H_
 typedef void thread_t;
+#endif
 typedef void event_t;
 typedef void mutex_t;
 
