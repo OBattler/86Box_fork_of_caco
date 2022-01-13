@@ -3,6 +3,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTORCC_OPTIONS "--compress-algo;zlib")
 
 find_package(Threads REQUIRED)
 
@@ -146,7 +147,7 @@ if (WIN32)
     qt_import_plugins(plat INCLUDE Qt${QT_MAJOR}::QWindowsIntegrationPlugin Qt${QT_MAJOR}::QICOPlugin QWindowsVistaStylePlugin)
 endif()
 
-if (UNIX AND NOT APPLE)
+if (UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(X11 REQUIRED)
     target_link_libraries(ui PRIVATE X11::X11)
     find_package(PkgConfig REQUIRED)

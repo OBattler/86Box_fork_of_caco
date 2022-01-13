@@ -22,7 +22,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 endif()
 
 if(QT)
-  if(UNIX AND NOT APPLE)
+  if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GLIB_PKG IMPORTED_TARGET glib-2.0)
     if (GLIB_PKG_FOUND)

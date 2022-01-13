@@ -42,7 +42,7 @@ extern "C" {
 #include "qt_machinestatus.hpp"
 #include "qt_mediamenu.hpp"
 
-#ifdef __unix__
+#if defined __unix__ && !defined __ANDROID__
 #ifdef WAYLAND
 #include "wl_mouse.hpp"
 #endif
@@ -929,7 +929,7 @@ uint16_t x11_keycode_to_keysym(uint32_t keycode)
     finalkeycode = (keycode & 0xFFFF);
 #elif defined(__APPLE__)
     finalkeycode = darwin_to_xt[keycode];
-#else
+#elif !defined(__ANDROID__)
     static Display* x11display = nullptr;
     if (QApplication::platformName().contains("wayland"))
     {

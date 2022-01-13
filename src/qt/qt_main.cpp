@@ -99,6 +99,8 @@ main_thread_fn()
     is_quit = 1;
 }
 
+extern "C" int main(int, char**);
+
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     Q_INIT_RESOURCE(qt_resources);

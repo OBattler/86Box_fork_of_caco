@@ -97,7 +97,7 @@ SettingsFloppyCDROM::SettingsFloppyCDROM(QWidget *parent) :
 
     Harddrives::populateRemovableBuses(ui->comboBoxBus->model());
     model = ui->comboBoxSpeed->model();
-    for (int i = 0; i <= 72; i++) {
+    for (int i = 1; i <= 72; i++) {
         Models::AddEntry(model, QString("%1x").arg(i), i);
     }
 
@@ -173,8 +173,7 @@ void SettingsFloppyCDROM::onCDROMRowChanged(const QModelIndex &current) {
     if (! match.isEmpty()) {
         ui->comboBoxChannel->setCurrentIndex(match.first().row());
     }
-    else ui->comboBoxChannel->setCurrentIndex(8);
-    ui->comboBoxSpeed->setCurrentIndex(speed);
+    ui->comboBoxSpeed->setCurrentIndex(speed == 0 ? 7 : speed - 1);
 }
 
 void SettingsFloppyCDROM::on_checkBoxTurboTimings_stateChanged(int arg1) {
