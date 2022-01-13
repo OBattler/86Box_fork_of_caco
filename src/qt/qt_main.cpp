@@ -48,6 +48,8 @@ extern "C" {
     extern int qt_nvr_save(void);
 }
 
+void qt_set_sequence_auto_mnemonic(bool b);
+
 void
 main_thread_fn()
 {
@@ -103,6 +105,7 @@ extern "C" int main(int, char**);
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    qt_set_sequence_auto_mnemonic(false);
     Q_INIT_RESOURCE(qt_resources);
     Q_INIT_RESOURCE(qt_translations);
     QSurfaceFormat fmt = QSurfaceFormat::defaultFormat();

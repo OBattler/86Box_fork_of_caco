@@ -34,6 +34,7 @@ extern "C" {
 #include <QActionGroup>
 #include <QOpenGLContext>
 #include <QScreen>
+#include <QString>
 
 #include <array>
 #include <unordered_map>
@@ -69,14 +70,24 @@ MainWindow::MainWindow(QWidget *parent) :
     statusBar()->setStyleSheet("QStatusBar::item {border: None; } QStatusBar QLabel { margin-right: 2px; margin-bottom: 1px; }");
     ui->toolBar->setVisible(!hide_tool_bar);
 
+    auto toolbar_spacer = new QWidget();
+    toolbar_spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->toolBar->addWidget(toolbar_spacer);
+
+    auto toolbar_label = new QLabel();    
+    ui->toolBar->addWidget(toolbar_label);
+
     this->setWindowIcon(QIcon(":/settings/win/icons/86Box-yellow.ico"));
     this->setWindowFlag(Qt::MSWindowsFixedSizeDialogHint, vid_resize != 1);
     this->setWindowFlag(Qt::WindowMaximizeButtonHint, vid_resize == 1);
 
+    this->setWindowTitle(QString("%1 - %2 %3").arg(vm_name, EMU_NAME_W, EMU_VERSION_FULL_W));
+
     connect(this, &MainWindow::showMessageForNonQtThread, this, &MainWindow::showMessage_, Qt::BlockingQueuedConnection);
 
-    connect(this, &MainWindow::setTitle, this, [this](const QString& title) {
-        setWindowTitle(title);
+    connect(this, &MainWindow::setTitle, this, [this,toolbar_label](const QString& title) {
+        if (!hide_tool_bar)
+            toolbar_label->setText(title);
     });
     connect(this, &MainWindow::getTitleForNonQtThread, this, &MainWindow::getTitle_, Qt::BlockingQueuedConnection);
 
@@ -299,7 +310,15 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionTake_screenshot->setShortcutVisibleInContextMenu(true);
 #endif
     video_setblit(qt_blit);
-    if (start_in_fullscreen) connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this] () { if (start_in_fullscreen) { QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger); start_in_fullscreen = 0; } } );
+
+    if (start_in_fullscreen) {
+        connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this] () {
+            if (start_in_fullscreen) {
+                QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger);
+                start_in_fullscreen = 0;
+            }
+        });
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -998,6 +1017,7 @@ void MainWindow::on_actionFullscreen_triggered() {
         showFullScreen();
         video_fullscreen = 1;
     }
+    ui->stackedWidget->rendererWindow->onResize(width(), height());
 }
 
 void MainWindow::getTitle_(wchar_t *title)
