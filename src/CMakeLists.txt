@@ -121,7 +121,7 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 if(APPLE)
     # Freetype is dynamically loaded by the emulator, however, we link it
     # on macOS so it gets copied to the bundle by the installation process
-    target_link_libraries(86Box Freetype::Freetype)
+    target_link_libraries(86Box PUBLIC Freetype::Freetype)
 endif()
 
 find_package(OpenAL REQUIRED)

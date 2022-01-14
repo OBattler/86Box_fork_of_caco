@@ -62,7 +62,7 @@ void evdev_thread_func()
 void evdev_stop()
 {
     stopped = true;
-    evdev_thread->wait();
+    if (evdev_thread) evdev_thread->wait();
 }
 
 void evdev_init()
