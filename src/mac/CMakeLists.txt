@@ -28,7 +28,7 @@ else()
     set(APP_ICON_MACOSX icons/branch/86Box.icns)
 endif()
 
-target_link_libraries(86Box "-framework AppKit")
+target_link_libraries(86Box PUBLIC "-framework AppKit")
 target_sources(86Box PRIVATE macOSXGlue.m ${APP_ICON_MACOSX})
 
 # Make sure the icon is copied to the bundle
