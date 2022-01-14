@@ -126,11 +126,12 @@ int main(int argc, char* argv[]) {
     }).waitForFinished();
     qDebug() << str;
     chdir(str.toUtf8().constData());
-#endif
+
     qDebug() << QDir::currentPath();
     argv[0] = strdup((QDir::currentPath() + "/86Box").toUtf8().constData());
     argv[2] = strdup((QDir::currentPath() + "/roms/").toUtf8().constData());
     argv[4] = strdup((QDir::currentPath()).toUtf8().constData());
+#endif
     QSurfaceFormat fmt = QSurfaceFormat::defaultFormat();
     fmt.setSwapInterval(0);
     QSurfaceFormat::setDefaultFormat(fmt);
