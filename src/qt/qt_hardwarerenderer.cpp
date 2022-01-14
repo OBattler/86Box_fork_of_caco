@@ -72,11 +72,11 @@ void HardwareRenderer::initializeGL()
         "out highp vec4 FragColor;\n"
         "void main(void)\n"
         "{\n"
-        "    FragColor = texture2D(texture, texc.st).bgra;\n"
+        "    FragColor = texture(texture, texc.st).bgra;\n"
         "}\n";
     if (m_context->isOpenGLES() && m_context->format().version() >= qMakePair(3, 0))
     {
-        fsrccore.prepend("#version 300 es\n");
+        fsrccore.prepend("#version 300 es\n#extension GL_EXT_shader_framebuffer_fetch : require\n");
         fshader->compileSourceCode(fsrccore);
     }
     else if (m_context->format().version() >= qMakePair(3, 0) && m_context->format().profile() == QSurfaceFormat::CoreProfile)
