@@ -135,6 +135,25 @@ if (QT)
     option(USE_QT6 "Use Qt6 instead of Qt5" OFF)
 endif()
 
+if(QT)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+  if (USE_QT6)
+      set(QT_MAJOR 6)
+  else()
+      set(QT_MAJOR 5)
+  endif()
+
+  # if we want to use qt5-static to eliminate need for bundling qt dlls (windows)
+  #set(QT_STATIC ON)
+  # needed to build with qt5-static if both qt5 and qt5-static are installed
+  #set(CMAKE_PREFIX_PATH "path/to/qt5-static")
+
+  find_package(Qt${QT_MAJOR} COMPONENTS Core Widgets OpenGL REQUIRED)
+  find_package(Qt${QT_MAJOR}LinguistTools REQUIRED)
+endif()
+
 # Determine the build type
 set(RELEASE_BUILD   OFF)
 set(BETA_BUILD      OFF)

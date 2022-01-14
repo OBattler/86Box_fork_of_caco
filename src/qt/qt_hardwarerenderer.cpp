@@ -72,7 +72,7 @@ void HardwareRenderer::initializeGL()
         "out highp vec4 FragColor;\n"
         "void main(void)\n"
         "{\n"
-        "    FragColor = texture2D(texture, texc.st).bgra;\n"
+        "    FragColor = texture(texture, texc.st).bgra;\n"
         "}\n";
     if (m_context->isOpenGLES() && m_context->format().version() >= qMakePair(3, 0))
     {

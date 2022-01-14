@@ -11,7 +11,9 @@ extern "C" {
 int joysticks_present;
 joystick_t joystick_state[MAX_JOYSTICKS];
 plat_joystick_t plat_joystick_state[MAX_PLAT_JOYSTICKS];
+#ifndef __ANDROID__
 static SDL_Joystick *sdl_joy[MAX_PLAT_JOYSTICKS];
+#endif
 }
 
 #include <algorithm>
@@ -21,6 +23,9 @@ static SDL_Joystick *sdl_joy[MAX_PLAT_JOYSTICKS];
 #endif
 
 void joystick_init() {
+#ifdef __ANDROID__
+    return;
+#else
     if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
         return;
     }
@@ -57,10 +62,12 @@ void joystick_init() {
             }
         }
     }
+#endif
 }
 
 void joystick_close()
 {
+#ifndef __ANDROID__
     int c;
 
     for (c = 0; c < joysticks_present; c++)
@@ -68,6 +75,7 @@ void joystick_close()
         if (sdl_joy[c])
             SDL_JoystickClose(sdl_joy[c]);
     }
+#endif
 }
 
 static int joystick_get_axis(int joystick_nr, int mapping)
@@ -105,6 +113,7 @@ static int joystick_get_axis(int joystick_nr, int mapping)
 }
 void joystick_process()
 {
+#ifndef __ANDROID__
     int c, d;
 
     SDL_JoystickUpdate();
@@ -164,4 +173,5 @@ void joystick_process()
                 joystick_state[c].pov[d] = -1;
         }
     }
+#endif
 }

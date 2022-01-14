@@ -29,7 +29,7 @@ if(MUNT)
     target_sources(snd PRIVATE midi_mt32.c)
 
     add_subdirectory(munt)
-    target_link_libraries(86Box mt32emu)
+    target_link_libraries(86Box PRIVATE mt32emu)
 endif()
 
 if(PAS16)
@@ -42,4 +42,4 @@ if(GUSMAX)
 endif()
 
 add_subdirectory(resid-fp)
-target_link_libraries(86Box resid-fp)
+target_link_libraries(86Box PRIVATE resid-fp)

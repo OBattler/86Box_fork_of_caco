@@ -84,7 +84,9 @@ Settings::Settings(QWidget *parent) :
     ui(new Ui::Settings)
 {
     ui->setupUi(this);
-
+#ifdef __ANDROID__
+    this->setFixedSize(parent->size());
+#endif
     ui->listView->setModel(new SettingsModel(this));
 
     Harddrives::busTrackClass = new SettingsBusTracking;

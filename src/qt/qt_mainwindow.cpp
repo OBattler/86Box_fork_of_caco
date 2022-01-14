@@ -43,7 +43,7 @@ extern "C" {
 #include "qt_machinestatus.hpp"
 #include "qt_mediamenu.hpp"
 
-#ifdef __unix__
+#if __has_include(<X11/Xlib.h>)
 #ifdef WAYLAND
 #include "wl_mouse.hpp"
 #endif
@@ -190,6 +190,15 @@ MainWindow::MainWindow(QWidget *parent) :
     if (QApplication::platformName().contains("eglfs") && vid_api >= 1) {
         fprintf(stderr, "OpenGL renderers are unsupported on EGLFS.\n");
         vid_api = 0;
+    }
+    if (QApplication::platformName().contains("android"))
+    {
+        vid_api = plat_vidapi("qt_opengles");
+        ui->actionOpenGL_3_0_Core->setVisible(false);
+        ui->actionSoftware_Renderer->setVisible(false);
+        ui->actionHardware_Renderer_OpenGL->setVisible(false);
+        if (vid_resize != 1) ui->actionResizable_window->trigger();
+        ui->actionResizable_window->setVisible(false);
     }
     QActionGroup* actGroup = nullptr;
     switch (vid_api) {
@@ -956,7 +965,7 @@ uint16_t x11_keycode_to_keysym(uint32_t keycode)
     finalkeycode = (keycode & 0xFFFF);
 #elif defined(__APPLE__)
     finalkeycode = darwin_to_xt[keycode];
-#else
+#elif __has_include(<X11/Xlib.h>)
     static Display* x11display = nullptr;
     if (QApplication::platformName().contains("wayland"))
     {

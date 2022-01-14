@@ -482,8 +482,10 @@ void ip6_input(void *m) {}
 int ip6_output(void *so, void *m, int fast) { return 0; }
 void in6_compute_ethaddr(struct in6_addr ip, uint8_t *eth) {}
 bool in6_equal(const void *a, const void *b) { return 0; }
+#ifndef ANDROID
 const struct in6_addr in6addr_any = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } };
 const struct in6_addr in6addr_loopback = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } };
+#endif
 int udp6_output(void *so, void *m, void *saddr, void *daddr) { return 0; }
 void icmp6_send_error(void *m, uint8_t type, uint8_t code) {}
 void ndp_send_ns(void *slirp, struct in6_addr addr) {}

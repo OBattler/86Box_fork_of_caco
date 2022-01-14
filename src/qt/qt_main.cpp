@@ -7,6 +7,9 @@
 #include <QTranslator>
 #include <QDirIterator>
 #include <QLibraryInfo>
+#ifdef __ANDROID__
+#include <QJniObject>
+#endif
 
 #ifdef QT_STATIC
 /* Static builds need plugin imports */
@@ -102,6 +105,7 @@ main_thread_fn()
 }
 
 int main(int argc, char* argv[]) {
+
     QApplication app(argc, argv);
     qt_set_sequence_auto_mnemonic(false);
     Q_INIT_RESOURCE(qt_resources);
@@ -115,6 +119,20 @@ int main(int argc, char* argv[]) {
         qDebug() << it.next() << "\n";
     }
 
+#ifdef __ANDROID__
+    QString str;
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([&str]()
+    {
+        static char curpath[4096];
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        str = activity.callObjectMethod("getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;")
+                .callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString();
+        plat_chdir(str.toUtf8().data());
+        plat_getcwd(curpath, 4096);
+        qDebug() << curpath;
+    }).waitForFinished();
+#endif
+
 #ifdef __APPLE__
     CocoaEventFilter cocoafilter;
     app.installNativeEventFilter(&cocoafilter);
@@ -125,6 +143,9 @@ int main(int argc, char* argv[]) {
     {
         return 0;
     }
+#ifdef __ANDROID__
+    strcpy(rom_path, (str + "/roms/").toUtf8().constData());
+#endif
     ProgSettings::loadTranslators(&app);
     if (! pc_init_modules()) {
         ui_msgbox_header(MBX_FATAL, (void*)IDS_2120, (void*)IDS_2056);
