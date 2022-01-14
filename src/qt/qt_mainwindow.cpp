@@ -67,7 +67,9 @@ MainWindow::MainWindow(QWidget *parent) :
     status = std::make_unique<MachineStatus>(this);
 
     ui->setupUi(this);
+#ifndef __ANDROID__
     ui->stackedWidget->setMouseTracking(true);
+#endif
     statusBar()->setVisible(!hide_status_bar);
     statusBar()->setStyleSheet("QStatusBar::item {border: None; } QStatusBar QLabel { margin-right: 2px; margin-bottom: 1px; }");
     ui->toolBar->setVisible(!hide_tool_bar);
@@ -977,6 +979,8 @@ uint16_t x11_keycode_to_keysym(uint32_t keycode)
         }
     }
     if (!QApplication::platformName().contains("eglfs")) finalkeycode =  selected_keycode[keycode];
+#else
+    if (keycode == 66) return 0x1C;
 #endif
     if (rctrl_is_lalt && finalkeycode == 0x11D)
     {
