@@ -1,6 +1,7 @@
 // Lifted from wx-sdl2-joystick.c in PCem
-
+#ifndef __ANDROID__
 #include <SDL2/SDL.h>
+#endif
 
 #include <algorithm>
 
@@ -11,9 +12,12 @@ extern "C" {
 int joysticks_present;
 joystick_t joystick_state[MAX_JOYSTICKS];
 plat_joystick_t plat_joystick_state[MAX_PLAT_JOYSTICKS];
+#ifndef __ANDROID__
 static SDL_Joystick *sdl_joy[MAX_PLAT_JOYSTICKS];
+#endif
 }
 
+#ifndef __ANDROID__
 #include <algorithm>
 
 #ifndef M_PI
@@ -165,3 +169,8 @@ void joystick_process()
         }
     }
 }
+#else
+void joystick_init() {}
+void joystick_close() {}
+void joystick_process() {}
+#endif

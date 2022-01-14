@@ -20,15 +20,15 @@ plat_delay_ms(uint32_t count)
     QThread::msleep(count);
 }
 
+static wchar_t qt_win_title[512];
 wchar_t* ui_window_title(wchar_t* str)
 {
     if (str == nullptr) {
-        static wchar_t title[512];
-        memset(title, 0, sizeof(title));
-        main_window->getTitle(title);
-        str = title;
+        return qt_win_title;
     } else {
-        emit main_window->setTitle(QString::fromWCharArray(str));
+        memset(qt_win_title, 0, sizeof(qt_win_title));
+        wcsncpy(qt_win_title, str, sizeof(qt_win_title));
+        emit main_window->setTitle(qt_win_title);
     }
     return str;
 }

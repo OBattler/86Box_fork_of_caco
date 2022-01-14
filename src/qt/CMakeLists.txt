@@ -128,6 +128,7 @@ endif()
 target_link_libraries(
     plat
     PRIVATE
+    Qt${QT_MAJOR}::Core
     Qt${QT_MAJOR}::Widgets
     Qt${QT_MAJOR}::Gui
     Threads::Threads
@@ -176,6 +177,11 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
         endif()
     endif()
 endif()
+
+if(ANDROID)
+    target_include_directories(plat PRIVATE ${Qt${QT_MAJOR}Core_PRIVATE_INCLUDE_DIRS})
+endif()
+
 set(QM_FILES)
 file(GLOB po_files "${CMAKE_CURRENT_SOURCE_DIR}/languages/*.po")
 foreach(po_file ${po_files})

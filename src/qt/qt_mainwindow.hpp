@@ -41,7 +41,7 @@ signals:
     void updateMenuResizeOptions();
     void updateWindowRememberOption();
 
-    void setTitle(const QString& title);
+    void setTitle(const wchar_t* title);
     void setFullscreen(bool state);
     void setMouseCapture(bool state);
 

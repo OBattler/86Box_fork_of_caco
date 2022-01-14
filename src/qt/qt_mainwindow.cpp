@@ -60,6 +60,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    Q_INIT_RESOURCE(qt_resources);
+    Q_INIT_RESOURCE(qt_translations);
     mm = std::make_shared<MediaMenu>(this);
     MediaMenu::ptr = mm;
     status = std::make_unique<MachineStatus>(this);
@@ -85,9 +87,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, &MainWindow::showMessageForNonQtThread, this, &MainWindow::showMessage_, Qt::BlockingQueuedConnection);
 
-    connect(this, &MainWindow::setTitle, this, [this,toolbar_label](const QString& title) {
+    connect(this, &MainWindow::setTitle, this, [this,toolbar_label](const wchar_t* title) {
         if (!hide_tool_bar)
-            toolbar_label->setText(title);
+            toolbar_label->setText(QString::fromWCharArray(title));
     });
     connect(this, &MainWindow::getTitleForNonQtThread, this, &MainWindow::getTitle_, Qt::BlockingQueuedConnection);
 
@@ -319,6 +321,8 @@ MainWindow::MainWindow(QWidget *parent) :
             }
         });
     }
+    ui->toolBar->setAttribute(Qt::WA_AlwaysStackOnTop, true);
+    ui->stackedWidget->lower();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {

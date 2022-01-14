@@ -194,7 +194,9 @@ plat_fopen(const char *path, const char *mode)
 #endif
 #ifdef Q_OS_UNIX
 */
-    return fopen(path, mode);
+    auto val = fopen(path, mode);
+    qDebug() << ("fopen: ") << path << " mode: " << mode << "ret: " << val;
+    return val;
 //#endif
 }
 
@@ -221,6 +223,7 @@ int
 plat_getcwd(char *bufp, int max)
 {
     CharPointer(bufp, max) = QDir::currentPath().toUtf8();
+    qDebug() << "Current Path: " << QDir::currentPath();
     return 0;
 }
 
@@ -584,5 +587,7 @@ wchar_t* plat_get_string(int i)
 int
 plat_chdir(char *path)
 {
+    extern int main();
+    (void)main;
     return QDir::setCurrent(QString(path)) ? 0 : -1;
 }

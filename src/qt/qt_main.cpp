@@ -7,6 +7,7 @@
 #include <QTranslator>
 #include <QDirIterator>
 #include <QLibraryInfo>
+#include <QStandardPaths>
 
 #ifdef QT_STATIC
 /* Static builds need plugin imports */
@@ -35,6 +36,10 @@ Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
 #include "qt_progsettings.hpp"
 #include "cocoa_mouse.hpp"
 #include "qt_styleoverride.hpp"
+#ifdef __ANDROID__
+#include <QtCore/private/qandroidextras_p.h>
+#include <unistd.h>
+#endif
 
 // Void Cast
 #define VC(x) const_cast<wchar_t*>(x)
@@ -101,21 +106,43 @@ main_thread_fn()
     is_quit = 1;
 }
 
-extern "C" int main(int, char**);
-
+extern "C"
+{
+#ifdef __ANDROID__
+__attribute__ ((visibility ("default"))) __attribute ((cdecl))
+int main() { int argc = 5; char* argv[] = { strdup("./86Box"), strdup("-R"), strdup(""), strdup("-P"), strdup("") };
+#else
 int main(int argc, char* argv[]) {
+#endif
     QApplication app(argc, argv);
-    qt_set_sequence_auto_mnemonic(false);
-    Q_INIT_RESOURCE(qt_resources);
-    Q_INIT_RESOURCE(qt_translations);
+    QString str;
+#ifdef __ANDROID__
+    QtAndroidPrivate::requestPermission(QtAndroidPrivate::PermissionType::Storage);
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([&str]()
+    {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        str = activity.callObjectMethod("getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;")
+                .callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString();
+    }).waitForFinished();
+    qDebug() << str;
+    chdir(str.toUtf8().constData());
+#endif
+    qDebug() << QDir::currentPath();
+    argv[0] = strdup((QDir::currentPath() + "/86Box").toUtf8().constData());
+    argv[2] = strdup((QDir::currentPath() + "/roms/").toUtf8().constData());
+    argv[4] = strdup((QDir::currentPath()).toUtf8().constData());
     QSurfaceFormat fmt = QSurfaceFormat::defaultFormat();
     fmt.setSwapInterval(0);
     QSurfaceFormat::setDefaultFormat(fmt);
     app.setStyle(new StyleOverride());
-    QDirIterator it(":", QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        qDebug() << it.next() << "\n";
+    qt_set_sequence_auto_mnemonic(false);
+    main_window = new MainWindow();
+    if (!pc_init(argc, argv))
+    {
+        return 0;
     }
+
+    main_window->show();
 
 #ifdef __APPLE__
     CocoaEventFilter cocoafilter;
@@ -123,10 +150,6 @@ int main(int argc, char* argv[]) {
 #endif
     elapsed_timer.start();
 
-    if (!pc_init(argc, argv))
-    {
-        return 0;
-    }
     ProgSettings::loadTranslators(&app);
     if (! pc_init_modules()) {
         ui_msgbox_header(MBX_FATAL, (void*)IDS_2120, (void*)IDS_2056);
@@ -134,8 +157,6 @@ int main(int argc, char* argv[]) {
     }
 
     discord_load();
-    main_window = new MainWindow();
-    main_window->show();
     app.installEventFilter(main_window);
 
 #ifdef Q_OS_WINDOWS
@@ -157,7 +178,7 @@ int main(int argc, char* argv[]) {
     QTimer onesec;
     QTimer discordupdate;
     QObject::connect(&onesec, &QTimer::timeout, &app, [] {
-        pc_onesec();
+        //pc_onesec();
     });
     onesec.start(1000);
     if (discord_loaded) {
@@ -184,4 +205,5 @@ int main(int argc, char* argv[]) {
     main_thread.join();
 
     return ret;
+}
 }

@@ -16,9 +16,40 @@
 #
 
 # WIN32 marks us as a GUI app on Windows
-add_executable(86Box WIN32 MACOSX_BUNDLE 86box.c config.c log.c random.c timer.c io.c acpi.c apm.c
-    dma.c ddma.c discord.c nmi.c pic.c pit.c port_6x.c port_92.c ppi.c pci.c mca.c usb.c fifo8.c
-    device.c nvr.c nvr_at.c nvr_ps2.c)
+macro(86BoxUseQt)
+    if(QT)
+      set(CMAKE_CXX_STANDARD 17)
+      set(CMAKE_CXX_STANDARD_REQUIRED ON)
+      set(CMAKE_CXX_EXTENSIONS OFF)
+      if (USE_QT6)
+          set(QT_MAJOR 6)
+      else()
+          set(QT_MAJOR 5)
+      endif()
+
+      # if we want to use qt5-static to eliminate need for bundling qt dlls (windows)
+      #set(QT_STATIC ON)
+      # needed to build with qt5-static if both qt5 and qt5-static are installed
+      #set(CMAKE_PREFIX_PATH "path/to/qt5-static")
+
+      find_package(Qt${QT_MAJOR} COMPONENTS Core Widgets OpenGL REQUIRED)
+      find_package(Qt${QT_MAJOR}LinguistTools REQUIRED)
+    endif()
+endmacro()
+if (ANDROID)
+    cmake_language(CALL 86BoxUseQt)
+    qt_add_executable(86Box 86box.c config.c log.c random.c timer.c io.c acpi.c apm.c
+        dma.c ddma.c discord.c nmi.c pic.c pit.c port_6x.c port_92.c ppi.c pci.c mca.c usb.c fifo8.c
+        device.c nvr.c nvr_at.c nvr_ps2.c)
+    set_property(TARGET 86Box APPEND PROPERTY
+        QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android/
+    )
+    target_link_options(86Box PRIVATE "-Wl,--require-defined=main")
+else()
+    add_executable(86Box WIN32 MACOSX_BUNDLE 86box.c config.c log.c random.c timer.c io.c acpi.c apm.c
+        dma.c ddma.c discord.c nmi.c pic.c pit.c port_6x.c port_92.c ppi.c pci.c mca.c usb.c fifo8.c
+        device.c nvr.c nvr_at.c nvr_ps2.c)
+endif()
 
 if(CPPTHREADS)
     target_sources(86Box PRIVATE thread.cpp)
@@ -53,7 +84,7 @@ if(VNC)
     endif()
 endif()
 
-target_link_libraries(86Box cpu chipset mch dev mem fdd game cdrom zip mo hdd
+target_link_libraries(86Box PRIVATE cpu chipset mch dev mem fdd game cdrom zip mo hdd
     net print scsi sio snd vid voodoo plat ui)
 
 if(WIN32 AND ARCH STREQUAL "i386")
@@ -83,24 +114,7 @@ if(APPLE)
     endif()
 endif()
 
-if(QT)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-  set(CMAKE_CXX_EXTENSIONS OFF)
-  if (USE_QT6)
-      set(QT_MAJOR 6)
-  else()
-      set(QT_MAJOR 5)
-  endif()
-  
-  # if we want to use qt5-static to eliminate need for bundling qt dlls (windows)
-  #set(QT_STATIC ON)
-  # needed to build with qt5-static if both qt5 and qt5-static are installed
-  #set(CMAKE_PREFIX_PATH "path/to/qt5-static")
-  
-  find_package(Qt${QT_MAJOR} COMPONENTS Core Widgets OpenGL REQUIRED)
-  find_package(Qt${QT_MAJOR}LinguistTools REQUIRED)
-endif()
+cmake_language(CALL 86BoxUseQt)
 
 find_package(Freetype REQUIRED)
 include_directories(${FREETYPE_INCLUDE_DIRS})
@@ -112,30 +126,32 @@ endif()
 
 find_package(OpenAL REQUIRED)
 include_directories(${OPENAL_INCLUDE_DIR})
-target_link_libraries(86Box ${OPENAL_LIBRARY})
+target_link_libraries(86Box PUBLIC ${OPENAL_LIBRARY})
 
-find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIRS})
-if(STATIC_BUILD AND TARGET SDL2::SDL2-static)
-    target_link_libraries(86Box SDL2::SDL2-static)
-elseif(TARGET SDL2::SDL2)
-    target_link_libraries(86Box SDL2::SDL2)
-else()
-    target_link_libraries(86Box ${SDL2_LIBRARIES})
+if (NOT ANDROID)
+    find_package(SDL2 REQUIRED)
+    include_directories(${SDL2_INCLUDE_DIRS})
+    if(STATIC_BUILD AND TARGET SDL2::SDL2-static)
+        target_link_libraries(86Box PUBLIC SDL2::SDL2-static)
+    elseif(TARGET SDL2::SDL2)
+        target_link_libraries(86Box PUBLIC SDL2::SDL2)
+    else()
+        target_link_libraries(86Box PUBLIC ${SDL2_LIBRARIES})
+    endif()
 endif()
 
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIRS})
-target_link_libraries(86Box PNG::PNG)
+target_link_libraries(86Box PUBLIC PNG::PNG)
 
 if(VCPKG_TOOLCHAIN)
     # vcpkg includes a config file for rtmidi
     find_package(RtMidi REQUIRED)
-    target_link_libraries(86Box RtMidi::rtmidi)
+    target_link_libraries(86Box PUBLIC RtMidi::rtmidi)
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(RTMIDI REQUIRED IMPORTED_TARGET rtmidi)
-    target_link_libraries(86Box PkgConfig::RTMIDI)
+    target_link_libraries(86Box PUBLIC PkgConfig::RTMIDI)
 
     if(WIN32)
         target_link_libraries(PkgConfig::RTMIDI INTERFACE winmm)
@@ -171,7 +187,7 @@ endif()
 if(WIN32 OR (APPLE AND CMAKE_MACOSX_BUNDLE))
     # Copy the binary to the root of the install prefix on Windows and macOS
     install(TARGETS 86Box DESTINATION ".")
-else()
+elseif(NOT ANDROID)
     # On Linux we want to copy the binary to the `bin` folder.
     install(TARGETS 86Box)
 endif()

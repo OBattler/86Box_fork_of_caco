@@ -218,6 +218,7 @@ void RendererStack::switchRenderer(Renderer renderer) {
     }
     current->setFocusPolicy(Qt::NoFocus);
     current->setFocusProxy(this);
+    current->setWindowFlag(Qt::WindowStaysOnBottomHint, true);
     addWidget(current.get());
 
     this->setStyleSheet("background-color: black");
