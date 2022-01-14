@@ -27,7 +27,7 @@ wchar_t* ui_window_title(wchar_t* str)
         return qt_win_title;
     } else {
         memset(qt_win_title, 0, sizeof(qt_win_title));
-        wcsncpy(qt_win_title, str, sizeof(qt_win_title));
+        wcsncpy(qt_win_title, str, sizeof(qt_win_title) - 1);
         emit main_window->setTitle(qt_win_title);
     }
     return str;

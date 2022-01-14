@@ -90,8 +90,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(this, &MainWindow::showMessageForNonQtThread, this, &MainWindow::showMessage_, Qt::BlockingQueuedConnection);
 
     connect(this, &MainWindow::setTitle, this, [this,toolbar_label](const wchar_t* title) {
+#ifndef __ANDROID__
         if (!hide_tool_bar)
             toolbar_label->setText(QString::fromWCharArray(title));
+#endif
     });
     connect(this, &MainWindow::getTitleForNonQtThread, this, &MainWindow::getTitle_, Qt::BlockingQueuedConnection);
 

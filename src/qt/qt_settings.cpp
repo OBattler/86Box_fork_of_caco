@@ -25,6 +25,7 @@ extern "C"
 #include <QDebug>
 #include <QMessageBox>
 #include <QCheckBox>
+#include <QScreen>
 
 class SettingsModel : public QAbstractListModel {
 public:
@@ -84,6 +85,9 @@ Settings::Settings(QWidget *parent) :
     ui(new Ui::Settings)
 {
     ui->setupUi(this);
+#ifdef __ANDROID__
+    this->setFixedSize(parent->size());
+#endif
 
     ui->listView->setModel(new SettingsModel(this));
 
