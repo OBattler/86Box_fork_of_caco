@@ -179,7 +179,7 @@ int main(int argc, char* argv[]) {
     QTimer onesec;
     QTimer discordupdate;
     QObject::connect(&onesec, &QTimer::timeout, &app, [] {
-        //pc_onesec();
+        pc_onesec();
     });
     onesec.start(1000);
     if (discord_loaded) {
