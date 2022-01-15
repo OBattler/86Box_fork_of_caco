@@ -22,6 +22,10 @@ if(QT)
         dma.c ddma.c discord.c nmi.c pic.c pit.c port_6x.c port_92.c ppi.c pci.c mca.c usb.c fifo8.c
         device.c nvr.c nvr_at.c nvr_ps2.c)
     target_link_options(86Box PRIVATE "-umain")
+    set_target_properties(86Box PROPERTIES QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/")
+    if (ANDROID)
+        target_sources(86Box PRIVATE "android/src/net/eightsixbox/eightsixbox/EmuActivity.java")
+    endif()
 else()
     add_executable(86Box WIN32 MACOSX_BUNDLE 86box.c config.c log.c random.c timer.c io.c acpi.c apm.c
         dma.c ddma.c discord.c nmi.c pic.c pit.c port_6x.c port_92.c ppi.c pci.c mca.c usb.c fifo8.c

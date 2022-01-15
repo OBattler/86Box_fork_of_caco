@@ -193,7 +193,7 @@ MainWindow::MainWindow(QWidget *parent) :
     }
     if (QApplication::platformName().contains("android"))
     {
-        vid_api = plat_vidapi("qt_opengles");
+        vid_api = 2;
         ui->actionOpenGL_3_0_Core->setVisible(false);
         ui->actionSoftware_Renderer->setVisible(false);
         ui->actionHardware_Renderer_OpenGL->setVisible(false);
@@ -393,6 +393,9 @@ void MainWindow::showEvent(QShowEvent *event) {
         scrnsz_y = window_h;
     }
     if (settings_only) QTimer::singleShot(0, this, [this] () { ui->actionSettings->trigger(); });
+#ifdef __ANDROID__
+    QTimer::singleShot(1000, this, [this] { ui->stackedWidget->switchRenderer(RendererStack::Renderer::OpenGLES); } );
+#endif
 }
 
 void MainWindow::on_actionKeyboard_requires_capture_triggered() {
