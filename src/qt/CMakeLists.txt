@@ -141,6 +141,10 @@ target_link_libraries(
     Threads::Threads
 )
 
+if (ANDROID)
+    target_include_directories(plat PRIVATE ${Qt${QT_MAJOR}Core_PRIVATE_INCLUDE_DIRS})
+endif()
+
 # needed for static builds
 if (WIN32)
     qt_import_plugins(plat INCLUDE Qt${QT_MAJOR}::QWindowsIntegrationPlugin Qt${QT_MAJOR}::QICOPlugin QWindowsVistaStylePlugin)

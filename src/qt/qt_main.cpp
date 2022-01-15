@@ -9,6 +9,7 @@
 #include <QLibraryInfo>
 #ifdef __ANDROID__
 #include <QJniObject>
+#include <private/qandroidextras_p.h>
 #endif
 
 #ifdef QT_STATIC
@@ -104,9 +105,27 @@ main_thread_fn()
     is_quit = 1;
 }
 
+class AndroidFilter : public QObject
+{
+public:
+    AndroidFilter(QObject* parent = nullptr)
+        : QObject(parent) {}
+    bool eventFilter(QObject* obj, QEvent* event)
+    {
+        if (qobject_cast<QDialog*>(obj) && !qobject_cast<MainWindow*>(obj) && event->type() == QEvent::Show)
+        {
+            qobject_cast<QDialog*>(obj)->setFixedSize(main_window->size());
+        }
+        return false;
+    }
+};
+
 int main(int argc, char* argv[]) {
 
     QApplication app(argc, argv);
+#ifdef __ANDROID__
+    app.installEventFilter(new AndroidFilter(&app));
+#endif
     qt_set_sequence_auto_mnemonic(false);
     Q_INIT_RESOURCE(qt_resources);
     Q_INIT_RESOURCE(qt_translations);
@@ -131,6 +150,7 @@ int main(int argc, char* argv[]) {
         plat_getcwd(curpath, 4096);
         qDebug() << curpath;
     }).waitForFinished();
+    QtAndroidPrivate::requestPermission(QtAndroidPrivate::Storage).waitForFinished();
 #endif
 
 #ifdef __APPLE__
@@ -147,14 +167,17 @@ int main(int argc, char* argv[]) {
     strcpy(rom_path, (str + "/roms/").toUtf8().constData());
 #endif
     ProgSettings::loadTranslators(&app);
+    main_window = new MainWindow();
+    main_window->show();
     if (! pc_init_modules()) {
         ui_msgbox_header(MBX_FATAL, (void*)IDS_2120, (void*)IDS_2056);
         return 6;
     }
 
     discord_load();
-    main_window = new MainWindow();
-    main_window->show();
+#ifdef __ANDROID__
+    app.setAttribute(Qt::AA_DontUseNativeDialogs);
+#endif
     app.installEventFilter(main_window);
 
 #ifdef Q_OS_WINDOWS

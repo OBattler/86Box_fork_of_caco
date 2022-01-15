@@ -60,19 +60,19 @@ void HardwareRenderer::initializeGL()
 
     QOpenGLShader *fshader = new QOpenGLShader(QOpenGLShader::Fragment, this);
     const char *fsrc =
-        "uniform sampler2D texture;\n"
+        "uniform sampler2D Texture;\n"
         "varying mediump vec4 texc;\n"
         "void main(void)\n"
         "{\n"
-        "    gl_FragColor = texture2D(texture, texc.st).bgra;\n"
+        "    gl_FragColor = texture2D(Texture, texc.st).bgra;\n"
         "}\n";
     QString fsrccore =
-        "uniform sampler2D texture;\n"
+        "uniform sampler2D Texture;\n"
         "in mediump vec4 texc;\n"
         "out highp vec4 FragColor;\n"
         "void main(void)\n"
         "{\n"
-        "    FragColor = texture(texture, texc.st).bgra;\n"
+        "    FragColor = texture(Texture, texc.st).bgra;\n"
         "}\n";
     if (m_context->isOpenGLES() && m_context->format().version() >= qMakePair(3, 0))
     {
@@ -94,7 +94,7 @@ void HardwareRenderer::initializeGL()
     m_prog->link();
 
     m_prog->bind();
-    m_prog->setUniformValue("texture", 0);
+    m_prog->setUniformValue("Texture", 0);
 
     if (m_context->format().version() >= qMakePair(3, 0) && m_vao.create()) {
         m_vao.bind();

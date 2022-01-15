@@ -35,6 +35,7 @@ public:
     {
         event->ignore();
     }
+    bool event(QEvent* event) override;
 
     enum class Renderer {
         Software,
@@ -62,7 +63,10 @@ private:
     mouseinputdata mousedata;
 
     int x, y, w, h, sx, sy, sw, sh;
-
+    uint8_t touchInProgress = 0;
+    uint8_t touchTap = 0;
+    bool touchUpdated = false;
+    bool touchMoveMouse = false;
     int currentBuf = 0;
     std::array<std::unique_ptr<uint8_t>, 2> imagebufs;
 

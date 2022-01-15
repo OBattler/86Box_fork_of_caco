@@ -9,6 +9,7 @@
 #include "evdev_mouse.hpp"
 
 #include <QScreen>
+#include <QTimer>
 
 #ifdef __APPLE__
 #include <CoreGraphics/CoreGraphics.h>
@@ -27,6 +28,9 @@ RendererStack::RendererStack(QWidget *parent) :
     ui(new Ui::RendererStack)
 {
     ui->setupUi(this);
+#ifdef __ANDROID__
+    setAttribute(Qt::WA_AcceptTouchEvents, true);
+#endif
     imagebufs[0].reset(new uint8_t[2048 * 2048 * 4]);
     imagebufs[1].reset(new uint8_t[2048 * 2048 * 4]);
 
@@ -253,4 +257,53 @@ void RendererStack::blit(int x, int y, int w, int h)
     video_blit_complete();
     blitToRenderer(&imagebufs[currentBuf], sx, sy, sw, sh, &buffers_in_use[currentBuf]);
     currentBuf = (currentBuf + 1) % 2;
+}
+
+bool RendererStack::event(QEvent* event)
+{
+    switch (event->type()) {
+#ifdef __ANDROID__
+        case QEvent::TouchBegin:
+            touchInProgress = true;
+            touchUpdated = false;
+            touchTap++;
+            if (touchTap >= 2)
+            {
+                touchUpdated = true;
+                mousedata.mousebuttons |= 1;
+            }
+            QTimer::singleShot(QApplication::doubleClickInterval(), this, [this]
+            {
+                if (touchTap) touchTap--;
+            });
+            break;
+        case QEvent::TouchUpdate:
+            {
+                touchUpdated = true;
+                auto touchevent = ((QTouchEvent*)(event));
+                for (int i = 0; i < touchevent->points().size(); i++)
+                {
+                    mouse_x += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).x();
+                    mouse_y += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).y();
+                }
+                break;
+            }
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel:
+            touchInProgress = false;
+            if (!(mousedata.mousebuttons & 1))
+            {
+                mousedata.mousebuttons |= 1;
+                QTimer::singleShot(100, this, [this]
+                {
+                    if (!touchInProgress) mousedata.mousebuttons &= ~1;
+                });
+            }
+            touchUpdated = false;
+            break;
+#endif
+         default:
+            break;
+    }
+    return QStackedWidget::event(event);
 }

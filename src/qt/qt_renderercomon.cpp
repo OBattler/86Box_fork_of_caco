@@ -104,6 +104,12 @@ bool RendererCommon::eventDelegate(QEvent *event, bool& result)
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
         case QEvent::MouseButtonRelease:
+#ifdef __ANDROID__
+        case QEvent::TouchBegin:
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel:
+        case QEvent::TouchUpdate:
+#endif
         case QEvent::Wheel:
         case QEvent::Enter:
         case QEvent::Leave:
