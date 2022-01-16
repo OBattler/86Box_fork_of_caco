@@ -293,7 +293,11 @@ bool RendererStack::event(QEvent* event)
         case QEvent::TouchEnd:
         case QEvent::TouchCancel:
             touchInProgress = false;
-            if (!(mousedata.mousebuttons & 1))
+            if (mousedata.mousebuttons & 1)
+            {
+                mousedata.mousebuttons &= ~1;
+            }
+            else if (!touchUpdated)
             {
                 mousedata.mousebuttons |= 1;
                 QTimer::singleShot(100, this, [this]

@@ -13,6 +13,7 @@
 #include <QTemporaryFile>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QApplication>
 
 #include <QLibrary>
 #include <QElapsedTimer>
@@ -22,6 +23,10 @@
 
 #ifdef Q_OS_UNIX
 #include <sys/mman.h>
+#endif
+
+#ifdef Q_OS_ANDROID
+#include <jni.h>
 #endif
 
 // static QByteArray buf;
@@ -586,3 +591,13 @@ plat_chdir(char *path)
 {
     return QDir::setCurrent(QString(path)) ? 0 : -1;
 }
+
+#ifdef __ANDROID__
+extern "C"
+{
+JNIEXPORT void JNICALL Java_net_eightsixbox_eightsixbox_EmuActivity_onKeyDownEvent(JNIEnv* env, jobject obj, jint keycode, jboolean down)
+{
+    QApplication::postEvent(main_window, new QKeyEvent(down ? QEvent::KeyPress : QEvent::KeyRelease, 0, QGuiApplication::keyboardModifiers(), keycode, 0, 0));
+}
+}
+#endif

@@ -43,6 +43,10 @@ extern "C" {
 #include "qt_machinestatus.hpp"
 #include "qt_mediamenu.hpp"
 
+#ifdef __ANDROID__
+#include <android/input.h>
+#endif
+
 #if __has_include(<X11/Xlib.h>)
 #ifdef WAYLAND
 #include "wl_mouse.hpp"
@@ -959,6 +963,116 @@ static std::unordered_map<uint32_t, uint16_t> evdev_to_xt =
         {111, 0x153}
 };
 
+#ifdef __ANDROID__
+static std::map<uint32_t, uint32_t> android_to_xt =
+{
+    {AKEYCODE_ESCAPE, 0x01},
+    {AKEYCODE_1, 0x02},
+    {AKEYCODE_2, 0x03},
+    {AKEYCODE_3, 0x04},
+    {AKEYCODE_4, 0x05},
+    {AKEYCODE_5, 0x06},
+    {AKEYCODE_6, 0x07},
+    {AKEYCODE_7, 0x08},
+    {AKEYCODE_8, 0x09},
+    {AKEYCODE_9, 0x0A},
+    {AKEYCODE_0, 0x0B},
+    {AKEYCODE_MINUS, 0x0C},
+    {AKEYCODE_EQUALS, 0x0D},
+    {AKEYCODE_DEL, 0x0E},
+    {AKEYCODE_TAB, 0x0F},
+    {AKEYCODE_Q, 0x10},
+    {AKEYCODE_W, 0x11},
+    {AKEYCODE_E, 0x12},
+    {AKEYCODE_R, 0x13},
+    {AKEYCODE_T, 0x14},
+    {AKEYCODE_Y, 0x15},
+    {AKEYCODE_U, 0x16},
+    {AKEYCODE_I, 0x17},
+    {AKEYCODE_O, 0x18},
+    {AKEYCODE_P, 0x19},
+    {AKEYCODE_LEFT_BRACKET, 0x1A},
+    {AKEYCODE_RIGHT_BRACKET, 0x1B},
+    {AKEYCODE_ENTER, 0x1C},
+    {AKEYCODE_CTRL_LEFT, 0x1D},
+    {AKEYCODE_A, 0x1E},
+    {AKEYCODE_S, 0x1F},
+    {AKEYCODE_D, 0x20},
+    {AKEYCODE_F, 0x21},
+    {AKEYCODE_G, 0x22},
+    {AKEYCODE_H, 0x23},
+    {AKEYCODE_J, 0x24},
+    {AKEYCODE_K, 0x25},
+    {AKEYCODE_L, 0x26},
+    {AKEYCODE_SEMICOLON, 0x27},
+    {AKEYCODE_APOSTROPHE, 0x28},
+    {AKEYCODE_GRAVE, 0x29},
+    {AKEYCODE_SHIFT_LEFT, 0x2A},
+    {AKEYCODE_BACKSLASH, 0x2B},
+    {AKEYCODE_Z, 0x2C},
+    {AKEYCODE_X, 0x2D},
+    {AKEYCODE_C, 0x2E},
+    {AKEYCODE_V, 0x2F},
+    {AKEYCODE_B, 0x30},
+    {AKEYCODE_N, 0x31},
+    {AKEYCODE_M, 0x32},
+    {AKEYCODE_COMMA, 0x33},
+    {AKEYCODE_PERIOD, 0x34},
+    {AKEYCODE_SLASH, 0x35},
+    {AKEYCODE_SHIFT_RIGHT, 0x36},
+    {AKEYCODE_NUMPAD_MULTIPLY, 0x37},
+    {AKEYCODE_ALT_LEFT, 0x38},
+    {AKEYCODE_SPACE, 0x39},
+    {AKEYCODE_CAPS_LOCK, 0x3A},
+    {AKEYCODE_F1, 0x3B},
+    {AKEYCODE_F2, 0x3C},
+    {AKEYCODE_F3, 0x3D},
+    {AKEYCODE_F4, 0x3E},
+    {AKEYCODE_F5, 0x3F},
+    {AKEYCODE_F6, 0x40},
+    {AKEYCODE_F7, 0x41},
+    {AKEYCODE_F8, 0x42},
+    {AKEYCODE_F9, 0x43},
+    {AKEYCODE_F10, 0x44},
+    {AKEYCODE_NUM_LOCK, 0x45},
+    {AKEYCODE_SCROLL_LOCK, 0x46},
+    {AKEYCODE_MOVE_HOME, 0x47},
+    {AKEYCODE_DPAD_UP, 0x48},
+    {AKEYCODE_PAGE_UP, 0x149},
+    {AKEYCODE_NUMPAD_SUBTRACT, 0x4A},
+    {AKEYCODE_DPAD_LEFT, 0x14B},
+    {AKEYCODE_NUMPAD_5, 0x4C},
+    {AKEYCODE_DPAD_RIGHT, 0x14D},
+    {AKEYCODE_NUMPAD_ADD, 0x4E},
+    {AKEYCODE_MOVE_END, 0x14F},
+    {AKEYCODE_DPAD_DOWN, 0x150},
+    {AKEYCODE_PAGE_DOWN, 0x151},
+    {AKEYCODE_INSERT, 0x152},
+    {AKEYCODE_FORWARD_DEL, 0x153},
+    {AKEYCODE_F11, 0x57},
+    {AKEYCODE_F12, 0x58},
+
+    {AKEYCODE_NUMPAD_ENTER, 0x11C},
+    {AKEYCODE_CTRL_RIGHT, 0x11D},
+    {AKEYCODE_NUMPAD_DIVIDE, 0x135},
+    {AKEYCODE_ALT_RIGHT, 0x138},
+    {AKEYCODE_NUMPAD_9, 0x49},
+    {AKEYCODE_NUMPAD_8, 0x48},
+    {AKEYCODE_NUMPAD_7, 0x47},
+    {AKEYCODE_NUMPAD_6, 0x4D},
+    {AKEYCODE_NUMPAD_4, 0x4B},
+    {AKEYCODE_NUMPAD_3, 0x51},
+    {AKEYCODE_NUMPAD_2, 0x50},
+    {AKEYCODE_NUMPAD_1, 0x4F},
+    {AKEYCODE_NUMPAD_0, 0x52},
+    {AKEYCODE_NUMPAD_DOT, 0x53},
+
+    {AKEYCODE_META_LEFT, 0x15B},
+    {AKEYCODE_META_RIGHT, 0x15C},
+    {AKEYCODE_SYSRQ, 0x137}
+};
+#endif
+
 static std::array<uint32_t, 256>& selected_keycode = x11_to_xt_base;
 
 uint16_t x11_keycode_to_keysym(uint32_t keycode)
@@ -968,6 +1082,8 @@ uint16_t x11_keycode_to_keysym(uint32_t keycode)
     finalkeycode = (keycode & 0xFFFF);
 #elif defined(__APPLE__)
     finalkeycode = darwin_to_xt[keycode];
+#elif defined Q_OS_ANDROID
+    finalkeycode = android_to_xt[keycode];
 #elif __has_include(<X11/Xlib.h>)
     static Display* x11display = nullptr;
     if (QApplication::platformName().contains("wayland"))
@@ -1091,52 +1207,10 @@ void MainWindow::showMessage_(const QString &header, const QString &message) {
     box.exec();
 }
 
-static QMap<int, uint32_t> fallbackkeys =
-{
-    {Qt::Key_F1, 0x3B},
-    {Qt::Key_F2, 0x3C},
-    {Qt::Key_F3, 0x3D},
-    {Qt::Key_F4, 0x3E},
-    {Qt::Key_F5, 0x3F},
-    {Qt::Key_F6, 0x40},
-    {Qt::Key_F7, 0x41},
-    {Qt::Key_F8, 0x42},
-    {Qt::Key_F9, 0x43},
-    {Qt::Key_F10, 0x44},
-    {Qt::Key_F11, 0x57},
-    {Qt::Key_F12, 0x58},
-    {Qt::Key_Tab, 0x0F},
-    {Qt::Key_SysReq, 0x137},
-    {Qt::Key_Backspace, 0x0E},
-    {Qt::Key_NumLock, 0x45},
-    {Qt::Key_ScrollLock, 0x46},
-    {Qt::Key_CapsLock, 0x3A},
-    {Qt::Key_Enter, 0x11C},
-    {Qt::Key_Return, 0x1C},
-    {Qt::Key_Escape, 1},
-    // Rest are temporary measures for Android until a proper physical keyboard implementation is done.
-#ifdef __ANDROID__
-    {Qt::Key_Up, 0x148},
-    {Qt::Key_Left, 0x14B},
-    {Qt::Key_Right, 0x14D},
-    {Qt::Key_Down, 0x150},
-    {Qt::Key_Home, 0x147},
-    {Qt::Key_End, 0x14F},
-    {Qt::Key_PageUp, 0x149},
-    {Qt::Key_PageDown, 0x151},
-    {Qt::Key_Insert, 0x152},
-    {Qt::Key_Delete, 0x53},
-#endif
-};
-
 void MainWindow::keyPressEvent(QKeyEvent* event)
 {
     qDebug() << "Press event key: " << event->nativeScanCode();
-    if (send_keyboard_input && fallbackkeys[event->key()] != 0)
-    {
-        keyboard_input(1, fallbackkeys[event->key()]);
-    }
-    else if (send_keyboard_input && !(kbd_req_capture && !mouse_capture && !video_fullscreen))
+    if (send_keyboard_input && !(kbd_req_capture && !mouse_capture && !video_fullscreen))
     {
 #ifdef __APPLE__
         keyboard_input(1, x11_keycode_to_keysym(event->nativeVirtualKey()));
@@ -1165,11 +1239,6 @@ void MainWindow::keyReleaseEvent(QKeyEvent* event)
     if (!send_keyboard_input)
         return;
 
-    if (fallbackkeys[event->key()] != 0)
-    {
-        keyboard_input(0, fallbackkeys[event->key()]);
-        return;
-    }
 #ifdef __APPLE__
     keyboard_input(0, x11_keycode_to_keysym(event->nativeVirtualKey()));
 #else
