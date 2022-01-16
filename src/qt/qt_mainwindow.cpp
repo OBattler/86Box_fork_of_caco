@@ -1091,9 +1091,52 @@ void MainWindow::showMessage_(const QString &header, const QString &message) {
     box.exec();
 }
 
+static QMap<int, uint32_t> fallbackkeys =
+{
+    {Qt::Key_F1, 0x3B},
+    {Qt::Key_F2, 0x3C},
+    {Qt::Key_F3, 0x3D},
+    {Qt::Key_F4, 0x3E},
+    {Qt::Key_F5, 0x3F},
+    {Qt::Key_F6, 0x40},
+    {Qt::Key_F7, 0x41},
+    {Qt::Key_F8, 0x42},
+    {Qt::Key_F9, 0x43},
+    {Qt::Key_F10, 0x44},
+    {Qt::Key_F11, 0x57},
+    {Qt::Key_F12, 0x58},
+    {Qt::Key_Tab, 0x0F},
+    {Qt::Key_SysReq, 0x137},
+    {Qt::Key_Backspace, 0x0E},
+    {Qt::Key_NumLock, 0x45},
+    {Qt::Key_ScrollLock, 0x46},
+    {Qt::Key_CapsLock, 0x3A},
+    {Qt::Key_Enter, 0x11C},
+    {Qt::Key_Return, 0x1C},
+    {Qt::Key_Escape, 1},
+    // Rest are temporary measures for Android until a proper physical keyboard implementation is done.
+#ifdef __ANDROID__
+    {Qt::Key_Up, 0x148},
+    {Qt::Key_Left, 0x14B},
+    {Qt::Key_Right, 0x14D},
+    {Qt::Key_Down, 0x150},
+    {Qt::Key_Home, 0x147},
+    {Qt::Key_End, 0x14F},
+    {Qt::Key_PageUp, 0x149},
+    {Qt::Key_PageDown, 0x151},
+    {Qt::Key_Insert, 0x152},
+    {Qt::Key_Delete, 0x53},
+#endif
+};
+
 void MainWindow::keyPressEvent(QKeyEvent* event)
 {
-    if (send_keyboard_input && !(kbd_req_capture && !mouse_capture && !video_fullscreen))
+    qDebug() << "Press event key: " << event->nativeScanCode();
+    if (send_keyboard_input && fallbackkeys[event->key()] != 0)
+    {
+        keyboard_input(1, fallbackkeys[event->key()]);
+    }
+    else if (send_keyboard_input && !(kbd_req_capture && !mouse_capture && !video_fullscreen))
     {
 #ifdef __APPLE__
         keyboard_input(1, x11_keycode_to_keysym(event->nativeVirtualKey()));
@@ -1122,6 +1165,11 @@ void MainWindow::keyReleaseEvent(QKeyEvent* event)
     if (!send_keyboard_input)
         return;
 
+    if (fallbackkeys[event->key()] != 0)
+    {
+        keyboard_input(0, fallbackkeys[event->key()]);
+        return;
+    }
 #ifdef __APPLE__
     keyboard_input(0, x11_keycode_to_keysym(event->nativeVirtualKey()));
 #else
@@ -1497,5 +1545,12 @@ void MainWindow::on_actionEnable_Discord_integration_triggered(bool checked)
         discord_update_activity(dopause);
     } else
         discord_close();
+}
+
+
+void MainWindow::on_actionShow_keyboard_triggered()
+{
+    QInputMethod *keyboard = QGuiApplication::inputMethod();
+    if (keyboard) keyboard->show();
 }
 

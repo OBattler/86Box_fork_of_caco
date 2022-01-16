@@ -10,6 +10,7 @@
 
 #include <QScreen>
 #include <QTimer>
+#include <QValidator>
 
 #ifdef __APPLE__
 #include <CoreGraphics/CoreGraphics.h>
@@ -30,6 +31,7 @@ RendererStack::RendererStack(QWidget *parent) :
     ui->setupUi(this);
 #ifdef __ANDROID__
     setAttribute(Qt::WA_AcceptTouchEvents, true);
+    setAttribute(Qt::WA_InputMethodEnabled, true);
 #endif
     imagebufs[0].reset(new uint8_t[2048 * 2048 * 4]);
     imagebufs[1].reset(new uint8_t[2048 * 2048 * 4]);

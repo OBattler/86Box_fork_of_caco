@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>724</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuAction">
@@ -79,6 +79,7 @@
     <addaction name="actionSound_gain"/>
     <addaction name="separator"/>
     <addaction name="actionPreferences"/>
+    <addaction name="actionShow_keyboard"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -664,6 +665,11 @@
    </property>
    <property name="toolTip">
     <string>ACPI Shutdown</string>
+   </property>
+  </action>
+  <action name="actionShow_keyboard">
+   <property name="text">
+    <string>Show keyboard...</string>
    </property>
   </action>
  </widget>

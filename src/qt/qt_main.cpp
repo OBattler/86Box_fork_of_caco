@@ -114,6 +114,7 @@ public:
     {
         if (qobject_cast<QDialog*>(obj) && !qobject_cast<MainWindow*>(obj) && event->type() == QEvent::Show)
         {
+            qobject_cast<QDialog*>(obj)->setGeometry(main_window->geometry());
             qobject_cast<QDialog*>(obj)->setFixedSize(main_window->size());
         }
         return false;
