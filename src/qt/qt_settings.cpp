@@ -25,6 +25,8 @@ extern "C"
 #include <QDebug>
 #include <QMessageBox>
 #include <QCheckBox>
+#include <QScroller>
+#include <QScreen>
 
 class SettingsModel : public QAbstractListModel {
 public:
@@ -124,6 +126,12 @@ Settings::Settings(QWidget *parent) :
     connect(ui->listView->selectionModel(), &QItemSelectionModel::currentChanged, this, [this](const QModelIndex &current, const QModelIndex &previous) {
         ui->stackedWidget->setCurrentIndex(current.row());
     });
+
+#ifdef __ANDROID__
+    QScroller::grabGesture(ui->scrollArea, QScroller::LeftMouseButtonGesture);
+    QScroller::grabGesture(ui->listView, QScroller::LeftMouseButtonGesture);
+    ui->listView->setMinimumWidth(ui->listView->sizeHintForColumn(0) / 2);
+#endif
 }
 
 Settings::~Settings()
