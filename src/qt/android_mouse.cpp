@@ -20,7 +20,7 @@ void android_mouse_capture(QWindow* window)
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]()
     {
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
-        activity.callObjectMethod("captureMouse", "()V");
+        activity.callMethod<void>("captureMouse");
     }).waitForFinished();
 }
 
@@ -29,7 +29,7 @@ void android_mouse_uncapture()
     QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]()
     {
         QJniObject activity = QNativeInterface::QAndroidApplication::context();
-        activity.callObjectMethod("uncaptureMouse", "()V");
+        activity.callMethod<void>("uncaptureMouse");
     }).waitForFinished();
 }
 
