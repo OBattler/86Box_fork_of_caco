@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 #include <atomic>
-#include <array>
+#include <tuple>
 
 #ifdef WAYLAND
 #include "wl_mouse.hpp"
@@ -63,7 +63,7 @@ public:
 
     RendererCommon* rendererWindow{nullptr};
 signals:
-    void blitToRenderer(const std::unique_ptr<uint8_t>* img, int, int, int, int, std::atomic_flag* in_use);
+    void blitToRenderer(int buf_idx, int x, int y, int w, int h);
 
 public slots:
     void blit(int x, int y, int w, int h);
@@ -110,12 +110,9 @@ private:
     bool touchUpdated = false;
     bool touchMoveMouse = false;
     int currentBuf = 0;
-    std::array<std::unique_ptr<uint8_t>, 2> imagebufs;
+    std::vector<std::tuple<uint8_t*, std::atomic_flag*>> imagebufs;
 
     std::unique_ptr<QWidget> current;
-
-    /* atomic flag for each buffer to not overload the renderer */
-    std::vector<std::atomic_flag> buffers_in_use;
 
     friend class MainWindow;
 };

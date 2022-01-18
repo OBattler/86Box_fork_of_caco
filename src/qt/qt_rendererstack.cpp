@@ -30,16 +30,11 @@ RendererStack::RendererStack(QWidget *parent) :
     ui(new Ui::RendererStack)
 {
     ui->setupUi(this);
+
 #ifdef __ANDROID__
     setAttribute(Qt::WA_AcceptTouchEvents, true);
     setAttribute(Qt::WA_InputMethodEnabled, true);
 #endif
-    imagebufs[0].reset(new uint8_t[2048 * 2048 * 4]);
-    imagebufs[1].reset(new uint8_t[2048 * 2048 * 4]);
-
-    buffers_in_use = std::vector<std::atomic_flag>(2);
-    buffers_in_use[0].clear();
-    buffers_in_use[1].clear();
 
 #ifdef WAYLAND
     if (QApplication::platformName().contains("wayland")) {
@@ -173,7 +168,7 @@ void RendererStack::switchRenderer(Renderer renderer) {
     switch (renderer) {
     case Renderer::Software:
     {
-        auto sw = new SoftwareRenderer(this);
+        auto sw = new SoftwareRenderer(this);        
         rendererWindow = sw;
         connect(this, &RendererStack::blitToRenderer, sw, &SoftwareRenderer::onBlit, Qt::QueuedConnection);
         current.reset(this->createWindowContainer(sw, this));
@@ -207,13 +202,14 @@ void RendererStack::switchRenderer(Renderer renderer) {
         break;
     }
     }
+
+    imagebufs = std::move(rendererWindow->getBuffers());
+
     current->setFocusPolicy(Qt::NoFocus);
     current->setFocusProxy(this);
     addWidget(current.get());
 
     this->setStyleSheet("background-color: black");
-    for (auto& in_use : buffers_in_use)
-        in_use.clear();
 
     endblit();
 }
@@ -221,7 +217,7 @@ void RendererStack::switchRenderer(Renderer renderer) {
 // called from blitter thread
 void RendererStack::blit(int x, int y, int w, int h)
 {
-    if ((w <= 0) || (h <= 0) || (w > 2048) || (h > 2048) || (buffer32 == NULL) || buffers_in_use[currentBuf].test_and_set())
+    if ((w <= 0) || (h <= 0) || (w > 2048) || (h > 2048) || (buffer32 == NULL) || std::get<std::atomic_flag*>(imagebufs[currentBuf])->test_and_set())
     {
         video_blit_complete();
         return;
@@ -230,7 +226,7 @@ void RendererStack::blit(int x, int y, int w, int h)
     sy = y;
     sw = this->w = w;
     sh = this->h = h;
-    auto imagebits = imagebufs[currentBuf].get();
+    uint8_t* imagebits = std::get<uint8_t*>(imagebufs[currentBuf]);
     for (int y1 = y; y1 < (y + h - 1); y1++)
     {
         auto scanline = imagebits + (y1 * (2048) * 4) + (x * 4);
@@ -242,8 +238,8 @@ void RendererStack::blit(int x, int y, int w, int h)
         video_screenshot((uint32_t *)imagebits, x, y, 2048);
     }
     video_blit_complete();
-    blitToRenderer(&imagebufs[currentBuf], sx, sy, sw, sh, &buffers_in_use[currentBuf]);
-    currentBuf = (currentBuf + 1) % 2;
+    emit blitToRenderer(currentBuf, sx, sy, sw, sh);
+    currentBuf = (currentBuf + 1) % imagebufs.size();
 }
 
 bool RendererStack::event(QEvent* event)
