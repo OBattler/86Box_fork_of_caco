@@ -14,6 +14,7 @@
 
 #ifdef __APPLE__
 #include <CoreGraphics/CoreGraphics.h>
+#include "cocoa_mouse.hpp"
 #endif
 
 extern "C"
@@ -65,37 +66,21 @@ qt_mouse_capture(int on)
     {
         mouse_capture = 0;
         QApplication::setOverrideCursor(Qt::ArrowCursor);
-#ifdef __APPLE__
-        CGAssociateMouseAndMouseCursorPosition(true);
-#endif
         return;
     }
     mouse_capture = 1;
     QApplication::setOverrideCursor(Qt::BlankCursor);
-#ifdef __APPLE__
-    CGAssociateMouseAndMouseCursorPosition(false);
-#endif
     return;
 }
 
 void RendererStack::mousePoll()
 {
-#ifdef __APPLE__
-    return macos_poll_mouse();
-#else
     mouse_x = mousedata.deltax;
     mouse_y = mousedata.deltay;
     mouse_z = mousedata.deltaz;
     mousedata.deltax = mousedata.deltay = mousedata.deltaz = 0;
     mouse_buttons = mousedata.mousebuttons;
-#ifdef WAYLAND
-    if (QApplication::platformName().contains("wayland"))
-        wl_mouse_poll();
-#endif
-#ifdef EVDEV_INPUT
-    evdev_mouse_poll();
-#endif
-#endif
+    mouse_input_backends[QApplication::platformName()].poll_mouse();
 }
 
 int ignoreNextMouseEvent = 1;

@@ -1,14 +1,16 @@
-package net.eightsixbox.eightsixbox;
+package src.android.src.net.eightsixbox.eightsixbox;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
 import org.qtproject.qt.android.bindings.QtActivity;
 
 public class EmuActivity extends QtActivity
 {
     private static final String TAG = "86BoxEmuActivity";
     private native void onKeyDownEvent(int keyCode, boolean down);
+    private native void onMouseMoveEvent(float x, float y);
     @Override
     public void onCreate(Bundle savedInstanceState)
     {
@@ -26,5 +28,23 @@ public class EmuActivity extends QtActivity
     {
         onKeyDownEvent(keyCode, false);
         return super.onKeyDown(keyCode, event);
+    }
+    public void uncaptureMouse()
+    {
+    	View view = this.findViewById(android.R.id.content);
+    	view.releasePointerCapture();
+    	view.setOnCapturedPointerListener(null);
+    }
+    public void captureMouse()
+    {
+    	View view = this.findViewById(android.R.id.content);
+    	view.setOnCapturedPointerListener(new View.OnCapturedPointerListener() {			
+			@Override
+			public boolean onCapturedPointer(View localview, MotionEvent motionEvent) {
+				onMouseMoveEvent(motionEvent.getX(), motionEvent.getY());
+				return true;
+			}
+		});
+    	view.requestPointerCapture();
     }
 }

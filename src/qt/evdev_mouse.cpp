@@ -100,3 +100,6 @@ void evdev_init()
         atexit(evdev_stop);
     }
 }
+
+void evdev_mouse_capture(QWindow*) {}
+void evdev_mouse_uncapture() {}

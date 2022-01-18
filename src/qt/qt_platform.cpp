@@ -595,7 +595,7 @@ plat_chdir(char *path)
 #ifdef __ANDROID__
 extern "C"
 {
-JNIEXPORT void JNICALL Java_net_eightsixbox_eightsixbox_EmuActivity_onKeyDownEvent(JNIEnv* env, jobject obj, jint keycode, jboolean down)
+JNIEXPORT void JNICALL Java_src_android_src_net_eightsixbox_eightsixbox_EmuActivity_onKeyDownEvent(JNIEnv* env, jobject obj, jint keycode, jboolean down)
 {
     QApplication::postEvent(main_window, new QKeyEvent(down ? QEvent::KeyPress : QEvent::KeyRelease, 0, QGuiApplication::keyboardModifiers(), keycode, 0, 0));
 }

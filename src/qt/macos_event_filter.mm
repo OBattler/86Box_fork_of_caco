@@ -93,6 +93,21 @@ bool CocoaEventFilter::nativeEventFilter(const QByteArray &eventType, void *mess
     return false;
 }
 
+extern "C" void macos_init()
+{
+
+}
+
+extern "C" void macos_mouse_capture(QWindow* window)
+{
+	CGAssociateMouseAndMouseCursorPosition(true);
+}
+
+extern "C" void macos_mouse_uncapture()
+{ 
+        CGAssociateMouseAndMouseCursorPosition(false);
+}
+
 extern "C" void macos_poll_mouse()
 {
     mouse_x = mousedata.deltax;

@@ -7,6 +7,14 @@
 #define result_t long
 #endif
 
+extern "C"
+{
+void macos_poll_mouse();
+void macos_mouse_capture(QWindow* window);
+void macos_mouse_uncapture();
+void macos_init();
+}
+
 class CocoaEventFilter : public QAbstractNativeEventFilter
 {
 public:

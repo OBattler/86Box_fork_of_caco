@@ -9,6 +9,22 @@
 #include <atomic>
 #include <array>
 
+#ifdef WAYLAND
+#include "wl_mouse.hpp"
+#endif
+
+#ifdef EVDEV_INPUT
+#include "evdev_mouse.hpp"
+#endif
+
+#ifdef __APPLE__
+#include "cocoa_mouse.hpp"
+#endif
+
+#ifdef __ANDROID__
+#include "android_mouse.hpp"
+#endif
+
 namespace Ui {
 class RendererStack;
 }
@@ -61,6 +77,32 @@ private:
         int mousebuttons;
     };
     mouseinputdata mousedata;
+
+    struct mouseinputbackend
+    {
+        std::function<void()> init = []{};
+        std::function<void(QWindow*)> capture_mouse = [](QWindow*){};
+        std::function<void()> uncapture_mouse = []{};
+        std::function<void()> poll_mouse = []{};
+    };
+
+    QMap<QString, mouseinputbackend> mouse_input_backends
+    {
+#ifdef WAYLAND
+        {"wayland", {wl_init, wl_mouse_capture, wl_mouse_uncapture, wl_mouse_poll}},
+#endif
+#ifdef EVDEV_INPUT
+        {"xcb", {evdev_init, evdev_mouse_capture, evdev_mouse_uncapture, evdev_mouse_poll}},
+        {"eglfs", {evdev_init, evdev_mouse_capture, evdev_mouse_uncapture, evdev_mouse_poll}},
+#endif
+#ifdef __APPLE__
+        {"cocoa", {macos_init, macos_mouse_capture, macos_mouse_uncapture, macos_poll_mouse}},
+#endif
+#ifdef __ANDROID__
+        {"android", {android_init, android_mouse_capture, android_mouse_uncapture, android_mouse_poll}},
+#endif
+        {"", mouseinputbackend()}
+    };
 
     int x, y, w, h, sx, sy, sw, sh;
     uint8_t touchInProgress = 0;

@@ -41,3 +41,6 @@ src/win/RCa04980
 CMakeLists.txt.user
 .classpath
 .project
+src/android/.gradle/
+src/android/.settings/
+workspace/

@@ -123,19 +123,11 @@ MainWindow::MainWindow(QWidget *parent) :
         if (mouse_capture) {
             ui->stackedWidget->grabMouse();
             this->grabKeyboard();
-#ifdef WAYLAND
-            if (QGuiApplication::platformName().contains("wayland")) {
-                wl_mouse_capture(this->windowHandle());
-            }
-#endif
+            ui->stackedWidget->mouse_input_backends[QApplication::platformName()].capture_mouse(this->windowHandle());
         } else {
             ui->stackedWidget->releaseMouse();
             this->releaseKeyboard();
-#ifdef WAYLAND
-            if (QGuiApplication::platformName().contains("wayland")) {
-                wl_mouse_uncapture();
-            }
-#endif
+            ui->stackedWidget->mouse_input_backends[QApplication::platformName()].uncapture_mouse();
         }
     });
 

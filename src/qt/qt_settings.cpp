@@ -127,6 +127,8 @@ Settings::Settings(QWidget *parent) :
         ui->stackedWidget->setCurrentIndex(current.row());
     });
 
+    ui->listView->setMaximumWidth(ui->listView->sizeHintForColumn(0) + 5);
+    setMaximumSize(sizeHint());
 #ifdef __ANDROID__
     QScroller::grabGesture(ui->scrollArea, QScroller::LeftMouseButtonGesture);
     QScroller::grabGesture(ui->listView, QScroller::LeftMouseButtonGesture);

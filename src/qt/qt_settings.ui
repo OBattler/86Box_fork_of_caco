@@ -38,14 +38,20 @@
         <widget class="QStackedWidget" name="stackedWidget">
          <property name="geometry">
           <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>625</width>
-           <height>517</height>
+           <x>312</x>
+           <y>258</y>
+           <width>0</width>
+           <height>0</height>
           </rect>
          </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <property name="autoFillBackground">
-          <bool>false</bool>
+          <bool>true</bool>
          </property>
         </widget>
        </widget>

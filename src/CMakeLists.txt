@@ -24,7 +24,7 @@ if(QT)
     target_link_options(86Box PRIVATE "-umain")
     set_target_properties(86Box PROPERTIES QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/")
     if (ANDROID)
-        target_sources(86Box PRIVATE "android/src/net/eightsixbox/eightsixbox/EmuActivity.java")
+        target_sources(86Box PRIVATE "android/src/net/eightsixbox/eightsixbox/EmuActivity.java" "android/AndroidManifest.xml")
     endif()
 else()
     add_executable(86Box WIN32 MACOSX_BUNDLE 86box.c config.c log.c random.c timer.c io.c acpi.c apm.c
