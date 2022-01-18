@@ -13,7 +13,7 @@ public class EmuActivity extends QtActivity
 {
     private static final String TAG = "86BoxEmuActivity";
     private native void onKeyDownEvent(int keyCode, boolean down);
-    private native void onMouseMoveEvent(float x, float y);
+    private native void onMouseMoveEvent(float x, float y, float z);
     private boolean pointerCaptured = false;
     @Override
     public void onCreate(Bundle savedInstanceState)
@@ -42,7 +42,7 @@ public class EmuActivity extends QtActivity
     @Override
     public boolean onTrackballEvent(MotionEvent motionEvent)
     {
-        onMouseMoveEvent(motionEvent.getX(), motionEvent.getY());
+        onMouseMoveEvent(motionEvent.getX(), motionEvent.getY(), motionEvent.getAxisValue(MotionEvent.AXIS_VSCROLL));
         return true;
     }
     public void captureMouse()
