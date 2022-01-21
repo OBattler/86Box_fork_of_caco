@@ -3,6 +3,7 @@
 #include <atomic>
 
 static std::atomic<float> android_mouse_relx, android_mouse_rely, android_mouse_relz;
+static std::atomic<uint32_t> android_mouse_buttons = 0;
 
 #include <QJniObject>
 #include <QApplication>
@@ -35,9 +36,13 @@ void android_mouse_uncapture()
 
 void android_mouse_poll()
 {
-    mouse_x = android_mouse_relx;
-    mouse_y = android_mouse_rely;
-    mouse_z = android_mouse_relz;
+    mouse_x += android_mouse_relx;
+    mouse_y += android_mouse_rely;
+    mouse_z += android_mouse_relz;
+    if (mouse_capture)
+    {
+        mouse_buttons |= android_mouse_buttons;
+    }
     android_mouse_relx = 0;
     android_mouse_rely = 0;
     android_mouse_relz = 0;
@@ -50,5 +55,11 @@ JNIEXPORT void JNICALL Java_src_android_src_net_eightsixbox_eightsixbox_EmuActiv
     android_mouse_relx = android_mouse_relx + relx;
     android_mouse_rely = android_mouse_rely + rely;
     android_mouse_relz = android_mouse_rely + wheel;
+}
+JNIEXPORT void JNICALL Java_src_android_src_net_eightsixbox_eightsixbox_EmuActivity_onMouseButtonEvent(JNIEnv* env, jobject obj, jboolean pressed, jint button)
+{
+    qDebug() << "Mouse button event";
+    if (pressed) android_mouse_buttons |= button;
+    else android_mouse_buttons &= ~button;
 }
 }

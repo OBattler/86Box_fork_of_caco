@@ -19,6 +19,7 @@
 
 extern "C"
 {
+#include <86box/86box.h>
 #include <86box/mouse.h>
 #include <86box/plat.h>
 #include <86box/video.h>
@@ -36,16 +37,7 @@ RendererStack::RendererStack(QWidget *parent) :
     setAttribute(Qt::WA_InputMethodEnabled, true);
 #endif
 
-#ifdef WAYLAND
-    if (QApplication::platformName().contains("wayland")) {
-        wl_init();
-    }
-#endif
-#ifdef EVDEV_INPUT
-    if (QApplication::platformName() == "xcb" || QApplication::platformName() == "eglfs") {
-        evdev_init();
-    }
-#endif
+    mouse_input_backends[QApplication::platformName()].init();
 }
 
 RendererStack::~RendererStack()
@@ -159,6 +151,11 @@ void RendererStack::leaveEvent(QEvent* event)
     event->accept();
 }
 
+void RendererStack::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    event->ignore();
+}
+
 void RendererStack::switchRenderer(Renderer renderer) {
     startblit();
     if (current) {
@@ -171,7 +168,11 @@ void RendererStack::switchRenderer(Renderer renderer) {
         auto sw = new SoftwareRenderer(this);        
         rendererWindow = sw;
         connect(this, &RendererStack::blitToRenderer, sw, &SoftwareRenderer::onBlit, Qt::QueuedConnection);
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        current.reset(sw);
+#else
         current.reset(this->createWindowContainer(sw, this));
+#endif
     }
         break;
     case Renderer::OpenGL:
@@ -180,7 +181,11 @@ void RendererStack::switchRenderer(Renderer renderer) {
         auto hw = new HardwareRenderer(this);
         rendererWindow = hw;
         connect(this, &RendererStack::blitToRenderer, hw, &HardwareRenderer::onBlit, Qt::QueuedConnection);
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        current.reset(hw);
+#else
         current.reset(this->createWindowContainer(hw, this));
+#endif
         break;
     }
     case Renderer::OpenGLES:
@@ -189,7 +194,11 @@ void RendererStack::switchRenderer(Renderer renderer) {
         auto hw = new HardwareRenderer(this, HardwareRenderer::RenderType::OpenGLES);
         rendererWindow = hw;
         connect(this, &RendererStack::blitToRenderer, hw, &HardwareRenderer::onBlit, Qt::QueuedConnection);
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        current.reset(hw);
+#else
         current.reset(this->createWindowContainer(hw, this));
+#endif
         break;
     }
     case Renderer::OpenGL3:
@@ -198,7 +207,11 @@ void RendererStack::switchRenderer(Renderer renderer) {
         auto hw = new HardwareRenderer(this, HardwareRenderer::RenderType::OpenGL3);
         rendererWindow = hw;
         connect(this, &RendererStack::blitToRenderer, hw, &HardwareRenderer::onBlit, Qt::QueuedConnection);
-        current.reset(this->createWindowContainer(hw, this));
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        current.reset(hw);
+#else
+        current.reset(this->createWindowContainer(sw, this));
+#endif
         break;
     }
     }
@@ -207,6 +220,9 @@ void RendererStack::switchRenderer(Renderer renderer) {
 
     current->setFocusPolicy(Qt::NoFocus);
     current->setFocusProxy(this);
+#ifdef __ANDROID__
+    current->setAttribute(Qt::WA_AcceptTouchEvents, true);
+#endif
     addWidget(current.get());
 
     this->setStyleSheet("background-color: black");
@@ -266,8 +282,8 @@ bool RendererStack::event(QEvent* event)
                 auto touchevent = ((QTouchEvent*)(event));
                 for (int i = 0; i < touchevent->points().size(); i++)
                 {
-                    mouse_x += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).x();
-                    mouse_y += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).y();
+                    mousedata.deltax += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).x();
+                    mousedata.deltay += (touchevent->points()[i].position() - touchevent->points()[i].lastPosition()).y();
                 }
                 break;
             }
@@ -291,6 +307,11 @@ bool RendererStack::event(QEvent* event)
 #endif
          default:
             break;
+    }
+    if (event->type() == QEvent::TouchBegin || event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchUpdate || event->type() == QEvent::TouchCancel)
+    {
+        event->setAccepted(cpu_thread_run == 1);
+        return true;
     }
     return QStackedWidget::event(event);
 }

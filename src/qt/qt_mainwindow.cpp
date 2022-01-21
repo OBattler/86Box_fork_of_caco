@@ -392,9 +392,18 @@ void MainWindow::showEvent(QShowEvent *event) {
         scrnsz_y = window_h;
     }
     if (settings_only) QTimer::singleShot(0, this, [this] () { ui->actionSettings->trigger(); });
-#ifdef __ANDROID__
+#if 0
     QTimer::singleShot(1000, this, [this] { ui->stackedWidget->switchRenderer(RendererStack::Renderer::OpenGLES); } );
 #endif
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    if (event->type() != QEvent::WindowStateChange) { event->ignore(); return; }
+    else event->accept();
+    auto prevState = ((QWindowStateChangeEvent*)event)->oldState();
+    if (!(prevState & Qt::WindowActive) && (windowState() & Qt::WindowActive)) this->grabKeyboard();
+    else if ((prevState & Qt::WindowActive) && !(windowState() & Qt::WindowActive)) this->releaseKeyboard();
 }
 
 void MainWindow::on_actionKeyboard_requires_capture_triggered() {
@@ -1272,12 +1281,12 @@ void MainWindow::on_actionHardware_Renderer_OpenGL_ES_triggered() {
 
 void MainWindow::focusInEvent(QFocusEvent* event)
 {
-    this->grabKeyboard();
+    //this->grabKeyboard();
 }
 
 void MainWindow::focusOutEvent(QFocusEvent* event)
 {
-    this->releaseKeyboard();
+    //this->releaseKeyboard();
 }
 
 void MainWindow::on_actionResizable_window_triggered(bool checked) {

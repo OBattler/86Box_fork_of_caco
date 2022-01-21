@@ -533,7 +533,13 @@ extern "C"
 {
 JNIEXPORT void JNICALL Java_src_android_src_net_eightsixbox_eightsixbox_EmuActivity_onKeyDownEvent(JNIEnv* env, jobject obj, jint keycode, jboolean down)
 {
-    QApplication::postEvent(main_window, new QKeyEvent(down ? QEvent::KeyPress : QEvent::KeyRelease, 0, QGuiApplication::keyboardModifiers(), keycode, 0, 0));
+    uint32_t topLevelWidgetCount = 0;
+    for (int i = 0; i < QApplication::topLevelWidgets().count(); i++)
+    {
+        if (QApplication::topLevelWidgets()[i]->isHidden()) continue;
+        topLevelWidgetCount++;
+    }
+    if (topLevelWidgetCount == 1) QApplication::postEvent(main_window, new QKeyEvent(down ? QEvent::KeyPress : QEvent::KeyRelease, 0, QGuiApplication::keyboardModifiers(), keycode, 0, 0));
 }
 }
 #endif

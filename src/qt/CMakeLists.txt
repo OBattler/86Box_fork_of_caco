@@ -144,6 +144,7 @@ target_link_libraries(
 if (ANDROID)
     target_include_directories(plat PRIVATE ${Qt${QT_MAJOR}Core_PRIVATE_INCLUDE_DIRS})
     target_sources(ui PRIVATE android_mouse.hpp android_mouse.cpp)
+    target_link_libraries(ui PRIVATE Qt6::OpenGLWidgets)
 endif()
 
 # needed for static builds

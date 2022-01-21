@@ -7,6 +7,13 @@
 #include <QTranslator>
 #include <QDirIterator>
 #include <QLibraryInfo>
+#include <QMessageBox>
+#include <QFileDialog>
+#include <QLayout>
+#include <QPushButton>
+#include <QProgressDialog>
+#include <QAbstractScrollArea>
+#include <QScroller>
 #ifdef __ANDROID__
 #include <QJniObject>
 #include <private/qandroidextras_p.h>
@@ -112,18 +119,27 @@ public:
         : QObject(parent) {}
     bool eventFilter(QObject* obj, QEvent* event)
     {
+        if (qobject_cast<QAbstractScrollArea*>(obj) && event->type() == QEvent::Show)
+        {
+            QScroller::grabGesture(obj, QScroller::LeftMouseButtonGesture);
+        }
         if (qobject_cast<QDialog*>(obj) && !qobject_cast<MainWindow*>(obj) && event->type() == QEvent::Show)
         {
-            qobject_cast<QDialog*>(obj)->setGeometry(main_window->geometry());
-            qobject_cast<QDialog*>(obj)->setFixedSize(main_window->size());
+            auto dialog = qobject_cast<QDialog*>(obj);
+            dialog->setGeometry(main_window->geometry());
+            if (dialog->maximumSize().width() < main_window->size().width()
+                && dialog->maximumSize().height() < main_window->size().height())
+                dialog->setFixedSize(main_window->size());
+            else qobject_cast<QDialog*>(obj)->setMaximumSize(main_window->size());
+            plat_mouse_capture(0);
         }
         return false;
     }
 };
 
 int main(int argc, char* argv[]) {
-
     QApplication app(argc, argv);
+    main_window = nullptr;
 #ifdef __ANDROID__
     app.installEventFilter(new AndroidFilter(&app));
 #endif
@@ -141,17 +157,24 @@ int main(int argc, char* argv[]) {
 
 #ifdef __ANDROID__
     QString str;
-    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([&str]()
+    QtAndroidPrivate::requestPermission(QtAndroidPrivate::Storage).waitForFinished();
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([&str, &app]()
     {
         static char curpath[4096];
-        QJniObject activity = QNativeInterface::QAndroidApplication::context();
-        str = activity.callObjectMethod("getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;")
-                .callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString();
+        if (plat_dir_check("/storage/emulated/0/Documents/86Box") || plat_dir_create("/storage/emulated/0/Documents/86Box") == 0)
+        {
+            str = "/storage/emulated/0/Documents/86Box";
+        }
+        else
+        {
+            QJniObject activity = QNativeInterface::QAndroidApplication::context();
+            str = activity.callObjectMethod("getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;")
+                    .callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString();
+        }
         plat_chdir(str.toUtf8().data());
         plat_getcwd(curpath, 4096);
         qDebug() << curpath;
     }).waitForFinished();
-    QtAndroidPrivate::requestPermission(QtAndroidPrivate::Storage).waitForFinished();
 #endif
 
 #ifdef __APPLE__
@@ -167,13 +190,94 @@ int main(int argc, char* argv[]) {
 #ifdef __ANDROID__
     strcpy(rom_path, (str + "/roms/").toUtf8().constData());
 #endif
-    ProgSettings::loadTranslators(&app);
-    main_window = new MainWindow();
-    main_window->show();
+    if (!main_window)
+    {
+        ProgSettings::loadTranslators(&app);
+        main_window = new MainWindow();
+        main_window->show();
+    }
     if (! pc_init_modules()) {
+#ifdef __ANDROID__
+        QMessageBox::information(main_window, "86Box", "No ROMs found. Press OK to select a folder containing the roms directory");
+        main_window->hide();
+        main_window->setDisabled(true);
+        QFileDialog dialog(nullptr, "Import ROM files");
+        dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+        dialog.setFileMode(QFileDialog::Directory);
+        dialog.setDirectory("/storage/emulated/0/");
+        QString curDir;
+        dialog.connect(&dialog, &QFileDialog::currentChanged, &app, [&app, &dialog, &curDir](const QString& file)
+        {
+            qDebug() << file;
+            curDir = file;
+            //if (!file.isEmpty()) QTimer::singleShot(400, &dialog, [&dialog, file] () { dialog.setDirectory(file); } );
+        });
+        auto enterButton = new QPushButton(QObject::tr("&Open"));
+        QObject::connect(enterButton, &QPushButton::released, &dialog, [&dialog] { dialog.setDirectory(dialog.selectedFiles()[0]); } );
+        dialog.layout()->addWidget(enterButton);
+        dialog.setFixedSize(main_window->size());
+        for (uint32_t i = 0; i < dialog.layout()->count(); i++)
+        {
+            if (dialog.layout()->itemAt(i)->widget() && qobject_cast<QAbstractScrollArea*>(dialog.layout()->itemAt(i)->widget()))
+            {
+                QScroller::grabGesture(dialog.layout()->itemAt(i)->widget(), QScroller::LeftMouseButtonGesture);
+            }
+        }
+        int result = dialog.exec();
+        auto copyfunc = [&dialog, &curDir, &result]()
+        {
+            if (result == QDialog::Accepted)
+            {
+                uint32_t count = 0;
+                QProgressDialog progressDialog(&dialog);
+                progressDialog.show();
+                progressDialog.setMinimum(0);
+                progressDialog.setMaximum(1);
+                progressDialog.setValue(0);
+                progressDialog.setLabelText("Counting files: ");
+                {
+                    QDirIterator dirit(curDir.isEmpty() ? dialog.directory() : curDir, QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
+                    while (dirit.hasNext())
+                    {
+                        dirit.next();
+                        if (dirit.fileInfo().isDir()) continue;
+                        count++;
+                        progressDialog.setLabelText(QStringLiteral("Counting files: %1").arg(count));
+                        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+                    }
+                }
+                progressDialog.setLabelText("Copying file");
+                progressDialog.setMaximum(count);
+                count = 0;
+                QDirIterator dirit(curDir.isEmpty() ? dialog.directory() : curDir, QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
+                while (dirit.hasNext()) {
+                    auto str = dirit.next();
+                    if (dirit.fileInfo().isDir()) { continue; }
+                    progressDialog.setLabelText("Copying file:\n" + str + QChar('\n') + QStringLiteral("to\n") + (QString(dirit.fileInfo().canonicalPath()).replace(dirit.path(), "./") + '/' + dirit.fileInfo().fileName()));
+                    QDir(QString(dirit.fileInfo().canonicalPath()).replace(dirit.path(), "./") + '/').mkpath(".");
+                    QFile(QString(dirit.fileInfo().canonicalPath()).replace(dirit.path(), "./") + '/' + dirit.fileInfo().fileName()).remove();
+                    if (!QFile(str).copy(QString(dirit.fileInfo().canonicalPath()).replace(dirit.path(), "./") + '/' + dirit.fileInfo().fileName()))
+                    {
+                        QMessageBox::critical(&progressDialog, "86Box", "Unable to copy file");
+                        progressDialog.cancel();
+                    }
+                    progressDialog.setValue(++count);
+                    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+                }
+                progressDialog.close();
+            }
+            QApplication::exit(6);
+            return 6;
+        };
+        main_window->show();
+        QTimer::singleShot(0, main_window, copyfunc);
+        app.exec();
+#else
         ui_msgbox_header(MBX_FATAL, (void*)IDS_2120, (void*)IDS_2056);
+#endif
         return 6;
     }
+    cpu_thread_run = 1;
 
     discord_load();
 #ifdef __ANDROID__

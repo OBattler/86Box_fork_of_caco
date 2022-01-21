@@ -8,9 +8,13 @@ extern "C" {
 }
 
 SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+#ifdef RENDERER_COMMON_USE_WIDGETS
+    : QWidget(parent)
+#else
     : QRasterWindow(parent->windowHandle())
+#endif
 {
-    parentWidget = parent;
+    rendererParentWidget = parent;
 
     images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
     images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
@@ -40,13 +44,22 @@ void SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h) {
 
 void SoftwareRenderer::resizeEvent(QResizeEvent *event) {
     onResize(width(), height());
+#ifdef RENDERER_COMMON_USE_WIDGETS
+    QWidget::resizeEvent(event);
+#else
     QRasterWindow::resizeEvent(event);
+#endif
 }
 
 bool SoftwareRenderer::event(QEvent *event)
 {
     bool res = false;
-    if (!eventDelegate(event, res)) return QRasterWindow::event(event);
+    if (!eventDelegate(event, res))
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        return QWidget::event(event);
+#else
+        return QRasterWindow::event(event);
+#endif
     return res;
 }
 

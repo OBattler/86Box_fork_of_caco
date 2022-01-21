@@ -8,7 +8,13 @@
 #include <atomic>
 #include "qt_renderercomon.hpp"
 
-class SoftwareRenderer : public QRasterWindow, public RendererCommon
+class SoftwareRenderer :
+        #ifdef RENDERER_COMMON_USE_WIDGETS
+        public QWidget,
+        #else
+        public QRasterWindow,
+        #endif
+        public RendererCommon
 {
     Q_OBJECT
 public:

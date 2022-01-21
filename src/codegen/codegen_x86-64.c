@@ -23,7 +23,6 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/mman.h>
-#include <unistd.h>
 #endif
 #if _WIN64
 #include <windows.h>

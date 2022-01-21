@@ -151,6 +151,9 @@ if(QT)
   #set(CMAKE_PREFIX_PATH "path/to/qt5-static")
 
   find_package(Qt${QT_MAJOR} COMPONENTS Core Widgets OpenGL REQUIRED)
+  if (USE_QT6)
+      find_package(Qt6 COMPONENTS OpenGLWidgets REQUIRED)
+  endif()
   find_package(Qt${QT_MAJOR}LinguistTools REQUIRED)
 endif()
 

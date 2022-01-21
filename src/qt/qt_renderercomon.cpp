@@ -86,6 +86,11 @@ void RendererCommon::onResize(int width, int height) {
 
 bool RendererCommon::eventDelegate(QEvent *event, bool& result)
 {
+    if (!cpu_thread_run)
+    {
+        event->ignore();
+        return false;
+    }
     switch (event->type())
     {
         default:
@@ -95,6 +100,7 @@ bool RendererCommon::eventDelegate(QEvent *event, bool& result)
             result = QApplication::sendEvent(main_window, event);
             return true;
         case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonDblClick:
         case QEvent::MouseMove:
         case QEvent::MouseButtonRelease:
 #ifdef __ANDROID__
@@ -106,7 +112,7 @@ bool RendererCommon::eventDelegate(QEvent *event, bool& result)
         case QEvent::Wheel:
         case QEvent::Enter:
         case QEvent::Leave:
-            result = QApplication::sendEvent(parentWidget, event);
+            result = QApplication::sendEvent(rendererParentWidget, event);
             return true;
     }
     return false;

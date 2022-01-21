@@ -8,6 +8,10 @@
 #include <tuple>
 #include <atomic>
 
+#ifdef __ANDROID__
+#define RENDERER_COMMON_USE_WIDGETS 1
+#endif
+
 class QWidget;
 
 class RendererCommon
@@ -21,7 +25,7 @@ protected:
     bool eventDelegate(QEvent* event, bool& result);
 
     QRect source, destination;
-    QWidget* parentWidget{nullptr};
+    QWidget* rendererParentWidget{nullptr};
 
     std::vector<std::atomic_flag> buf_usage;
 };

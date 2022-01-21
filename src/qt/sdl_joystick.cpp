@@ -1,6 +1,8 @@
 // Lifted from wx-sdl2-joystick.c in PCem
 
+#ifndef __ANDROID__
 #include <SDL2/SDL.h>
+#endif
 
 #include <algorithm>
 
@@ -80,6 +82,7 @@ void joystick_close()
 
 static int joystick_get_axis(int joystick_nr, int mapping)
 {
+#ifndef __ANDROID__
     if (mapping & POV_X)
     {
         switch (plat_joystick_state[joystick_nr].p[mapping & 3])
@@ -110,6 +113,9 @@ static int joystick_get_axis(int joystick_nr, int mapping)
     }
     else
         return plat_joystick_state[joystick_nr].a[plat_joystick_state[joystick_nr].axis[mapping].id];
+#else
+    return 0;
+#endif
 }
 void joystick_process()
 {

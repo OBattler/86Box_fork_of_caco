@@ -8,6 +8,7 @@
 #include <QOpenGLShader>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTextureBlitter>
+#include <QOpenGLWidget>
 #include <QPainter>
 #include <QEvent>
 #include <QKeyEvent>
@@ -26,7 +27,14 @@
 #include "wl_mouse.hpp"
 #endif
 
-class HardwareRenderer : public QOpenGLWindow, protected QOpenGLFunctions, public RendererCommon
+class HardwareRenderer :
+        #ifdef RENDERER_COMMON_USE_WIDGETS
+        public QOpenGLWidget,
+        #else
+        public QOpenGLWindow,
+        #endif
+        protected QOpenGLFunctions,
+        public RendererCommon
 {
 	Q_OBJECT
 
@@ -49,7 +57,12 @@ public:
     void paintGL() override;
     std::vector<std::tuple<uint8_t*, std::atomic_flag*>> getBuffers() override;
     HardwareRenderer(QWidget* parent = nullptr, RenderType rtype = RenderType::OpenGL)
-    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent->windowHandle()), QOpenGLFunctions()
+#ifdef RENDERER_COMMON_USE_WIDGETS
+    : QOpenGLWidget(parent),
+#else
+    : QOpenGLWindow(QOpenGLWindow::NoPartialUpdate, parent->windowHandle()),
+#endif
+      QOpenGLFunctions()
     {
         imagebufs[0] = std::unique_ptr<uint8_t>(new uint8_t[2048 * 2048 * 4]);
         imagebufs[1] = std::unique_ptr<uint8_t>(new uint8_t[2048 * 2048 * 4]);
@@ -59,23 +72,41 @@ public:
         buf_usage[1].clear();
 
         setMinimumSize(QSize(16, 16));
+#ifndef RENDERER_COMMON_USE_WIDGETS
         setFlags(Qt::FramelessWindowHint);
-        parentWidget = parent;
+#endif
+        rendererParentWidget = parent;
         setRenderType(rtype);
 
+#ifndef RENDERER_COMMON_USE_WIDGETS
         m_context = new QOpenGLContext();
         m_context->setFormat(format());
         m_context->create();
+#endif
     }
+#ifdef RENDERER_COMMON_USE_WIDGETS
+    operator QSurface*()
+    {
+        return this->windowHandle();
+    }
+#endif
     ~HardwareRenderer()
     {
-        m_context->makeCurrent(this);
+#ifndef RENDERER_COMMON_USE_WIDGETS
+        if (m_context) m_context->makeCurrent((QSurface*)this);
+#else
+        makeCurrent();
+#endif
         if (m_blt) m_blt->destroy();
         m_prog->release();
         delete m_prog;
         m_prog = nullptr;
-        m_context->doneCurrent();
-        delete m_context;
+#ifndef RENDERER_COMMON_USE_WIDGETS
+        if (m_context) {
+            m_context->doneCurrent();
+            delete m_context;
+        }
+#endif
     }
 
 

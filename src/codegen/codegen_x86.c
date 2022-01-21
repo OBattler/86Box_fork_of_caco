@@ -63,7 +63,6 @@
 
 #ifdef __unix__
 #include <sys/mman.h>
-#include <unistd.h>
 #endif
 #if defined _WIN32
 #include <windows.h>

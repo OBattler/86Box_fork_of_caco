@@ -20,7 +20,11 @@ void HardwareRenderer::resizeGL(int w, int h)
 
 void HardwareRenderer::initializeGL()
 {
-    m_context->makeCurrent(this);
+#ifndef RENDERER_COMMON_USE_WIDGETS
+    m_context->makeCurrent((QSurface*)this);
+#else
+    m_context = this->context();
+#endif
     initializeOpenGLFunctions();
     m_texture = new QOpenGLTexture(QImage(2048,2048, QImage::Format::Format_RGB32));
     m_blt = new QOpenGLTextureBlitter;
@@ -116,7 +120,9 @@ void HardwareRenderer::initializeGL()
 }
 
 void HardwareRenderer::paintGL() {
-    m_context->makeCurrent(this);
+#ifndef RENDERER_COMMON_USE_WIDGETS
+    m_context->makeCurrent((QSurface*)this);
+#endif
     glClear(GL_COLOR_BUFFER_BIT);
     QVector<QVector2D> verts, texcoords;
     QMatrix4x4 mat;
@@ -171,7 +177,9 @@ void HardwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h) {
         source.setRect(x, y, w, h);
         return;
     }
-    m_context->makeCurrent(this);
+#ifndef RENDERER_COMMON_USE_WIDGETS
+    m_context->makeCurrent((QSurface*)this);
+#endif
     m_texture->setData(QOpenGLTexture::PixelFormat::RGBA, QOpenGLTexture::PixelType::UInt8, (const void*)imagebufs[buf_idx].get());
     buf_usage[buf_idx].clear();
     source.setRect(x, y, w, h);
@@ -180,14 +188,22 @@ void HardwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h) {
 
 void HardwareRenderer::resizeEvent(QResizeEvent *event) {
     onResize(width(), height());
-    
+#ifdef RENDERER_COMMON_USE_WIDGETS
+    QOpenGLWidget::resizeEvent(event);
+#else
     QOpenGLWindow::resizeEvent(event);
+#endif
 }
 
 bool HardwareRenderer::event(QEvent *event)
 {
     bool res = false;
-    if (!eventDelegate(event, res)) return QOpenGLWindow::event(event);
+    if (!eventDelegate(event, res))
+#ifdef RENDERER_COMMON_USE_WIDGETS
+        return QOpenGLWidget::event(event);
+#else
+        return QOpenGLWindow::event(event);
+#endif
     return res;
 }
 
