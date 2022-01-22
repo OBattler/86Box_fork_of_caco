@@ -11,7 +11,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <meta-data android:name="android.app.lib_name" android:value="86Box"/>
-            <meta-data android:name="android.app.arguments" android:value=""/>
+            <meta-data android:name="android.app.arguments" android:value="-L ./86Box.log"/>
             <meta-data android:name="android.app.extract_android_style" android:value="minimal"/>
         </activity>
     </application>

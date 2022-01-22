@@ -27,6 +27,7 @@ public:
     void showMessage(const QString& header, const QString& message);
     void getTitle(wchar_t* title);
     void blitToWidget(int x, int y, int w, int h);
+    void reloadWidget();
     QSize getRenderWidgetSize();
     void setSendKeyboardInput(bool enabled);
 signals:

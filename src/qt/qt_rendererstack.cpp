@@ -23,6 +23,7 @@ extern "C"
 #include <86box/mouse.h>
 #include <86box/plat.h>
 #include <86box/video.h>
+#include <86box/keyboard.h>
 }
 
 extern MainWindow* main_window;
@@ -35,6 +36,8 @@ RendererStack::RendererStack(QWidget *parent) :
 #ifdef __ANDROID__
     setAttribute(Qt::WA_AcceptTouchEvents, true);
     setAttribute(Qt::WA_InputMethodEnabled, true);
+    setInputMethodHints(inputMethodHints() | Qt::ImhLatinOnly | Qt::ImhHiddenText | Qt::ImhSensitiveData | Qt::ImhNoAutoUppercase | Qt::ImhNoPredictiveText);
+    connect(QApplication::inputMethod(), &QInputMethod::visibleChanged, this, &RendererStack::keyboardVisibleChanged);
 #endif
 
     mouse_input_backends[QApplication::platformName()].init();
@@ -314,4 +317,107 @@ bool RendererStack::event(QEvent* event)
         return true;
     }
     return QStackedWidget::event(event);
+}
+
+void RendererStack::keyboardVisibleChanged()
+{
+    this->imeInputText = "";
+}
+
+void RendererStack::inputMethodEvent(QInputMethodEvent* event)
+{
+    if (event->attributes().length() == 0) return;
+    if (event->preeditString().length() == 0) return;
+    static const QMap<QChar, std::array<uint32_t, 2>> latinToXt =
+    {
+        {'\x1b', {0x01}},
+        {'1', {0x02}},
+        {'!', {0x02, 1}},
+        {'2', {0x03}},
+        {'@', {0x03, 1}},
+        {'3', {0x04}},
+        {'#', {0x04, 1}},
+        {'4', {0x05}},
+        {'$', {0x05, 1}},
+        {'5', {0x06}},
+        {'%', {0x06, 1}},
+        {'6', {0x07}},
+        {'^', {0x07, 1}},
+        {'7', {0x08}},
+        {'&', {0x08, 1}},
+        {'8', {0x09}},
+        {'9', {0x0A}},
+        {'(', {0x0A, 1}},
+        {'0', {0x0B}},
+        {')', {0x0B, 1}},
+        {'-', {0x4A}},
+        {'_', {0x0C, 1}},
+        {'=', {0x0D}},
+        {'+', {0x4E}},
+        {'\t', {0x0F}},
+        {'q', {0x10}},
+        {'w', {0x11}},
+        {'e', {0x12}},
+        {'r', {0x13}},
+        {'t', {0x14}},
+        {'y', {0x15}},
+        {'u', {0x16}},
+        {'i', {0x17}},
+        {'o', {0x18}},
+        {'p', {0x19}},
+        {'{', {0x1A, 1}},
+        {'[', {0x1A}},
+        {'}', {0x1B, 1}},
+        {']', {0x1B}},
+        {'\n', {0x1C}},
+        {'a', {0x1E}},
+        {'s', {0x1F}},
+        {'d', {0x20}},
+        {'f', {0x21}},
+        {'g', {0x22}},
+        {'h', {0x23}},
+        {'j', {0x24}},
+        {'k', {0x25}},
+        {'l', {0x26}},
+        {';', {0x27}},
+        {':', {0x27, 1}},
+        {'\'', {0x28}},
+        {'"', {0x28, 1}},
+        {'`', {0x29}},
+        {'~', {0x29, 1}},
+        {'\\', {0x2B}},
+        {'|', {0x2B, 1}},
+        {'z', {0x2C}},
+        {'x', {0x2D}},
+        {'c', {0x2E}},
+        {'v', {0x2F}},
+        {'b', {0x30}},
+        {'n', {0x31}},
+        {'m', {0x32}},
+        {',', {0x33}},
+        {'<', {0x33, 1}},
+        {'.', {0x34}},
+        {'>', {0x34, 1}},
+        {'/', {0x35}},
+        {'?', {0x35, 1}},
+        {'*', {0x37}},
+        {' ', {0x39}},
+    };
+    if (event->preeditString()[0] <= (QChar)127 && event->preeditString()[0].isLetter() && event->preeditString()[0].isUpper())
+    {
+        QChar lowercaseCharacter = event->preeditString()[0].toLower();
+        keyboard_input(1, 0x2A);
+        keyboard_input(1, latinToXt[lowercaseCharacter][0]);
+        keyboard_input(0, latinToXt[lowercaseCharacter][0]);
+        keyboard_input(0, 0x2A);
+    }
+    else
+    {
+        bool shiftNeeded = latinToXt[event->preeditString()[0]][1];
+        if (shiftNeeded) keyboard_input(1, 0x2A);
+        keyboard_input(1, latinToXt[event->preeditString()[0]][0]);
+        keyboard_input(0, latinToXt[event->preeditString()[0]][0]);
+        if (shiftNeeded) keyboard_input(0, 0x2A);
+    }
+    event->accept();
 }

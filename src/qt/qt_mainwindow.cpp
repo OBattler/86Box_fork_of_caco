@@ -1628,3 +1628,7 @@ void MainWindow::on_actionShow_keyboard_triggered()
     if (keyboard) keyboard->show();
 }
 
+void MainWindow::reloadWidget()
+{
+    ui->stackedWidget->switchRenderer((RendererStack::Renderer)vid_api);
+}

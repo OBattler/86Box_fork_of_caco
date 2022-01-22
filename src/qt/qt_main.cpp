@@ -147,6 +147,7 @@ static QtMessageHandler prevHandler;
 static int logfd = -1;
 void EmuMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
 {
+    prevHandler(type, ctx, msg);
     QString txt;
     switch (type) {
     case QtInfoMsg:
@@ -165,6 +166,7 @@ void EmuMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const QStr
         txt = QString("Fatal: %1").arg(msg);
         abort();
     }
+    logfile->flush();
     logfile->write(txt.toUtf8() + '\n');
     logfile->flush();
 }
@@ -174,33 +176,32 @@ static QString tag;
 #ifndef _WIN32
 int start_logger(const char *app_name)
 {
-    tag = app_name;
+    //tag = app_name;
+
+    /* make stdout line-buffered and stderr unbuffered */
+    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stderr, 0, _IONBF, 0);
 
     /* create the pipe and redirect stdout and stderr */
     pipe(pfd);
     dup2(pfd[1], 1);
     dup2(pfd[1], 2);
-    auto thread = std::thread([] ()
+    auto thread = new std::thread([] ()
     {
         ssize_t rdsz;
         char buf[128];
         while((rdsz = read(pfd[0], buf, sizeof buf - 1)) > 0) {
-            write(logfd, buf, rdsz);
+            if (logfd != -1) write(logfd, buf, rdsz);
         }
     });
-    thread.detach();
 }
 #endif
 
 int main(int argc, char* argv[]) {
-#ifdef __ANDROID__
-    /* make stdout line-buffered and stderr unbuffered */
-    setvbuf(stdout, 0, _IOLBF, 0);
-    setvbuf(stderr, 0, _IONBF, 0);
-#endif
     QApplication app(argc, argv);
     main_window = nullptr;
 #ifdef __ANDROID__
+    QNativeInterface::QAndroidApplication::hideSplashScreen(0);
     app.installEventFilter(new AndroidFilter(&app));
 #endif
     qt_set_sequence_auto_mnemonic(false);
@@ -347,6 +348,7 @@ int main(int argc, char* argv[]) {
     discord_load();
 #ifdef __ANDROID__
     app.setAttribute(Qt::AA_DontUseNativeDialogs);
+    main_window->reloadWidget();
 #endif
     app.installEventFilter(main_window);
 

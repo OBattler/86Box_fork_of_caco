@@ -44,6 +44,7 @@ public:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent *event) override;
     void leaveEvent(QEvent *event) override;
+    void inputMethodEvent(QInputMethodEvent *event) override;
     void keyPressEvent(QKeyEvent* event) override
     {
         event->ignore();
@@ -69,6 +70,7 @@ signals:
 public slots:
     void blit(int x, int y, int w, int h);
     void mousePoll();
+    void keyboardVisibleChanged();
 
 private:
     Ui::RendererStack *ui;
@@ -114,6 +116,7 @@ private:
     std::vector<std::tuple<uint8_t*, std::atomic_flag*>> imagebufs;
 
     std::unique_ptr<QWidget> current;
+    QString imeInputText;
 
     friend class MainWindow;
 };
