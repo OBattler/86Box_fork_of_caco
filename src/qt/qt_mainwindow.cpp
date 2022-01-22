@@ -68,6 +68,7 @@ MainWindow::MainWindow(QWidget *parent) :
     MediaMenu::ptr = mm;
     status = std::make_unique<MachineStatus>(this);
 
+    setUnifiedTitleAndToolBarOnMac(true);
     ui->setupUi(this);
     ui->stackedWidget->setMouseTracking(true);
     statusBar()->setVisible(!hide_status_bar);
@@ -1621,7 +1622,6 @@ void MainWindow::on_actionEnable_Discord_integration_triggered(bool checked)
         discord_close();
 }
 
-
 void MainWindow::on_actionShow_keyboard_triggered()
 {
     QInputMethod *keyboard = QGuiApplication::inputMethod();
@@ -1631,4 +1631,20 @@ void MainWindow::on_actionShow_keyboard_triggered()
 void MainWindow::reloadWidget()
 {
     ui->stackedWidget->switchRenderer((RendererStack::Renderer)vid_api);
+}
+
+void MainWindow::showSettings()
+{
+    if (findChild<Settings*>() == nullptr)
+        ui->actionSettings->trigger();
+}
+
+void MainWindow::hardReset()
+{
+    ui->actionHard_Reset->trigger();
+}
+
+void MainWindow::togglePause()
+{
+    ui->actionPause->trigger();
 }

@@ -48,6 +48,10 @@ signals:
 
     void showMessageForNonQtThread(const QString& header, const QString& message);
     void getTitleForNonQtThread(wchar_t* title);
+public slots:
+    void showSettings();
+    void hardReset();
+    void togglePause();
 private slots:
     void on_actionFullscreen_triggered();
     void on_actionSettings_triggered();

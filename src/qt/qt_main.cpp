@@ -35,6 +35,8 @@ Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
 
 #ifdef Q_OS_WINDOWS
 #include "qt_winrawinputfilter.hpp"
+#include "qt_winmanagerfilter.hpp"
+#include <86box/win.h>
 #endif
 
 #include <86box/86box.h>
@@ -45,6 +47,7 @@ Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
 
 #include <thread>
 #include <iostream>
+#include <memory>
 
 #include "qt_mainwindow.hpp"
 #include "qt_progsettings.hpp"
@@ -353,6 +356,38 @@ int main(int argc, char* argv[]) {
     app.installEventFilter(main_window);
 
 #ifdef Q_OS_WINDOWS
+    /* Setup VM-manager messages */
+    std::unique_ptr<WindowsManagerFilter> wmfilter;
+    if (source_hwnd)
+    {
+        HWND main_hwnd = (HWND)main_window->winId();
+
+        wmfilter.reset(new WindowsManagerFilter());
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::showsettings, main_window, &MainWindow::showSettings);
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::pause, main_window, &MainWindow::togglePause);
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::reset, main_window, &MainWindow::hardReset);
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::shutdown, [](){ plat_power_off(); });
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::ctrlaltdel, [](){ pc_send_cad(); });
+        QObject::connect(wmfilter.get(), &WindowsManagerFilter::dialogstatus, [main_hwnd](bool open){
+            PostMessage((HWND)(uintptr_t)source_hwnd, WM_SENDDLGSTATUS, (WPARAM)(open ? 1 : 0), (LPARAM)main_hwnd);
+        });
+
+        /* Native filter to catch VM-managers commands */
+        app.installNativeEventFilter(wmfilter.get());
+
+        /* Filter to catch main window being blocked (by modal dialog) */
+        main_window->installEventFilter(wmfilter.get());
+
+        /* Send main window HWND to manager */
+        PostMessage((HWND)(uintptr_t)source_hwnd, WM_SENDHWND, (WPARAM)unique_id, (LPARAM)main_hwnd);
+
+        /* Send shutdown message to manager */
+        QObject::connect(&app, &QApplication::destroyed, [main_hwnd](QObject*) {
+            PostMessage((HWND)(uintptr_t)source_hwnd, WM_HAS_SHUTDOWN, (WPARAM)0, (LPARAM)main_hwnd);
+        });
+    }
+
+    /* Setup raw input */
     auto rawInputFilter = WindowsRawInputFilter::Register(main_window);
     if (rawInputFilter)
     {
@@ -360,7 +395,7 @@ int main(int argc, char* argv[]) {
         QObject::disconnect(main_window, &MainWindow::pollMouse, 0, 0);
         QObject::connect(main_window, &MainWindow::pollMouse, (WindowsRawInputFilter*)rawInputFilter.get(), &WindowsRawInputFilter::mousePoll, Qt::DirectConnection);
         main_window->setSendKeyboardInput(false);
-    }
+    }    
 #endif
 
     pc_reset_hard_init();
