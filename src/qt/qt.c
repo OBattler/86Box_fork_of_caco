@@ -24,7 +24,11 @@ char  icon_set[256] = "";  /* name of the iconset to be used */
 int
 plat_vidapi(char* api) {
     if (!strcasecmp(api, "default") || !strcasecmp(api, "system")) {
+#ifdef __ANDROID__
+        return 2;
+#else
         return 0;
+#endif
     } else if (!strcasecmp(api, "qt_software")) {
         return 0;
     } else if (!strcasecmp(api, "qt_opengl")) {

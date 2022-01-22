@@ -14,9 +14,13 @@
 #include <QProgressDialog>
 #include <QAbstractScrollArea>
 #include <QScroller>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #ifdef __ANDROID__
 #include <QJniObject>
 #include <private/qandroidextras_p.h>
+#include <android/log.h>
 #endif
 
 #ifdef QT_STATIC
@@ -137,7 +141,63 @@ public:
     }
 };
 
+static QFile* logfile = nullptr;
+static QTextStream* logtextfile = nullptr;
+static QtMessageHandler prevHandler;
+static int logfd = -1;
+void EmuMessageHandler(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
+{
+    QString txt;
+    switch (type) {
+    case QtInfoMsg:
+        txt = QString("Info: %1").arg(msg);
+        break;
+    case QtDebugMsg:
+        txt = QString("Debug: %1").arg(msg);
+        break;
+    case QtWarningMsg:
+        txt = QString("Warning: %1").arg(msg);
+        break;
+    case QtCriticalMsg:
+        txt = QString("Critical: %1").arg(msg);
+        break;
+    case QtFatalMsg:
+        txt = QString("Fatal: %1").arg(msg);
+        abort();
+    }
+    logfile->write(txt.toUtf8() + '\n');
+    logfile->flush();
+}
+
+static int pfd[2];
+static QString tag;
+#ifndef _WIN32
+int start_logger(const char *app_name)
+{
+    tag = app_name;
+
+    /* create the pipe and redirect stdout and stderr */
+    pipe(pfd);
+    dup2(pfd[1], 1);
+    dup2(pfd[1], 2);
+    auto thread = std::thread([] ()
+    {
+        ssize_t rdsz;
+        char buf[128];
+        while((rdsz = read(pfd[0], buf, sizeof buf - 1)) > 0) {
+            write(logfd, buf, rdsz);
+        }
+    });
+    thread.detach();
+}
+#endif
+
 int main(int argc, char* argv[]) {
+#ifdef __ANDROID__
+    /* make stdout line-buffered and stderr unbuffered */
+    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stderr, 0, _IONBF, 0);
+#endif
     QApplication app(argc, argv);
     main_window = nullptr;
 #ifdef __ANDROID__
@@ -175,7 +235,12 @@ int main(int argc, char* argv[]) {
         plat_getcwd(curpath, 4096);
         qDebug() << curpath;
     }).waitForFinished();
+    logfile = new QFile("./86Box.log");
+    logfile->open(QFile::WriteOnly);
+    logfd = logfile->handle();
+    prevHandler = qInstallMessageHandler(EmuMessageHandler);
 #endif
+
 
 #ifdef __APPLE__
     CocoaEventFilter cocoafilter;

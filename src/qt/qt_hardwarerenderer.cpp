@@ -70,6 +70,7 @@ void HardwareRenderer::initializeGL()
         "void main(void)\n"
         "{\n"
         "    gl_FragColor = texture2D(Texture, texc.st).bgra;\n"
+        "    gl_FragColor.a = 1.0;\n"
         "}\n";
     QString fsrccore =
         "uniform sampler2D Texture;\n"
@@ -78,6 +79,7 @@ void HardwareRenderer::initializeGL()
         "void main(void)\n"
         "{\n"
         "    FragColor = texture(Texture, texc.st).bgra;\n"
+        "    FragColor.a = 1.0;\n"
         "}\n";
     if (m_context->isOpenGLES() && m_context->format().version() >= qMakePair(3, 0))
     {

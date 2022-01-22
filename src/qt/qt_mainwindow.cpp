@@ -192,12 +192,13 @@ MainWindow::MainWindow(QWidget *parent) :
     }
     if (QApplication::platformName().contains("android"))
     {
-        vid_api = 2;
+        if (vid_api != 0 && vid_api != 2) vid_api = 2;
         ui->actionOpenGL_3_0_Core->setVisible(false);
-        ui->actionSoftware_Renderer->setVisible(false);
+        //ui->actionSoftware_Renderer->setVisible(false);
         ui->actionHardware_Renderer_OpenGL->setVisible(false);
         if (vid_resize != 1) ui->actionResizable_window->trigger();
         ui->actionResizable_window->setVisible(false);
+        ui->actionSpecify_dimensions->setVisible(false);
     }
     QActionGroup* actGroup = nullptr;
     switch (vid_api) {
