@@ -64,6 +64,10 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    auto font_name = tr("FONT_NAME");
+    auto font_size = tr("FONT_SIZE");
+    setFont(QFont(font_name, font_size.toInt()));
+
     mm = std::make_shared<MediaMenu>(this);
     MediaMenu::ptr = mm;
     status = std::make_unique<MachineStatus>(this);
@@ -79,7 +83,7 @@ MainWindow::MainWindow(QWidget *parent) :
     toolbar_spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     ui->toolBar->addWidget(toolbar_spacer);
 
-    auto toolbar_label = new QLabel();    
+    auto toolbar_label = new QLabel();
     ui->toolBar->addWidget(toolbar_label);
 
     this->setWindowIcon(QIcon(":/settings/win/icons/86Box-yellow.ico"));
@@ -104,6 +108,7 @@ MainWindow::MainWindow(QWidget *parent) :
                 toolbar_label->setText(QString("%1 - %2").arg(parts[1], parts.last()));
         }
 #endif
+        ui->actionPause->setChecked(dopause);
     });
     connect(this, &MainWindow::getTitleForNonQtThread, this, &MainWindow::getTitle_, Qt::BlockingQueuedConnection);
 
@@ -397,15 +402,6 @@ void MainWindow::showEvent(QShowEvent *event) {
 #if 0
     QTimer::singleShot(1000, this, [this] { ui->stackedWidget->switchRenderer(RendererStack::Renderer::OpenGLES); } );
 #endif
-}
-
-void MainWindow::changeEvent(QEvent *event)
-{
-    if (event->type() != QEvent::WindowStateChange) { event->ignore(); return; }
-    else event->accept();
-    auto prevState = ((QWindowStateChangeEvent*)event)->oldState();
-    if (!(prevState & Qt::WindowActive) && (windowState() & Qt::WindowActive)) this->grabKeyboard();
-    else if ((prevState & Qt::WindowActive) && !(windowState() & Qt::WindowActive)) this->releaseKeyboard();
 }
 
 void MainWindow::on_actionKeyboard_requires_capture_triggered() {
@@ -1648,3 +1644,20 @@ void MainWindow::togglePause()
 {
     ui->actionPause->trigger();
 }
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange)
+    {
+        auto font_name = tr("FONT_NAME");
+        auto font_size = tr("FONT_SIZE");
+        setFont(QFont(font_name, font_size.toInt()));
+    }
+    if (event->type() != QEvent::WindowStateChange) { return QMainWindow::changeEvent(event); }
+    auto prevState = ((QWindowStateChangeEvent*)event)->oldState();
+    if (!(prevState & Qt::WindowActive) && (windowState() & Qt::WindowActive)) this->grabKeyboard();
+    else if ((prevState & Qt::WindowActive) && !(windowState() & Qt::WindowActive)) this->releaseKeyboard();
+
+    QMainWindow::changeEvent(event);
+}
+

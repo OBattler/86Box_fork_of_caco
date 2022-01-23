@@ -214,10 +214,6 @@ int main(int argc, char* argv[]) {
     fmt.setSwapInterval(0);
     QSurfaceFormat::setDefaultFormat(fmt);
     app.setStyle(new StyleOverride());
-    QDirIterator it(":", QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        qDebug() << it.next() << "\n";
-    }
 
 #ifdef __ANDROID__
     QString str;
