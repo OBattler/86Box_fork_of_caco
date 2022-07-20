@@ -747,6 +747,8 @@ kbd_init(const device_t *info)
     if (kbd->type == KBD_TYPE_PS2) {
         io_sethandler(0x0066, 3,
 		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+        io_sethandler(0x006A, 1,
+		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
     }
     keyboard_send = kbd_adddata_ex;
     kbd_reset(kbd);

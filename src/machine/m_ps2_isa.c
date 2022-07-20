@@ -168,7 +168,7 @@ ps2_isa_setup(int model, int cpu_type)
 
 	device_add(&port_92_device);
 
-    mem_remap_top(384);
+    if (cpu_type == 286) mem_remap_top(384);
 
     device_add(&ps_nvr_device);
 
@@ -235,8 +235,6 @@ machine_ps2_m30_init(const machine_t *model)
 
         machine_common_init(model);
 
-	//mem_remap_top(384);
-
 	device_add(&fdc_xt_device);
 
         pit_ctr_set_out_func(&pit->counters[1], pit_refresh_timer_xt);
@@ -247,6 +245,9 @@ machine_ps2_m30_init(const machine_t *model)
 
  	ps2_isa_setup(30, 8086);
         device_add(&mcga_device);
+
+    extern void nmi_init(void);
+    nmi_init();
 
 	return ret;
 }
