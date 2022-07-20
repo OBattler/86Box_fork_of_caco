@@ -54,6 +54,7 @@ typedef struct mcga_t
         uint8_t *vram;
 
         uint8_t charbuffer[256];
+        uint8_t mcga_extmode;
 
 	int revision;
 	int composite;

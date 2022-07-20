@@ -71,6 +71,9 @@ mcga_out(uint16_t addr, uint8_t val, void *p)
                 cga->fullchange = changeframecount;
 				mcga_recalctimings(cga);
 			}
+			if (cga->crtcreg == 0x10) {
+ 				mem_mapping_set_addr(&cga->mapping, (cga->crtc[cga->crtcreg] & 0x3) ? 0xA0000 : 0xB8000, (cga->crtc[cga->crtcreg] & 0x3) ? 64000 : 0x8000);
+			}
 		}
 		return;
 	case 0x3D8:
@@ -84,6 +87,9 @@ mcga_out(uint16_t addr, uint8_t val, void *p)
 			mcga_recalctimings(cga);
 		}
 		return;
+	case 0x3DD: /* Extended Mode Control Register. */
+		cga->mcga_extmode = val;
+		break;
 	case 0x3D9:
 		old = cga->cgacol;
 		cga->cgacol = val;
@@ -110,6 +116,14 @@ mcga_in(uint16_t addr, void *p)
 		break;
 	case 0x3D5:
 		ret = (cga->crtcreg == 0x12 && (cga->crtc[0x11] & 0x80)) ? 0x2 : cga->crtc[cga->crtcreg];
+		if (cga->crtcreg == 0x10) {
+			ret &= 0x13;
+			ret |= (cga->cgamode & 0x01) ? 0x80 : 0x00;
+			ret |= (cga->cgamode & 0x01) ? 0x08 : 0x00;
+		}
+		break;
+	case 0x3DD: /* Extended Mode Control Register. */
+		ret = cga->mcga_extmode;
 		break;
 	case 0x3DA:
 		ret = cga->cgastat;
@@ -136,12 +150,7 @@ mcga_write(uint32_t addr, uint8_t val, void *p)
 {
     mcga_t *cga = (mcga_t *) p;
 
-    cga->vram[addr & 0x3fff] = val;
-    if (cga->snow_enabled) {
-		int offset = ((timer_get_remaining_u64(&cga->timer) / CGACONST) * 2) & 0xfc;
-		cga->charbuffer[offset] = cga->vram[addr & 0x3fff];
-		cga->charbuffer[offset | 1] = cga->vram[addr & 0x3fff];
-    }
+    cga->vram[addr & 0xffff] = val;
     mcga_waitstates(cga);
 }
 
@@ -152,12 +161,7 @@ mcga_read(uint32_t addr, void *p)
     mcga_t *cga = (mcga_t *) p;
 
     mcga_waitstates(cga);
-    if (cga->snow_enabled) {
-		int offset = ((timer_get_remaining_u64(&cga->timer) / CGACONST) * 2) & 0xfc;
-		cga->charbuffer[offset] = cga->vram[addr & 0x3fff];
-		cga->charbuffer[offset | 1] = cga->vram[addr & 0x3fff];
-    }
-    return cga->vram[addr & 0x3fff];
+    return cga->vram[addr & 0xffff];
 }
 
 
@@ -186,7 +190,7 @@ void
 mcga_poll(void *p)
 {
     mcga_t *cga = (mcga_t *)p;
-    uint16_t ca = (cga->crtc[15] | (cga->crtc[14] << 8)) & 0x3fff;
+    uint16_t ca = (cga->crtc[15] | (cga->crtc[14] << 8)) & 0xffff;
     int drawcursor;
     int x, c, xs_temp, ys_temp;
     int oldvc;
@@ -266,8 +270,8 @@ mcga_poll(void *p)
 		} else if (!(cga->cgamode & 2)) {
 			for (x = 0; x < cga->crtc[1]; x++) {
 				if (cga->cgamode & 8) {
-					chr  = cga->vram[((cga->ma << 1) & 0x3fff)];
-					attr = cga->vram[(((cga->ma << 1) + 1) & 0x3fff)];
+					chr  = cga->vram[((cga->ma << 1) & 0xffff)];
+					attr = cga->vram[(((cga->ma << 1) + 1) & 0xffff)];
 				} else
 					chr = attr = 0;
 				drawcursor = ((cga->ma == ca) && cga->con && cga->cursoron);
@@ -387,7 +391,7 @@ mcga_poll(void *p)
 		cga->vadj--;
 		if (!cga->vadj) {
 			cga->cgadispon = 1;
-			cga->ma = cga->maback = (cga->crtc[13] | (cga->crtc[12] << 8)) & 0x3fff;
+			cga->ma = cga->maback = (cga->crtc[13] | (cga->crtc[12] << 8)) & 0xffff;
 			cga->sc = 0;
 		}
 	} else if (cga->sc == cga->crtc[9]) {
@@ -405,7 +409,7 @@ mcga_poll(void *p)
 			cga->vadj = cga->crtc[5];
 			if (!cga->vadj) {
 				cga->cgadispon = 1;
-				cga->ma = cga->maback = (cga->crtc[13] | (cga->crtc[12] << 8)) & 0x3fff;
+				cga->ma = cga->maback = (cga->crtc[13] | (cga->crtc[12] << 8)) & 0xffff;
 			}
 			switch (cga->crtc[10] & 0x60) {
 				case 0x20:
@@ -492,7 +496,7 @@ mcga_poll(void *p)
 		cga->con = 1;
 	if (cga->cgadispon && (cga->cgamode & 1)) {
 		for (x = 0; x < (cga->crtc[1] << 1); x++)
-			cga->charbuffer[x] = cga->vram[(((cga->ma << 1) + x) & 0x3fff)];
+			cga->charbuffer[x] = cga->vram[(((cga->ma << 1) + x) & 0xffff)];
 	}
     }
 }
@@ -518,7 +522,8 @@ mcga_standalone_init(const device_t *info)
     display_type = device_get_config_int("display_type");
     cga->snow_enabled = device_get_config_int("snow_enabled");
 
-    cga->vram = calloc(1, 0x4000);
+    cga->vram = calloc(1, 0x10000);
+	cga->mcga_extmode |= 0x80; /* Readable DAC. */
 
     cga_comp_init(cga->revision);
     timer_add(&cga->timer, mcga_poll, cga, 1);
