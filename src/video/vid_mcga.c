@@ -122,6 +122,9 @@ mcga_in(uint16_t addr, void *p)
 			ret |= (cga->cgamode & 0x01) ? 0x08 : 0x00;
 		}
 		break;
+	case 0x3D8:
+		ret = cga->cgamode;
+		break;
 	case 0x3DD: /* Extended Mode Control Register. */
 		ret = cga->mcga_extmode;
 		break;
