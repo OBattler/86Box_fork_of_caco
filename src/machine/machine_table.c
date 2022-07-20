@@ -1773,6 +1773,40 @@ const machine_t machines[] = {
         .vid_device = NULL
     },
     {
+        .name = "[8086] IBM PS/2 Model 30",
+        .internal_name = "ibmps2_m30",
+        .type = MACHINE_TYPE_8086,
+        .chipset = MACHINE_CHIPSET_PROPRIETARY,
+        .init = machine_ps2_m30_init,
+        .pad = 0,
+        .pad0 = 0,
+        .pad1 = MACHINE_AVAILABLE,
+        .pad2 = 0,
+        .cpu = {
+            .package = CPU_PKG_8086,
+            .block = CPU_BLOCK_NONE,
+            .min_bus = 0,
+            .max_bus = 0,
+            .min_voltage = 0,
+            .max_voltage = 0,
+            .min_multi = 0,
+            .max_multi = 0
+        },
+        .bus_flags = MACHINE_PC,
+        .flags = MACHINE_VIDEO,
+        .ram = {
+            .min = 128,
+            .max = 640,
+            .step = 128
+        },
+        .nvrmask = 127,
+        .kbc = KBC_IBM_PC_XT,
+        .kbc_p1 = 0xff00,
+        .gpio = 0xffffffff,
+        .device = NULL,
+        .vid_device = NULL
+    },
+    {
         .name = "[8086] Toshiba T1200",
         .internal_name = "t1200",
         .type = MACHINE_TYPE_8086,

@@ -172,7 +172,7 @@ ps2_isa_setup(int model, int cpu_type)
 
     device_add(&ps_nvr_device);
 
-    device_add(&fdc_at_ps1_device);
+    if (cpu_type == 286) device_add(&fdc_at_ps1_device);
 
     /* Enable the builtin HDC. */
     if (hdc_current == 1) {
@@ -241,18 +241,12 @@ machine_ps2_m30_init(const machine_t *model)
 
         pit_ctr_set_out_func(&pit->counters[1], pit_refresh_timer_xt);
         dma_init();
+        extern device_t mcga_device;
 	device_add(&keyboard_ps2_xt_device);
-	device_add(&ps_nvr_device);
         pic_init();
-        ps2board_init();
-	device_add(&ps1vga_device);
 
- 	/* Enable the builtin HDC. */
-	if (hdc_current == 1) {
-		priv = device_add(&ps1_hdc_device);
-
-		ps1_hdc_inform(priv, &ps2_91);
-	}
+ 	ps2_isa_setup(30, 8086);
+        device_add(&mcga_device);
 
 	return ret;
 }
