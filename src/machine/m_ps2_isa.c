@@ -203,3 +203,42 @@ machine_ps2_m30_286_init(const machine_t *model)
 
 	return ret;
 }
+
+extern device_t keyboard_ps2_xt_device;
+int
+machine_ps2_m30_init(const machine_t *model)
+{
+	void *priv;
+
+	int ret;
+
+	ret = bios_load_interleaved("roms/machines/ibmps2_m30/33F4498.BIN",
+                                "roms/machines/ibmps2_m30/33F4499.BIN",
+			       0x000f0000, 0x10000, 0);
+
+	if (bios_only || !ret)
+		return ret;
+
+        machine_common_init(model);
+
+	//mem_remap_top(384);
+
+	device_add(&fdc_xt_device);
+
+        pit_ctr_set_out_func(&pit->counters[1], pit_refresh_timer_xt);
+        dma_init();
+	device_add(&keyboard_ps2_xt_device);
+	device_add(&ps_nvr_device);
+        pic_init();
+        ps2board_init();
+	device_add(&ps1vga_device);
+
+ 	/* Enable the builtin HDC. */
+	if (hdc_current == 1) {
+		priv = device_add(&ps1_hdc_device);
+
+		ps1_hdc_inform(priv, &ps2_91);
+	}
+
+	return ret;
+}

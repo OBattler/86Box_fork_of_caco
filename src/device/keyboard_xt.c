@@ -66,6 +66,7 @@
 #define KBD_TYPE_VTECH    7
 #define KBD_TYPE_OLIVETTI 8
 #define KBD_TYPE_ZENITH   9
+#define KBD_TYPE_PS2      10
 
 typedef struct {
     int want_irq;
@@ -75,6 +76,9 @@ typedef struct {
     uint8_t pa, pb, pd;
     uint8_t key_waiting;
     uint8_t type;
+    uint8_t stored_key;
+    uint8_t port_status;
+    uint8_t intr_status;
 
     pc_timer_t send_delay_timer;
 } xtkbd_t;
@@ -344,8 +348,11 @@ const scancode scancode_xt[512] = {
 static uint8_t	key_queue[16];
 static int	key_queue_start = 0,
 		key_queue_end = 0;
+static uint8_t	mouse_queue[16];
+static int	mouse_queue_start_xt = 0,
+		mouse_queue_end_xt = 0;
 static int	is_tandy = 0, is_t1x00 = 0,
-		is_amstrad = 0;
+		is_amstrad = 0, is_ps2 = 0;
 
 
 #ifdef ENABLE_KEYBOARD_XT_LOG
@@ -401,13 +408,14 @@ kbd_poll(void *priv)
 
     timer_advance_u64(&kbd->send_delay_timer, 1000 * TIMER_USEC);
 
-    if (!(kbd->pb & 0x40) && (kbd->type != KBD_TYPE_TANDY))
+    if (!(kbd->pb & 0x40) && (kbd->type != KBD_TYPE_TANDY) && (kbd->type != KBD_TYPE_PS2))
 	return;
 
     if (kbd->want_irq) {
 	kbd->want_irq = 0;
 	kbd->pa = kbd->key_waiting;
 	kbd->blocked = 1;
+    kbd->intr_status = 0x4;
 	picint(2);
 #ifdef ENABLE_KEYBOARD_XT_LOG
 	kbd_log("kbd_poll(): keyboard_xt : take IRQ\n");
@@ -513,7 +521,23 @@ kbd_write(uint16_t port, uint8_t val, void *priv)
     xtkbd_t *kbd = (xtkbd_t *)priv;
 
     switch (port) {
+    case 0x67: /* Write to keyboard output buffer (PS/2) */
+        {
+            kbd_adddata(val);
+            break;
+        }
+    case 0x66: /* Port status (PS/2) */
+        {
+            kbd->port_status = val;
+            break;
+        }
+    case 0x60: /* Store keystroke (PS/2) */
+        {
+            kbd->stored_key = val;
+            break;
+        }
 	case 0x61: /* Keyboard Control Register (aka Port B) */
+        if (kbd->type == KBD_TYPE_PS2) val &= 0x33;
 		if (!(kbd->pb & 0x40) && (val & 0x40)) {
 			key_queue_start = key_queue_end = 0;
 			kbd->want_irq = 0;
@@ -593,7 +617,7 @@ kbd_read(uint16_t port, void *priv)
 					ret |= 0x02;
 			}
 		} else
-			ret = kbd->pa;
+			ret = is_ps2 ? kbd->stored_key : kbd->pa;
 		break;
 
 	case 0x61: /* Keyboard Control Register (aka Port B) */
@@ -658,6 +682,24 @@ kbd_read(uint16_t port, void *priv)
                 || (kbd->type == KBD_TYPE_TOSHIBA))
 			ret = kbd->pd;
 		break;
+    case 0x68:
+        ret = 0x00;
+        break;
+    case 0x67: /* Keyboard Data Register (PS/2) */
+        ret = kbd->pa;
+        break;
+    case 0x66: /* Port status (PS/2) */
+        ret = kbd->port_status;
+        break;
+    case 0x6A: /* Input availablity (PS/2) */
+        ret = (kbd->pa ? 0x4 : 0x00);
+        break;
+    case 0x64: /* PIC Base Interrupt (PS/2) */
+        ret = (pic.icw2 << 3) & 0xf8;
+        break;
+    case 0xa0: /* Interrupt Control/Status Register (PS/2) */
+        ret = (kbd->intr_status);
+        break;
     }
 
     return(ret);
@@ -673,6 +715,9 @@ kbd_reset(void *priv)
     kbd->blocked = 0;
     kbd->pa = 0x00;
     kbd->pb = 0x00;
+    kbd->stored_key = 0x00;
+    kbd->port_status = 0x00;
+    kbd->intr_status = 0x00;
 
     keyboard_scan = 1;
 
@@ -696,11 +741,15 @@ kbd_init(const device_t *info)
     kbd = (xtkbd_t *)malloc(sizeof(xtkbd_t));
     memset(kbd, 0x00, sizeof(xtkbd_t));
 
-    io_sethandler(0x0060, 4,
+    kbd->type = info->local;
+    io_sethandler(0x0060, kbd->type == KBD_TYPE_PS2 ? 3 : 4,
 		  kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+    if (kbd->type == KBD_TYPE_PS2) {
+        io_sethandler(0x0066, 3,
+		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+    }
     keyboard_send = kbd_adddata_ex;
     kbd_reset(kbd);
-    kbd->type = info->local;
 
     key_queue_start = key_queue_end = 0;
 
@@ -845,6 +894,7 @@ kbd_init(const device_t *info)
 
     is_tandy = (kbd->type == KBD_TYPE_TANDY);
     is_t1x00 = (kbd->type == KBD_TYPE_TOSHIBA);
+    is_ps2 = (kbd->type == KBD_TYPE_PS2);
 
     is_amstrad = 0;
 
@@ -918,6 +968,20 @@ const device_t keyboard_xt86_device = {
     .internal_name = "keyboard_xt86",
     .flags = 0,
     .local = KBD_TYPE_XT86,
+    .init = kbd_init,
+    .close = kbd_close,
+    .reset = kbd_reset,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw = NULL,
+    .config = NULL
+};
+
+const device_t keyboard_ps2_xt_device = {
+    .name = "PS/2 (8086 planars) Keyboard",
+    .internal_name = "keyboard_ps28086",
+    .flags = 0,
+    .local = KBD_TYPE_PS2,
     .init = kbd_init,
     .close = kbd_close,
     .reset = kbd_reset,

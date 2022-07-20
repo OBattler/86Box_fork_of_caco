@@ -47,6 +47,8 @@ typedef struct {
     int		x, y, z, b;
 
     uint8_t	last_data[6];
+	uint8_t mouse_queue[16];
+	int mouse_queue_start, mouse_queue_end;
 } mouse_t;
 #define FLAG_INTELLI	0x80			/* device is IntelliMouse */
 #define FLAG_INTMODE	0x40			/* using Intellimouse mode */
