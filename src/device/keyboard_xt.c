@@ -697,6 +697,18 @@ kbd_read(uint16_t port, void *priv)
     case 0x64: /* PIC Base Interrupt (PS/2) */
         ret = (pic.icw2 << 3) & 0xf8;
         break;
+    case 0x6b:
+        {
+            ret = 0;
+            if (mem_size < (640 * 1024)) ret |= 1 << 6;
+            if (mem_size < ((640 - 64) * 1024)) ret |= 1 << 5;
+            if (mem_size < ((640 - 128) * 1024)) ret |= 1 << 4;
+            if (mem_size < ((640 - 192) * 1024)) ret |= 1 << 3;
+            if (mem_size < ((640 - 256) * 1024)) ret |= 1 << 2;
+            if (mem_size < ((640 - (256 + 64)) * 1024)) ret |= 1 << 2;
+
+            break;
+        }
     case 0xa0: /* Interrupt Control/Status Register (PS/2) */
         ret = (kbd->intr_status);
         break;
@@ -747,7 +759,7 @@ kbd_init(const device_t *info)
     if (kbd->type == KBD_TYPE_PS2) {
         io_sethandler(0x0066, 3,
 		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
-        io_sethandler(0x006A, 1,
+        io_sethandler(0x006A, 2,
 		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
     }
     keyboard_send = kbd_adddata_ex;
@@ -919,6 +931,12 @@ kbd_close(void *priv)
 
     io_removehandler(0x0060, 4,
 		     kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+    if (kbd->type == KBD_TYPE_PS2) {
+        io_removehandler(0x0066, 3,
+		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+        io_removehandler(0x006A, 2,
+		    kbd_read, NULL, NULL, kbd_write, NULL, NULL, kbd);
+    }
 
     free(kbd);
 }

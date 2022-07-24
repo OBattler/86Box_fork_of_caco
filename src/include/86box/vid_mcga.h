@@ -54,12 +54,16 @@ typedef struct mcga_t
         uint8_t *vram;
 
         uint8_t charbuffer[256];
+        uint8_t pal[256 * 3];
         uint8_t mcga_extmode;
+        uint8_t read_index, write_index, last_cycle;
 
 	int revision;
 	int composite;
 	int snow_enabled;
 	int rgb_type;
+        int read_times;
+        int write_times;
 } mcga_t;
 
 void    mcga_init(mcga_t *cga);

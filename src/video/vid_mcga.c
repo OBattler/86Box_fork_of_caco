@@ -58,6 +58,22 @@ mcga_out(uint16_t addr, uint8_t val, void *p)
 	addr = (addr & 0xff9) | 0x004;
 
     switch (addr) {
+	case 0x3C7:
+		cga->read_index = val;
+		break;
+	case 0x3C8:
+		cga->write_index = val;
+		break;
+	case 0x3C9:
+		{
+			cga->last_cycle = 0x0;
+			cga->pal[(3 * cga->write_index) + cga->write_times] = val;
+			if (cga->write_times == 2) {
+				cga->write_index++;
+				cga->write_times = 0;
+			}
+			cga->write_times++;
+		}
 	case 0x3D4:
 		cga->crtcreg = val & 31;
 		return;
@@ -111,6 +127,22 @@ mcga_in(uint16_t addr, void *p)
 	addr = (addr & 0xff9) | 0x004;
 
     switch (addr) {
+	case 0x3C6:
+		return 0xFF;
+	case 0x3C7:
+		return cga->last_cycle & 0x3;
+	case 0x3C8:
+		return cga->read_index;
+	case 0x3C9:
+		{
+			cga->last_cycle = 0x3;
+			ret = cga->pal[(3 * cga->read_index) + cga->read_times];
+			if (cga->read_times == 2) {
+				cga->read_index++;
+				cga->read_times = 0;
+			}
+			cga->read_times++;
+		}
 	case 0x3D4:
 		ret = cga->crtcreg;
 		break;
@@ -531,6 +563,7 @@ mcga_standalone_init(const device_t *info)
     cga_comp_init(cga->revision);
     timer_add(&cga->timer, mcga_poll, cga, 1);
     mem_mapping_add(&cga->mapping, 0xb8000, 0x08000, mcga_read, NULL, NULL, mcga_write, NULL, NULL, NULL /*cga->vram*/, MEM_MAPPING_EXTERNAL, cga);
+	io_sethandler(0x03c6, 0x0004, mcga_in, NULL, NULL, mcga_out, NULL, NULL, cga);
     io_sethandler(0x03d0, 0x0010, mcga_in, NULL, NULL, mcga_out, NULL, NULL, cga);
 
     overscan_x = overscan_y = 16;
