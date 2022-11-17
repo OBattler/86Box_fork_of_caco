@@ -467,6 +467,20 @@ const device_t mirosound_pcm10_device = {
     .name          = "miroSound PCM10",
     .internal_name = "mirosound_pcm10",
     .flags         = DEVICE_ISA | DEVICE_AT,
+    .local         = 0xE3 | OPTIMC_OPL4,
+    .init          = optimc_init,
+    .close         = optimc_close,
+    .reset         = NULL,
+    { .available = mirosound_pcm10_available },
+    .speed_changed = optimc_speed_changed,
+    .force_redraw  = NULL,
+    .config        = acermagic_s20_config
+};
+
+const device_t mirosound_pcm1_pro_device = {
+    .name          = "miroSound PCM1 Pro",
+    .internal_name = "mirosound_pcm1_pro",
+    .flags         = DEVICE_ISA | DEVICE_AT,
     .local         = 0xE3 | OPTIMC_OPL4 | OPTIMC_CS4231,
     .init          = optimc_init,
     .close         = optimc_close,
