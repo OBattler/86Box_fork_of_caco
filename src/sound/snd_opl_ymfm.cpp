@@ -336,6 +336,7 @@ ymfm_drv_write(uint16_t port, uint8_t val, void *priv)
 {
     YMFMChipBase *drv = (YMFMChipBase *) priv;
     ymfm_log("YMFM write port %04x value = %02x\n", port, val);
+    if (port == 0x380 || port == 0x381) { port += 4; }
     drv->write(port, val);
     drv->update();
 }

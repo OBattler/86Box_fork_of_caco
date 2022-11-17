@@ -378,6 +378,9 @@ optimc_init(const device_t *info)
     io_sethandler(optimc->cur_addr + 0, 0x0004, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
     io_sethandler(optimc->cur_addr + 8, 0x0002, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
     io_sethandler(0x0388, 0x0004, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
+    if (optimc->fm_type == FM_YMF278B) {
+        io_sethandler(0x380, 2, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
+    }
 
     io_sethandler(optimc->cur_addr + 4, 0x0002, sb_ct1345_mixer_read, NULL, NULL, sb_ct1345_mixer_write, NULL, NULL, optimc->sb);
 
@@ -414,7 +417,7 @@ optimc_speed_changed(void *p)
 }
 
 static int
-mirosound_pcm12_available(void)
+mirosound_pcm10_available(void)
 {
     return rom_present("roms/yamaha/yrw801.rom");
 }
@@ -460,15 +463,15 @@ const device_t acermagic_s20_device = {
     .config        = acermagic_s20_config
 };
 
-const device_t mirosound_pcm12_device = {
-    .name          = "miroSound PCM12",
-    .internal_name = "mirosound_pcm12",
+const device_t mirosound_pcm10_device = {
+    .name          = "miroSound PCM10",
+    .internal_name = "mirosound_pcm10",
     .flags         = DEVICE_ISA | DEVICE_AT,
-    .local         = 0xE3 | OPTIMC_CS4231 | OPTIMC_OPL4,
+    .local         = 0xE3 | OPTIMC_OPL4 | OPTIMC_CS4231,
     .init          = optimc_init,
     .close         = optimc_close,
     .reset         = NULL,
-    { .available = mirosound_pcm12_available },
+    { .available = mirosound_pcm10_available },
     .speed_changed = optimc_speed_changed,
     .force_redraw  = NULL,
     .config        = acermagic_s20_config
