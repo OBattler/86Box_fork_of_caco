@@ -37,13 +37,15 @@
 #include <86box/gameport.h>
 #include <86box/snd_ad1848.h>
 #include <86box/snd_sb.h>
+#include <86box/mem.h>
+#include <86box/rom.h>
 
 static int optimc_wss_dma[4] = { 0, 0, 1, 3 };
 static int optimc_wss_irq[8] = { 5, 7, 9, 10, 11, 12, 14, 15 }; /* W95 only uses 7-10, others may be wrong */
 
 enum optimc_local_flags {
     OPTIMC_CS4231 = 0x100,
-    OPTIMC_OPL4   = 0x200, /* Unused */
+    OPTIMC_OPL4   = 0x200,
 };
 
 typedef struct optimc_t {
@@ -184,8 +186,6 @@ optimc_reg_write(uint16_t addr, uint8_t val, void *p)
                 }
             case 1: /* MC2 */
                 optimc->regs[1] = val;
-                if (old != val)
-                    optimc_reload_opl(optimc);
                 break;
             case 2: /* MC3 */
                 if (val == optimc->type)
@@ -228,8 +228,6 @@ optimc_reg_write(uint16_t addr, uint8_t val, void *p)
                 break;
             case 3: /* MC4 */
                 optimc->regs[3] = val;
-                if ((old & 0x8) != (val & 0x8))
-                    optimc_reload_opl(optimc);
                 break;
             case 4: /* MC5 */
                 optimc->regs[4] = val;
@@ -375,7 +373,7 @@ optimc_init(const device_t *info)
     sb_dsp_setdma8(&optimc->sb->dsp, optimc->cur_dma);
     sb_ct1345_mixer_reset(optimc->sb);
 
-    optimc->fm_type = (info->local & OPTIMC_OPL4) ? FM_YMF289B : FM_YMF262;
+    optimc->fm_type = (info->local & OPTIMC_OPL4) ? FM_YMF278B : FM_YMF262;
     fm_driver_get(optimc->fm_type, &optimc->sb->opl);
     io_sethandler(optimc->cur_addr + 0, 0x0004, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
     io_sethandler(optimc->cur_addr + 8, 0x0002, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
@@ -415,6 +413,12 @@ optimc_speed_changed(void *p)
     sb_speed_changed(optimc->sb);
 }
 
+static int
+mirosound_pcm12_available(void)
+{
+    return rom_present("roms/yamaha/yrw801.rom");
+}
+
 static const device_config_t acermagic_s20_config[] = {
   // clang-format off
     {
@@ -446,11 +450,25 @@ const device_t acermagic_s20_device = {
     .name          = "AcerMagic S20",
     .internal_name = "acermagic_s20",
     .flags         = DEVICE_ISA | DEVICE_AT,
-    .local         = 0xE3 | 0x100,
+    .local         = 0xE3 | OPTIMC_CS4231,
     .init          = optimc_init,
     .close         = optimc_close,
     .reset         = NULL,
     { .available = NULL },
+    .speed_changed = optimc_speed_changed,
+    .force_redraw  = NULL,
+    .config        = acermagic_s20_config
+};
+
+const device_t mirosound_pcm12_device = {
+    .name          = "miroSound PCM12",
+    .internal_name = "mirosound_pcm12",
+    .flags         = DEVICE_ISA | DEVICE_AT,
+    .local         = 0xE3 | OPTIMC_CS4231 | OPTIMC_OPL4,
+    .init          = optimc_init,
+    .close         = optimc_close,
+    .reset         = NULL,
+    { .available = mirosound_pcm12_available },
     .speed_changed = optimc_speed_changed,
     .force_redraw  = NULL,
     .config        = acermagic_s20_config
