@@ -110,7 +110,6 @@ static const SOUND_CARD sound_cards[] = {
     { &sound_none_device         },
     { &sound_internal_device     },
     { &acermagic_s20_device      },
-    { &mirosound_pcm1_pro_device },
     { &mirosound_pcm10_device    },
     { &adlib_device              },
     { &adgold_device             },

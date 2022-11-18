@@ -82,7 +82,6 @@ extern const device_t adgold_device;
 extern const device_t azt2316a_device;
 extern const device_t acermagic_s20_device;
 extern const device_t mirosound_pcm10_device;
-extern const device_t mirosound_pcm1_pro_device;
 extern const device_t azt1605_device;
 
 /* Ensoniq AudioPCI */
