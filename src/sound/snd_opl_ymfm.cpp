@@ -320,6 +320,7 @@ ymfm_drv_read(uint16_t port, void *priv)
 {
     YMFMChipBase *drv = (YMFMChipBase *) priv;
 
+    if (port == 0x381) { port += 4; } /* Point to register read port. */
     if (drv->flags() & FLAG_CYCLES) {
         cycles -= ((int) (isa_timing * 8));
     }
