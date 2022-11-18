@@ -345,7 +345,7 @@ optimc_init(const device_t *info)
     optimc->regs[1] = 0x03;
     optimc->regs[2] = 0x00;
     optimc->regs[3] = 0x00;
-    optimc->regs[4] = 0x2F;
+    optimc->regs[4] = 0x3F;
     optimc->regs[5] = 0x83;
 
     optimc->gameport = gameport_add(&gameport_device);
