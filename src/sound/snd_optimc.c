@@ -123,8 +123,6 @@ optimc_remove_opl(optimc_t *optimc)
 static void
 optimc_add_opl(optimc_t *optimc)
 {
-    fm_driver_get(FM_YMF262, &optimc->sb->opl);
-    
     /* DSP I/O handler is activated in sb_dsp_setaddr */
     io_sethandler(optimc->cur_addr + 0, 0x0004, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
     io_sethandler(optimc->cur_addr + 8, 0x0002, optimc->sb->opl.read, NULL, NULL, optimc->sb->opl.write, NULL, NULL, optimc->sb->opl.priv);
