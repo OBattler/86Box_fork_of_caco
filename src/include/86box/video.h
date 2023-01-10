@@ -538,6 +538,9 @@ extern const device_t velocity_200_agp_device;
 /* Wyse 700 */
 extern const device_t wy700_device;
 
+/* Chips & Technolgies SVGA cards */
+extern const device_t chips_vid_device;
+
 #endif
 
 #endif /*EMU_VIDEO_H*/
