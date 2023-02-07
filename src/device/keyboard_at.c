@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #define HAVE_STDARG_H
 #include <wchar.h>
 #include <86box/86box.h>
@@ -98,6 +99,9 @@ typedef struct {
         wantirq, key_wantdata, ami_flags, first_write;
 
     uint8_t mem[0x100];
+    uint16_t host_input_fifo[0x10000];
+
+    atomic_int host_input_fifo_read, host_input_fifo_write;
 
     int last_irq, old_last_irq,
         reset_delay,
@@ -739,6 +743,11 @@ kbd_poll(void *priv)
 
     timer_advance_u64(&dev->send_delay_timer, (100ULL * TIMER_USEC));
 
+    while ((dev->host_input_fifo_read & 0xFFFF) != (dev->host_input_fifo_write & 0xFFFF) && ((key_queue_end - key_queue_start) < 12)) {
+        add_data_kbd(dev->host_input_fifo[dev->host_input_fifo_read & 0xFFFF]);
+        dev->host_input_fifo_read++;
+    }
+
     if (dev->out_new != -1 && !dev->last_irq) {
         dev->wantirq = 0;
         if (dev->out_new & 0x100) {
@@ -1080,6 +1089,15 @@ add_data_kbd(uint16_t val)
 
     if (sc_or == 0x80)
         sc_or = 0;
+}
+
+static void
+add_data_kbd_queue_host(uint16_t val)
+{
+    atkbd_t *dev = SavedKbd;
+
+    dev->host_input_fifo[dev->host_input_fifo_write & 0xFFFF] = val;
+    dev->host_input_fifo_write++;
 }
 
 static void
@@ -2496,7 +2514,7 @@ kbd_init(const device_t *info)
 
     io_sethandler(0x0060, 1, kbd_read, NULL, NULL, kbd_write, NULL, NULL, dev);
     io_sethandler(0x0064, 1, kbd_read, NULL, NULL, kbd_write, NULL, NULL, dev);
-    keyboard_send = add_data_kbd;
+    keyboard_send = add_data_kbd_queue_host;
 
     timer_add(&dev->send_delay_timer, kbd_poll, dev, 1);
     timer_add(&dev->pulse_cb, pulse_poll, dev, 0);
