@@ -777,7 +777,7 @@ kbd_poll(void *priv)
         kbd_log("ATkbc: %02X delayed on channel %i\n", dev->out_delayed & 0xff, channels[(dev->out_delayed >> 8) & 0x03]);
         dev->out_new     = dev->out_delayed;
         dev->out_delayed = -1;
-    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !(dev->mem[0] & 0x20) && mouse_queue_start != mouse_queue_end) {
+    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !((dev->mem[0] & 0x20) && ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF)) && mouse_queue_start != mouse_queue_end) {
         kbd_log("ATkbc: %02X on channel 2\n", mouse_queue[mouse_queue_start]);
         dev->out_new      = mouse_queue[mouse_queue_start] | 0x100;
         mouse_queue_start = (mouse_queue_start + 1) & 0xf;
