@@ -140,7 +140,6 @@ extern const scancode scancode_xt[512];
 extern uint8_t keyboard_set3_flags[512];
 extern uint8_t keyboard_set3_all_repeat;
 extern uint8_t keyboard_set3_all_break;
-extern int     mouse_queue_start, mouse_queue_end;
 extern int     mouse_scan;
 
 #ifdef EMU_DEVICE_H

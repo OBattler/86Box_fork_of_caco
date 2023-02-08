@@ -46,6 +46,7 @@
 #include <86box/snd_speaker.h>
 #include <86box/video.h>
 #include <86box/keyboard.h>
+#include <86box/fifo8.h>
 
 #define STAT_PARITY        0x80
 #define STAT_RTIMEOUT      0x40
@@ -125,12 +126,9 @@ uint8_t keyboard_set3_all_break;
 /* Bits 0 - 1 = scan code set, bit 6 = translate or not. */
 uint8_t keyboard_mode = 0x42;
 
-static uint8_t key_ctrl_queue[16];
-static int     key_ctrl_queue_start = 0, key_ctrl_queue_end = 0;
-static uint8_t key_queue[16];
-static int     key_queue_start = 0, key_queue_end = 0;
-uint8_t        mouse_queue[16];
-int            mouse_queue_start = 0, mouse_queue_end = 0;
+static Fifo8 key_ctrl_queue;
+static Fifo8 key_queue;
+static Fifo8 mouse_queue;
 static uint8_t kbd_last_scan_code;
 static void (*mouse_write)(uint8_t val, void *priv) = NULL;
 static void    *mouse_p                             = NULL;
@@ -624,14 +622,11 @@ static void
 kbc_queue_reset(uint8_t channel)
 {
     if (channel == 2) {
-        mouse_queue_start = mouse_queue_end = 0;
-        memset(mouse_queue, 0x00, sizeof(mouse_queue));
+        fifo8_reset(&mouse_queue);
     } else if (channel == 1) {
-        key_queue_start = key_queue_end = 0;
-        memset(key_queue, 0x00, sizeof(key_queue));
+        fifo8_reset(&key_queue);
     } else {
-        key_ctrl_queue_start = key_ctrl_queue_end = 0;
-        memset(key_ctrl_queue, 0x00, sizeof(key_ctrl_queue));
+        fifo8_reset(&key_ctrl_queue);
     }
 }
 
@@ -649,16 +644,13 @@ kbc_queue_add(atkbd_t *dev, uint8_t val, uint8_t channel, uint8_t stat_hi)
 
     if (channel == 2) {
         kbd_log("ATkbc: mouse_queue[%02X] = %02X;\n", mouse_queue_end, val);
-        mouse_queue[mouse_queue_end] = val;
-        mouse_queue_end              = (mouse_queue_end + 1) & 0xf;
+        fifo8_push(&mouse_queue, val);
     } else if (channel == 1) {
         kbd_log("ATkbc: key_queue[%02X] = %02X;\n", key_queue_end, val);
-        key_queue[key_queue_end] = val;
-        key_queue_end            = (key_queue_end + 1) & 0xf;
+        fifo8_push(&key_queue, val);
     } else {
         kbd_log("ATkbc: key_ctrl_queue[%02X] = %02X;\n", key_ctrl_queue_end, val);
-        key_ctrl_queue[key_ctrl_queue_end] = val;
-        key_ctrl_queue_end                 = (key_ctrl_queue_end + 1) & 0xf;
+        fifo8_push(&key_ctrl_queue, val);
     }
 }
 
@@ -697,7 +689,7 @@ add_to_kbc_queue_front(atkbd_t *dev, uint8_t val, uint8_t channel, uint8_t stat_
 static void
 add_data_kbd_queue(atkbd_t *dev, int direct, uint8_t val)
 {
-    if ((!keyboard_scan && !direct) || (dev->reset_delay > 0) || (key_queue_end >= 16)) {
+    if ((!keyboard_scan && !direct) || (dev->reset_delay > 0) || (fifo8_num_free(&key_queue) == 0)) {
         kbd_log("ATkbc: Unable to add to queue, conditions: %i, %i, %i\n", !keyboard_scan, (dev->reset_delay > 0), (key_queue_end >= 16));
         return;
     }
@@ -743,7 +735,7 @@ kbd_poll(void *priv)
 
     timer_advance_u64(&dev->send_delay_timer, (100ULL * TIMER_USEC));
 
-    while ((dev->host_input_fifo_read & 0xFFFF) != (dev->host_input_fifo_write & 0xFFFF) && ((key_queue_end - key_queue_start) < 12)) {
+    while ((dev->host_input_fifo_read & 0xFFFF) != (dev->host_input_fifo_write & 0xFFFF) && ((fifo8_num_used(&key_queue)) < 12)) {
         add_data_kbd(dev->host_input_fifo[dev->host_input_fifo_read & 0xFFFF]);
         dev->host_input_fifo_read++;
     }
@@ -769,22 +761,19 @@ kbd_poll(void *priv)
         }
     }
 
-    if (dev->out_new == -1 && !(dev->status & STAT_OFULL) && key_ctrl_queue_start != key_ctrl_queue_end) {
+    if (dev->out_new == -1 && !(dev->status & STAT_OFULL) && !fifo8_is_empty(&key_ctrl_queue)) {
         kbd_log("ATkbc: %02X on channel 0\n", key_ctrl_queue[key_ctrl_queue_start]);
-        dev->out_new         = key_ctrl_queue[key_ctrl_queue_start] | 0x200;
-        key_ctrl_queue_start = (key_ctrl_queue_start + 1) & 0xf;
+        dev->out_new         = fifo8_pop(&key_ctrl_queue) | 0x200;
     } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && dev->out_delayed != -1) {
         kbd_log("ATkbc: %02X delayed on channel %i\n", dev->out_delayed & 0xff, channels[(dev->out_delayed >> 8) & 0x03]);
         dev->out_new     = dev->out_delayed;
         dev->out_delayed = -1;
-    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !((dev->mem[0] & 0x20) && ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF)) && mouse_queue_start != mouse_queue_end) {
+    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !((dev->mem[0] & 0x20) && ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF)) && !fifo8_is_empty(&mouse_queue)) {
         kbd_log("ATkbc: %02X on channel 2\n", mouse_queue[mouse_queue_start]);
-        dev->out_new      = mouse_queue[mouse_queue_start] | 0x100;
-        mouse_queue_start = (mouse_queue_start + 1) & 0xf;
-    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !(dev->mem[0] & 0x10) && key_queue_start != key_queue_end) {
+        dev->out_new      = fifo8_pop(&mouse_queue) | 0x100;
+    } else if (!(dev->status & STAT_OFULL) && dev->out_new == -1 && !(dev->mem[0] & 0x10) && !fifo8_is_empty(&key_queue)) {
         kbd_log("ATkbc: %02X on channel 1\n", key_queue[key_queue_start]);
-        dev->out_new    = key_queue[key_queue_start];
-        key_queue_start = (key_queue_start + 1) & 0xf;
+        dev->out_new    = fifo8_pop(&key_queue);
     }
 
     if (dev->reset_delay) {
@@ -2290,6 +2279,8 @@ kbd_write(uint16_t port, uint8_t val, void *priv)
                         kbc_queue_reset(i);
                     kbd_last_scan_code = 0x00;
                     dev->status &= ~STAT_OFULL;
+                    if ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF)
+                        dev->status &= ~STAT_MFULL;
                     dev->last_irq = dev->old_last_irq = 0;
 
                     if ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF)
@@ -2498,6 +2489,9 @@ kbd_close(void *priv)
 
     SavedKbd = NULL;
     free(dev);
+    fifo8_destroy(&key_ctrl_queue);
+    fifo8_destroy(&key_queue);
+    fifo8_destroy(&mouse_queue);
 }
 
 static void *
@@ -2513,6 +2507,9 @@ kbd_init(const device_t *info)
     video_reset(gfxcard[0]);
     kbd_reset(dev);
 
+    fifo8_create(&key_ctrl_queue, 16);
+    fifo8_create(&key_queue, 16);
+    fifo8_create(&mouse_queue, 16);
     io_sethandler(0x0060, 1, kbd_read, NULL, NULL, kbd_write, NULL, NULL, dev);
     io_sethandler(0x0064, 1, kbd_read, NULL, NULL, kbd_write, NULL, NULL, dev);
     keyboard_send = add_data_kbd_queue_host;
@@ -2891,7 +2888,7 @@ keyboard_at_mouse_reset(void)
 uint8_t
 keyboard_at_mouse_pos(void)
 {
-    return ((mouse_queue_end - mouse_queue_start) & 0xf);
+    return fifo8_num_used(&mouse_queue);
 }
 
 void
