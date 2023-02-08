@@ -2398,6 +2398,7 @@ kbd_read(uint16_t port, void *priv)
         case 0x60:
             ret = dev->out;
             dev->status &= ~STAT_OFULL;
+            if ((dev->flags & KBC_TYPE_MASK) >= KBC_TYPE_PS2_NOREF) dev->status &= ~STAT_MFULL;
             picintc(dev->last_irq);
             dev->last_irq = 0;
             break;
