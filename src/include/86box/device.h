@@ -54,6 +54,7 @@
 #define CONFIG_MAC       9
 #define CONFIG_MIDI_IN   10
 #define CONFIG_BIOS      11
+#define CONFIG_SERPORT   12
 
 enum {
     DEVICE_PCJR = 2,      /* requires an IBM PCjr */
@@ -109,7 +110,7 @@ typedef struct {
     int                             default_int;
     const char                     *file_filter;
     const device_config_spinner_t   spinner;
-    const device_config_selection_t selection[16];
+    const device_config_selection_t selection[32];
     const device_config_bios_t      bios[32];
 } device_config_t;
 

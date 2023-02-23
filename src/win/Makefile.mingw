@@ -76,6 +76,9 @@ ifeq ($(DEV_BUILD), y)
  ifndef PAS16
   PAS16 := y
  endif
+ ifndef PCI_DUMMY
+  PCI_DUMMY := y
+ endif
  ifndef SIO_DETECT
   SIO_DETECT := y
  endif
@@ -136,6 +139,9 @@ else
  endif
  ifndef PAS16
   PAS16 := n
+ endif
+ ifndef PCI_DUMMY
+  PCI_DUMMY := n
  endif
  ifndef SIO_DETECT
   SIO_DETECT := n
@@ -476,6 +482,11 @@ ifeq ($(DEV_BRANCH), y)
   DEVBROBJ += snd_pas16.o
  endif
 
+ ifeq ($(PCI_DUMMY), y)
+  OPTS     += -DUSE_PCI_DUMMY
+  DEVBROBJ += pci_dummy.o
+ endif
+
  ifeq ($(SIO_DETECT), y)
   OPTS     += -DUSE_SIO_DETECT
   DEVBROBJ += sio_detect.o
@@ -771,13 +782,19 @@ ifdef EXOBJ
  OBJ += $(EXOBJ)
 endif
 
+ifeq ($(LOG), y)
+ MWIN := -lcomdlg32
+else
+ MWIN := -mwindows
+endif
+
 ifeq ($(OPENAL), y)
- LIBS := -mwindows -lopenal -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
+ LIBS := $(MWIN) -lopenal -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
 else
  ifeq ($(FAUDIO), y)
-  LIBS := -mwindows -lfaudio -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
+  LIBS := $(MWIN) -lfaudio -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
  else
-  LIBS := -mwindows -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
+  LIBS := $(MWIN) -lcomctl32 -lSDL2 -limagehlp -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid -lws2_32
  endif
 endif
 
