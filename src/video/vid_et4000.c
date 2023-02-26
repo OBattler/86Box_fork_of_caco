@@ -79,6 +79,8 @@ typedef struct {
     uint32_t vram_size,
         vram_mask;
 
+    uint8_t vram_label_index; /* For label gotos. */
+
     uint8_t  port_22cb_val;
     uint8_t  port_32cb_val;
     int      get_korean_font_enabled;
@@ -478,58 +480,90 @@ get_et4000_addr(uint32_t addr, void *p)
 {
     svga_t  *svga = (svga_t *) p;
     uint32_t nbank;
+    static const void* label_addr[16] = 
+    {
+        &&vidconf_0x00,
+        &&vidconf_0x01,
+        &&vidconf_0x02,
+        &&vidconf_0x03,
+        &&vidconf_default,
+        &&vidconf_default,
+        &&vidconf_default,
+        &&vidconf_default,
+        &&vidconf_0x08,
+        &&vidconf_0x09,
+        &&vidconf_default,
+        &&vidconf_0x0B,
+        &&vidconf_default,
+        &&vidconf_default,
+        &&vidconf_default,
+        &&vidconf_default
+    };
 
-    switch (svga->crtc[0x37] & 0x0B) {
-        case 0x00:
-        case 0x01:
-            nbank = 0;
-            addr &= 0xFFFF;
-            break;
-        case 0x02:
-            nbank = (addr & 1) << 1;
-            addr  = (addr >> 1) & 0xFFFF;
-            break;
-        case 0x03:
-            nbank = addr & 3;
-            addr  = (addr >> 2) & 0xFFFF;
-            break;
-        case 0x08:
-        case 0x09:
-            nbank = 0;
-            addr &= 0x3FFFF;
-            break;
-        case 0x0A:
-            nbank = (addr & 1) << 1;
-            addr  = (addr >> 1) & 0x3FFFF;
-            break;
-        case 0x0B:
-            nbank = addr & 3;
-            addr  = (addr >> 2) & 0x3FFFF;
-            break;
-        default:
-            nbank = 0;
-            break;
-    }
+    static const void* label_addr_vram[5] = 
+    {
+        &&vram_max_128kib,
+        &&vram_max_256kib,
+        &&vram_max_512kib,
+        &&vram_max_512kib,
+        &&vram_max_1024kib
+    };
 
-    if (svga->vram_max >= 1024 * 1024) {
-        addr = (addr << 2) | (nbank & 3);
-        if ((svga->crtc[0x37] & 3) == 2)
-            addr >>= 1;
-        else if ((svga->crtc[0x37] & 3) < 2)
-            addr >>= 2;
-    } else if (svga->vram_max >= 512 * 1024) {
-        addr = (addr << 1) | ((nbank & 2) >> 1) | ((nbank & 1) << 19);
-        if ((svga->crtc[0x37] & 3) < 2)
-            addr >>= 1;
-    } else if (svga->vram_max >= 256 * 1024)
-        addr = addr | (nbank << 18);
-    else if (svga->vram_max > 128 * 1024) {
-        addr = (addr << 1) | ((nbank & 2) >> 1) | ((nbank & 1) << 17);
-        if ((svga->crtc[0x37] & 3) < 2)
-            addr >>= 1;
-    } else
-        addr = addr | (nbank << 16);
+    goto *label_addr[svga->crtc[0x37] & 0x0B];
 
+vidconf_0x00:
+vidconf_0x01:
+    nbank = 0;
+    addr &= 0xFFFF;
+    goto vram_check;
+
+vidconf_0x02:
+    nbank = (addr & 1) << 1;
+    addr  = (addr >> 1) & 0xFFFF;
+    goto vram_check;
+
+vidconf_0x03:
+    nbank = addr & 3;
+    addr  = (addr >> 2) & 0xFFFF;
+    goto vram_check;
+
+vidconf_0x08:
+vidconf_0x09:
+    nbank = 0;
+    addr &= 0x3FFFF;
+    goto vram_check;
+
+vidconf_0x0B:
+    nbank = addr & 3;
+    addr  = (addr >> 2) & 0x3FFFF;
+    goto vram_check;
+
+vidconf_default:
+    nbank = 0;
+
+vram_check:
+    goto *label_addr_vram[svga->vram_max / (256 * 1024)];
+
+vram_max_1024kib:
+    addr = (addr << 2) | (nbank & 3);
+    if ((svga->crtc[0x37] & 3) == 2)
+        addr >>= 1;
+    else if ((svga->crtc[0x37] & 3) < 2)
+        addr >>= 2;
+    return addr;
+
+vram_max_512kib:
+    addr = (addr << 1) | ((nbank & 2) >> 1) | ((nbank & 1) << 19);
+    if ((svga->crtc[0x37] & 3) < 2)
+        addr >>= 1;
+    return addr;
+
+vram_max_256kib:
+    addr = addr | (nbank << 18);
+    return addr;
+
+vram_max_128kib:
+    addr = addr | (nbank << 16);
     return addr;
 }
 
