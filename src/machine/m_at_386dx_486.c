@@ -1421,6 +1421,10 @@ machine_at_itoxstar_init(const machine_t *model)
     device_add(&stpc_client_device);
     device_add(&sst_flash_29ee020_device);
     device_add(&w83781d_device);    /* fans: Chassis, CPU, unused; temperatures: Chassis, CPU, unused */
+    if (gfxcard[0] == VID_INTERNAL) {
+        extern device_t stpc_vid_device;
+        device_add(&stpc_vid_device);
+    }
     hwm_values.fans[2]         = 0; /* unused */
     hwm_values.temperatures[2] = 0; /* unused */
     hwm_values.voltages[0]     = 0; /* Vcore unused */

@@ -24,14 +24,21 @@
 #ifndef VIDEO_SVGA_H
 #    define VIDEO_SVGA_H
 
-#    define FLAG_EXTRA_BANKS  1
-#    define FLAG_ADDR_BY8     2
-#    define FLAG_EXT_WRITE    4
-#    define FLAG_LATCH8       8
-#    define FLAG_NOSKEW       16
-#    define FLAG_ADDR_BY16    32
-#    define FLAG_RAMDAC_SHIFT 64
-#    define FLAG_128K_MASK    128
+#    define FLAG_EXTRA_BANKS      1
+#    define FLAG_ADDR_BY8         2
+#    define FLAG_EXT_WRITE        4
+#    define FLAG_LATCH8           8
+#    define FLAG_NOSKEW           16
+#    define FLAG_ADDR_BY16        32
+#    define FLAG_RAMDAC_SHIFT     64
+#    define FLAG_128K_MASK        128
+/* Below flag when enabled: 
+    Memory Mapping 0 = 0xA0000-0xA7FFF first bank, 0xA8000-0xAFFFF second bank
+    Memory Mapping 1 = 0xA0000-0xAFFFF first bank, 0xB0000-0xBFFFF second bank */
+#    define FLAG_EXTRA_BANKS_HALF 256
+/* Divide bank offsets by 4 prior to addition to host address when packed_chain4
+   and chain4 is enabled. */
+#    define FLAG_EXTRA_BANKS_SEQ4 512
 
 struct monitor_t;
 

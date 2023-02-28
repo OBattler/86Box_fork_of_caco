@@ -1052,10 +1052,20 @@ svga_decode_addr(svga_t *svga, uint32_t addr, int write)
     }
 
     if (memory_map_mode <= 1) {
-        if (svga->adv_flags & FLAG_EXTRA_BANKS)
+        if (svga->adv_flags & FLAG_EXTRA_BANKS_HALF) {
+            uint8_t bank_select = !!(addr >= (memory_map_mode == 0 ? 0x10000 : 0x8000));
+            addr &= (memory_map_mode == 0 ? 0xFFFF : 0x7FFF);
+            if ((svga->adv_flags & FLAG_EXTRA_BANKS_SEQ4) && svga->chain4 && svga->packed_chain4) {
+                addr += svga->extra_banks[bank_select] / 4;
+            }
+            else addr += svga->extra_banks[bank_select];
+        } else if (svga->adv_flags & FLAG_EXTRA_BANKS)
             addr = (addr & 0x17fff) + svga->extra_banks[(addr >> 15) & 1];
         else {
-            if (write)
+            if ((svga->adv_flags & FLAG_EXTRA_BANKS_SEQ4) && svga->chain4 && svga->packed_chain4) {
+                addr += (write ? svga->write_bank : svga->read_bank) / 4;
+            }
+            else if (write)
                 addr += svga->write_bank;
             else
                 addr += svga->read_bank;
