@@ -573,6 +573,7 @@ MediaMenu::cdromUpdateMenu(int i)
 
     auto *muteMenu = dynamic_cast<QAction *>(childs[cdromMutePos]);
     muteMenu->setChecked(cdrom[i].sound_on == 0);
+    muteMenu->setIcon(QApplication::style()->standardIcon((cdrom[i].sound_on == 0) ? QStyle::SP_MediaVolume : QStyle::SP_MediaVolumeMuted));
 
     auto *imageMenu = dynamic_cast<QAction *>(childs[cdromImagePos]);
     imageMenu->setEnabled(!name.isEmpty());
