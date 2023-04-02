@@ -6,17 +6,19 @@
  *
  *           This file is part of the 86Box distribution.
  *
- *           Ensoniq AudioPCI (ES1371) emulation.
+ *           Ensoniq AudioPCI (ES1371, ES1370) emulation.
  *
  *
  *
  * Authors:  Sarah Walker, <https://pcem-emulator.co.uk/>
  *           RichardG, <richardg867@gmail.com>
  *           Miran Grca, <mgrca8@gmail.com>
+ *           Cacodemon345
  *
  *           Copyright 2008-2021 Sarah Walker.
  *           Copyright 2021 RichardG.
  *           Copyright 2021 Miran Grca.
+ *           Copyright 2023 Cacodemon345.
  */
 #include <stdarg.h>
 #include <stdint.h>
@@ -43,6 +45,9 @@
 
 #define ES1371_NCoef 91
 
+#define ES1371        0
+#define ES1370        1
+
 static float low_fir_es1371_coef[ES1371_NCoef];
 
 typedef struct {
@@ -57,6 +62,7 @@ typedef struct {
     uint32_t int_ctrl, int_status,
         legacy_ctrl;
     void *gameport;
+    void *ak4531_codec;
 
     int mem_page;
 
@@ -169,6 +175,9 @@ typedef struct {
 #define FORMAT_STEREO_8           1
 #define FORMAT_MONO_16            2
 #define FORMAT_STEREO_16          3
+
+extern void ak4531a_write_reg(void* priv, uint8_t reg, uint8_t val);
+extern void* ak4531a_create(void);
 
 static void es1371_fetch(es1371_t *dev, int dac_nr);
 static void update_legacy(es1371_t *dev, uint32_t old_legacy_ctrl);
@@ -310,11 +319,11 @@ es1371_reset(void *p)
 
     /* Interrupt/Chip Select Control Register, Address 00H
        Addressable as byte, word, longword */
-    dev->int_ctrl = 0xfc0f0000;
+    dev->int_ctrl = (dev->type) ? 0x00 : 0xfc0f0000;
 
     /* Interrupt/Chip Select Control Register, Address 00H
        Addressable as longword only */
-    dev->int_status = 0x7ffffec0;
+    dev->int_status = (dev->type) ? 0x60 : 0x7ffffec0;
 
     /* UART Status Register, Address 09H
        Addressable as byte only */
@@ -609,7 +618,7 @@ es1371_inb(uint16_t port, void *p)
             ret = (dev->int_ctrl >> 16) & 0x0f;
             break;
         case 0x03:
-            ret = ((dev->int_ctrl >> 24) & 0x03) | 0xfc;
+            ret = (dev->type) ? (dev->int_ctrl & 0xff) : ((dev->int_ctrl >> 24) & 0x03) | 0xfc;
             break;
 
         /* Interrupt/Chip Select Status Register, Address 04H
@@ -707,6 +716,11 @@ es1371_inw(uint16_t port, void *p)
     es1371_t *dev = (es1371_t *) p;
     uint16_t  ret = 0xffff;
 
+    if (dev->type && (port & 0x3e) == 0x10) {
+        fatal("ES1370 CODEC read unimplemented!\n");
+        return 0xFFFF;
+    }
+
     switch (port & 0x3e) {
         /* Interrupt/Chip Select Control Register, Address 00H
            Addressable as byte, word, longword */
@@ -714,7 +728,7 @@ es1371_inw(uint16_t port, void *p)
             ret = dev->int_ctrl & 0xffff;
             break;
         case 0x02:
-            ret = ((dev->int_ctrl >> 16) & 0x030f) | 0xfc00;
+            ret = (dev->type) ? (dev->int_ctrl & 0xffff) : ((dev->int_ctrl >> 16) & 0x030f) | 0xfc00;
             break;
 
         /* Memory Page Register, Address 0CH
@@ -800,7 +814,7 @@ es1371_inl(uint16_t port, void *p)
         /* Interrupt/Chip Select Control Register, Address 00H
            Addressable as byte, word, longword */
         case 0x00:
-            ret = (dev->int_ctrl & 0x030fffff) | 0xfc000000;
+            ret = (dev->type) ? (dev->int_ctrl) : (dev->int_ctrl & 0x030fffff) | 0xfc000000;
             break;
 
         /* Interrupt/Chip Select Status Register, Address 04H
@@ -879,6 +893,12 @@ es1371_outb(uint16_t port, uint8_t val, void *p)
 
     audiopci_log("es1371_outb: port=%04x val=%02x\n", port, val);
 
+    if (dev->type && ((port & 0x3f) == 0x10 || (port & 0x3f) == 0x11)) {
+        pclog("ES1370 codec write (byte): 0x%04X\n", val);
+        //ak4531a_write_reg(dev, val & 0xff, (val >> 8) & 0xff);
+        return;
+    }
+
     switch (port & 0x3f) {
         /* Interrupt/Chip Select Control Register, Address 00H
            Addressable as byte, word, longword */
@@ -905,7 +925,7 @@ es1371_outb(uint16_t port, uint8_t val, void *p)
             break;
         case 0x03:
             dev->int_ctrl = (dev->int_ctrl & 0x00ffffff) | (val << 24);
-            gameport_remap(dev->gameport, 0x200 | ((val & 0x03) << 3));
+            if (!dev->type) gameport_remap(dev->gameport, 0x200 | ((val & 0x03) << 3));
             break;
 
         /* UART Data Register, Address 08H
@@ -991,11 +1011,23 @@ es1371_outb(uint16_t port, uint8_t val, void *p)
     }
 }
 
+extern void ak4351a_attn_dac1(void* priv, int* master_l, int* master_r);
+extern void ak4351a_attn_dac2(void* priv, int* master_l, int* master_r);
+extern void ak4351a_attn_master(void* priv, int* master_l, int* master_r);
+
 static void
 es1371_outw(uint16_t port, uint16_t val, void *p)
 {
     es1371_t *dev = (es1371_t *) p;
     uint32_t  old_legacy_ctrl;
+
+    if (dev->type && (port & 0x3f) == 0x10) {
+        pclog("ES1370 codec write: 0x%04X\n", val);
+        ak4531a_write_reg(dev->ak4531_codec, (val >> 8) & 0xff, (val) & 0xff);
+        ak4351a_attn_dac1(dev->ak4531_codec, &dev->pcm_vol_l, &dev->pcm_vol_r);
+        ak4351a_attn_master(dev->ak4531_codec, &dev->master_vol_l, &dev->master_vol_r);
+        return;
+    }
 
     switch (port & 0x3f) {
         /* Interrupt/Chip Select Control Register, Address 00H
@@ -1017,7 +1049,7 @@ es1371_outw(uint16_t port, uint16_t val, void *p)
             break;
         case 0x02:
             dev->int_ctrl = (dev->int_ctrl & 0x0000ffff) | (val << 16);
-            gameport_remap(dev->gameport, 0x200 | ((val & 0x0300) >> 5));
+            if (!dev->type) gameport_remap(dev->gameport, 0x200 | ((val & 0x0300) >> 5));
             break;
 
         /* Memory Page Register, Address 0CH
@@ -1099,7 +1131,7 @@ es1371_outl(uint16_t port, uint32_t val, void *p)
                 es1371_fetch(dev, 1);
             }
             dev->int_ctrl = val;
-            gameport_remap(dev->gameport, 0x200 | ((val & 0x03000000) >> 21));
+            if (!dev->type) gameport_remap(dev->gameport, 0x200 | ((val & 0x03000000) >> 21));
             break;
 
         /* Interrupt/Chip Select Status Register, Address 04H
@@ -1164,6 +1196,10 @@ es1371_outl(uint16_t port, uint32_t val, void *p)
         /* CODEC Write Register, Address 14H
            Addressable as longword only */
         case 0x14:
+            if (dev->type) {
+                pclog("ES1370: DWORD write to CODEC (ignored).\n");
+                break;
+            }
             if (val & CODEC_READ) {
                 dev->codec_ctrl &= 0x00ff0000;
                 dev->codec_ctrl |= ac97_codec_readw(dev->codec, val >> 16);
@@ -1531,6 +1567,19 @@ es1371_pci_read(int func, int addr, void *p)
 
     if ((addr > 0x3f) && ((addr < 0xdc) || (addr > 0xe1)))
         return 0x00;
+
+    if (dev->type) {
+        switch (addr) {
+            case 0x02:
+                return 0x00;
+            
+            case 0x03:
+                return 0x50;
+            
+            default:
+                break;
+        }
+    }
 
     switch (addr) {
         case 0x00:
@@ -2011,21 +2060,30 @@ es1371_init(const device_t *info)
     sound_add_handler(es1371_get_buffer, dev);
     sound_set_cd_audio_filter(es1371_filter_cd_audio, dev);
 
-    dev->gameport = gameport_add(&gameport_pnp_device);
-    gameport_remap(dev->gameport, 0x200);
+    dev->type = !!(info->local & 0x2);
+    pclog("dev->type = %d\n", dev->type);
+    if (!dev->type) {
+        dev->gameport = gameport_add(&gameport_pnp_device);
+        gameport_remap(dev->gameport, 0x200);
+    }
 
-    dev->card = pci_add_card(info->local ? PCI_ADD_SOUND : PCI_ADD_NORMAL, es1371_pci_read, es1371_pci_write, dev);
+    dev->card = pci_add_card((info->local & 0x1) ? PCI_ADD_SOUND : PCI_ADD_NORMAL, es1371_pci_read, es1371_pci_write, dev);
 
     timer_add(&dev->dac[1].timer, es1371_poll, dev, 1);
 
     generate_es1371_filter();
 
-    ac97_codec       = &dev->codec;
-    ac97_codec_count = 1;
-    ac97_codec_id    = 0;
-    /* Let the machine decide the codec on onboard implementations. */
-    if (!info->local)
-        device_add(ac97_codec_get(device_get_config_int("codec")));
+    if (!dev->type) {
+        ac97_codec       = &dev->codec;
+        ac97_codec_count = 1;
+        ac97_codec_id    = 0;
+        /* Let the machine decide the codec on onboard implementations. */
+        if (!(info->local & 0x1))
+            device_add(ac97_codec_get(device_get_config_int("codec")));
+    } else {
+        dev->ak4531_codec = ak4531a_create();
+        dev->dac[0].vol_l = dev->dac[0].vol_r = dev->dac[1].vol_l = dev->dac[1].vol_r = (1 << 12);
+    }
 
     es1371_reset(dev);
 
@@ -2037,6 +2095,7 @@ es1371_close(void *p)
 {
     es1371_t *dev = (es1371_t *) p;
 
+    free(dev->ak4531_codec);
     free(dev);
 }
 
@@ -2128,4 +2187,19 @@ const device_t es1371_onboard_device = {
     .speed_changed = es1371_speed_changed,
     .force_redraw  = NULL,
     .config        = es1371_onboard_config
+};
+
+/* Codec used is Asahi Kasei AK4531A. */
+const device_t es1370_device = {
+    .name          = "Ensoniq AudioPCI (ES1370)",
+    .internal_name = "es1370",
+    .flags         = DEVICE_PCI,
+    .local         = 2,
+    .init          = es1371_init,
+    .close         = es1371_close,
+    .reset         = es1371_reset,
+    { .available = NULL },
+    .speed_changed = es1371_speed_changed,
+    .force_redraw  = NULL,
+    .config        = es1371_config
 };

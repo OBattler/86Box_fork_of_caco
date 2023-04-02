@@ -94,6 +94,7 @@ extern const device_t mirosound_pcm10_device;
 extern const device_t azt1605_device;
 
 /* Ensoniq AudioPCI */
+extern const device_t es1370_device;
 extern const device_t es1371_device;
 extern const device_t es1371_onboard_device;
 
