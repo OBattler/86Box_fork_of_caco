@@ -100,6 +100,9 @@ extern const device_t es1371_onboard_device;
 /* Creative Labs Game Blaster */
 extern const device_t cms_device;
 
+/* IBM Music Feature Card */
+extern const device_t imfc_card_device;
+
 /* Gravis UltraSound and UltraSound Max */
 extern const device_t gus_device;
 
