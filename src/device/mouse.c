@@ -199,8 +199,12 @@ mouse_reset(void)
 
     mouse_curr = mouse_devices[mouse_type].device;
 
-    if (mouse_curr != NULL)
+    if (mouse_curr != NULL) {
         mouse_priv = device_add(mouse_curr);
+        if (mouse_priv == NULL) {
+            mouse_curr = NULL;
+        }
+    }
 }
 
 /* Callback from the hardware driver. */

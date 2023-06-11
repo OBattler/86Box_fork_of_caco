@@ -322,7 +322,7 @@ usb_mouse_init(const device_t* info)
 
     fifo8_create(&usb_mouse->device_instance.fifo, 4096);
     
-    usb_mouse->port = usb_attach_device(usb_device_inst, &usb_mouse->device_instance, USB_BUS_OHCI);
+    usb_mouse->port = usb_attach_device(usb_device_inst, &usb_mouse->device_instance, USB_BUS_UHCI);
     if (usb_mouse->port == (uint16_t)-1) {
         fifo8_destroy(&usb_mouse->device_instance.fifo);
         free(usb_mouse);

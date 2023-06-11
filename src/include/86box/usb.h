@@ -38,7 +38,8 @@ enum usb_errors
     USB_ERROR_NAK = 1,
     USB_ERROR_OVERRUN = 2,
     USB_ERROR_UNDERRUN = 3,
-    USB_ERROR_STALL = 4
+    USB_ERROR_STALL = 4,
+    USB_ERROR_NODEV = 5,
 };
 
 enum usb_bus_types
@@ -67,21 +68,36 @@ typedef union
 /* USB Host Controller device struct */
 typedef struct usb_t
 {
-    uint8_t       uhci_io[32];
+    /* OHCI. */
     ohci_mmio_t   ohci_mmio[1024];
-    uint16_t      uhci_io_base;
-    int           uhci_enable, ohci_enable;
+    int           ohci_enable;
     uint32_t      ohci_mem_base, irq_level;
     mem_mapping_t ohci_mmio_mapping;
     pc_timer_t    ohci_frame_timer;
     pc_timer_t    ohci_port_reset_timer[2];
     uint8_t       ohci_interrupt_counter : 3;
     usb_device_t* ohci_devices[2];
-    usb_device_t* uhci_devices[2];
     uint8_t       ohci_usb_buf[4096];
     uint8_t       ohci_initial_start;
 
     ohci_mmio_t* ohci_rhports;
+
+    /* UHCI. */
+    union {
+        uint8_t       uhci_io[32];
+        struct {
+            uint16_t usbcmd, status, intr, frnum;
+            uint32_t frbaseadd;
+            uint32_t sofmod;
+            uint16_t ports[8];
+        } uhci_io_regs;
+    };
+    uint16_t      uhci_io_base;
+    int           uhci_enable;
+    usb_device_t* uhci_devices[2];
+    pc_timer_t    uhci_frame_timer;
+    uint32_t      uhci_status_shadow;
+    uint32_t      uhci_irq_level;
 
     usb_params_t* usb_params;
 } usb_t;

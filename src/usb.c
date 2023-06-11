@@ -151,77 +151,13 @@ usb_interrupt_ohci(usb_t *dev, uint32_t level)
     }
 }
 
-static uint8_t
-uhci_reg_read(uint16_t addr, void *p)
-{
-    usb_t   *dev = (usb_t *) p;
-    uint8_t  ret;
-    uint8_t *regs = dev->uhci_io;
-
-    addr &= 0x0000001f;
-
-    ret = regs[addr];
-
-    return ret;
-}
-
-static void
-uhci_reg_write(uint16_t addr, uint8_t val, void *p)
-{
-    usb_t   *dev  = (usb_t *) p;
-    uint8_t *regs = dev->uhci_io;
-
-    addr &= 0x0000001f;
-
-    switch (addr) {
-        case 0x02:
-            regs[0x02] &= ~(val & 0x3f);
-            break;
-        case 0x04:
-            regs[0x04] = (val & 0x0f);
-            break;
-        case 0x09:
-            regs[0x09] = (val & 0xf0);
-            break;
-        case 0x0a:
-        case 0x0b:
-            regs[addr] = val;
-            break;
-        case 0x0c:
-            regs[0x0c] = (val & 0x7f);
-            break;
-    }
-}
-
-static void
-uhci_reg_writew(uint16_t addr, uint16_t val, void *p)
-{
-    usb_t    *dev  = (usb_t *) p;
-    uint16_t *regs = (uint16_t *) dev->uhci_io;
-
-    addr &= 0x0000001f;
-
-    switch (addr) {
-        case 0x00:
-            if ((val & 0x0001) && !(regs[0x00] & 0x0001))
-                regs[0x01] &= ~0x20;
-            else if (!(val & 0x0001))
-                regs[0x01] |= 0x20;
-            regs[0x00] = (val & 0x00ff);
-            break;
-        case 0x06:
-            regs[0x03] = (val & 0x07ff);
-            break;
-        case 0x10:
-        case 0x12:
-            regs[addr >> 1] = ((regs[addr >> 1] & 0xedbb) | (val & 0x1244)) & ~(val & 0x080a);
-            break;
-        default:
-            uhci_reg_write(addr, val & 0xff, p);
-            uhci_reg_write(addr + 1, (val >> 8) & 0xff, p);
-            break;
-    }
-}
+extern uint8_t uhci_reg_read(uint16_t addr, void *p);
+extern void uhci_reg_write(uint16_t addr, uint8_t val, void *p);
+extern void uhci_reg_writew(uint16_t addr, uint16_t val, void *p);
+extern uint16_t uhci_attach_device(usb_t *dev, usb_device_t* device);
+extern void uhci_detach_device(usb_t *dev, uint16_t port);
+extern void uhci_reset(usb_t* dev);
+extern void uhci_process_frame_schedule(void* p);
 
 void
 uhci_update_io_mapping(usb_t *dev, uint8_t base_l, uint8_t base_h, int enable)
@@ -727,7 +663,7 @@ ohci_soft_reset(usb_t* dev)
     dev->ohci_mmio[OHCI_HcFmNumber].l = 0x0;
     dev->ohci_mmio[OHCI_HcLSThreshold].l = 0x628;
     dev->ohci_mmio[OHCI_HcInterruptStatus].l = 0;
-    dev->ohci_mmio[OHCI_HcInterruptEnable].l = (1 << 31);
+    dev->ohci_mmio[OHCI_HcInterruptEnable].l = 0;
     dev->ohci_mmio[OHCI_HcInterruptDisable].l = 0;
     dev->ohci_mmio[OHCI_HcControl].l = old_HcControl;
     dev->ohci_mmio[OHCI_HcBulkHeadED].l = dev->ohci_mmio[OHCI_HcBulkCurrentED].l = 0;
@@ -753,7 +689,7 @@ ohci_rhport_reset(usb_t* dev)
     for (int i = 0; i < 2; i++) {
         if (dev->ohci_devices[i]) {
             usb_device_t* usbdev = dev->ohci_devices[i];
-            usb_detach_device(dev, i | (USB_BUS_OHCI << 16));
+            usb_detach_device(dev, i | (USB_BUS_OHCI << 8));
             usb_attach_device(dev, usbdev, USB_BUS_OHCI);
             dev->ohci_devices[i]->device_reset(dev->ohci_devices[i]->priv);
         }
@@ -1014,6 +950,7 @@ ohci_mmio_write(uint32_t addr, uint8_t val, void *p)
         case OHCI_aHcLSThreshold + 3:
             return;
         case OHCI_aHcRhDescriptorB ... OHCI_aHcRhDescriptorB + 3:
+        case OHCI_aHcRhDescriptorA ... OHCI_aHcRhDescriptorA + 3:
             return;
 #if 0
         case OHCI_aHcRhDescriptorA:
@@ -1267,6 +1204,11 @@ usb_attach_device(usb_t *dev, usb_device_t* device, uint8_t bus_type)
                 }
             }
             break;
+        case USB_BUS_UHCI:
+            {
+                return uhci_attach_device(dev, device);
+            }
+            break;
     }
     return (uint16_t)-1;
 }
@@ -1295,7 +1237,11 @@ usb_detach_device(usb_t *dev, uint16_t port)
                         ohci_set_interrupt(dev, OHCI_HcInterruptEnable_RHSC);
                     return;
                 }
-
+            }
+            break;
+        case USB_BUS_UHCI:
+            {
+                return uhci_detach_device(dev, port);
             }
             break;
     }
@@ -1492,9 +1438,7 @@ usb_reset(void *priv)
 {
     usb_t *dev = (usb_t *) priv;
 
-    memset(dev->uhci_io, 0x00, sizeof(dev->uhci_io));
-    dev->uhci_io[0x0c] = 0x40;
-    dev->uhci_io[0x10] = dev->uhci_io[0x12] = 0x80;
+    uhci_reset(dev);
 
     ohci_soft_reset(dev);
     dev->ohci_mmio[OHCI_HcControl].l = 0x00;
@@ -1538,6 +1482,7 @@ usb_init_ext(const device_t *info, void *params)
     mem_mapping_disable(&dev->ohci_mmio_mapping);
 
     timer_add(&dev->ohci_frame_timer, ohci_frame_boundary, dev, 0);
+    timer_add(&dev->uhci_frame_timer, uhci_process_frame_schedule, dev, 0);
     timer_add(&dev->ohci_port_reset_timer[0], ohci_port_reset_callback, dev, 0);
     timer_add(&dev->ohci_port_reset_timer[1], ohci_port_reset_callback_2, dev, 0);
 
