@@ -226,6 +226,7 @@ video_cards[] = {
     { &gd5430_diamond_speedstar_pro_se_a8_vlb_device },
     { &gd5430_vlb_device                             },
     { &gd5434_vlb_device                             },
+    { &sis_6202_device                               },
     { &s3_metheus_86c928_vlb_device                  },
     { &s3_mirocrystal_8s_805_vlb_device              },
     { &s3_mirocrystal_10sd_805_vlb_device            },
