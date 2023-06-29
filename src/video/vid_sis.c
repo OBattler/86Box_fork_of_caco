@@ -50,7 +50,7 @@ typedef struct sis_accel_t {
     uint32_t bg_color_rop;
 
     uint16_t mask[4];
-    
+
     uint16_t left_clip;
     uint16_t right_clip;
     uint16_t top_clip;
@@ -67,7 +67,7 @@ typedef struct sis_accel_line_t {
     uint16_t src_pitch; /* Reserved */
     uint16_t dst_pitch; /* Reserved */
 
-    int16_t line_length;
+    int16_t  line_length;
     uint16_t reserved_2;
 
     uint32_t fg_color_rop;
@@ -87,6 +87,12 @@ typedef struct sis_accel_line_t {
 } sis_accel_line_t;
 #pragma(pack, pop)
 
+typedef struct sis_cpu_bitblt_fifo_t {
+    uint32_t dst;
+    uint32_t len;
+    uint32_t dat, orig_dat;
+} sis_cpu_bitblt_fifo_t;
+
 typedef struct sis_t {
     svga_t        svga;
     uint8_t       pci_conf_status;
@@ -96,6 +102,7 @@ typedef struct sis_t {
     atomic_bool   engine_active;
     atomic_bool   quit;
     thread_t     *accel_thread;
+    event_t      *fifo_event, *fifo_data_event;
     uint16_t      rom_addr;
     mem_mapping_t linear_mapping, mmio_mapping;
 
@@ -112,17 +119,20 @@ typedef struct sis_t {
         sis_accel_line_t accel_line_cur;
     };
     union {
-        sis_accel_t accel_queue[32];
+        sis_accel_t      accel_queue[32];
         sis_accel_line_t accel_line_queue[32];
     };
 
     atomic_int accel_fifo_read_idx;
     atomic_int accel_fifo_write_idx;
 
+    /* CPU-driven BitBlt members. */
+    int cpu_pixel_count;
+
     rom_t bios_rom;
 } sis_t;
 
-#define FIFO_EMPTY(sis) (sis->accel_fifo_write_idx == sis->accel_fifo_read_idx)
+#define FIFO_EMPTY(sis)   (sis->accel_fifo_write_idx == sis->accel_fifo_read_idx)
 #define FIFO_ENTRIES(sis) (sis->accel_fifo_write_idx - sis->accel_fifo_read_idx)
 
 static video_timings_t timing_sis = { .type = VIDEO_PCI, .write_b = 2, .write_w = 2, .write_l = 4, .read_b = 20, .read_w = 20, .read_l = 35 };
@@ -191,12 +201,12 @@ sis_recalctimings(svga_t *svga)
         } else if (svga->seqregs[0x6] & 0x10) {
             svga->bpp    = 24;
             svga->render = sis_render_24bpp_highres;
-            //pclog("SiS: 16.7M\n");
+            // pclog("SiS: 16.7M\n");
         }
         if (svga->hdisp == 1280 || svga->hdisp == 1024)
             svga->rowoffset >>= 1;
     }
-    //pclog("SiS: hdisp = %d, dispend = %d, enhanced = %d\n", svga->hdisp, svga->dispend, !!(svga->seqregs[0x6] & 0x2));
+    // pclog("SiS: hdisp = %d, dispend = %d, enhanced = %d\n", svga->hdisp, svga->dispend, !!(svga->seqregs[0x6] & 0x2));
 }
 
 void
@@ -386,8 +396,9 @@ sis_do_rop_16bpp(uint16_t *dst, uint16_t src, uint8_t rop)
 }
 
 void
-sis_do_rop_24bpp(uint16_t *dst, uint16_t src, uint8_t rop)
+sis_do_rop_24bpp(uint32_t *dst, uint32_t src, uint8_t rop)
 {
+    uint32_t orig_dst = *dst & 0xFF000000;
     switch (rop) {
         case 0x00:
             *dst = 0;
@@ -437,6 +448,325 @@ sis_do_rop_24bpp(uint16_t *dst, uint16_t src, uint8_t rop)
             *dst = 0xFF;
             break;
     }
+    *dst &= 0xFFFFFF;
+    *dst |= orig_dst;
+}
+
+void
+sis_do_rop_8bpp_patterned(uint8_t *dst, uint8_t src, uint8_t nonpattern_src, uint8_t rop)
+{
+    switch (rop) {
+        case 0x00:
+            *dst = 0;
+            break;
+        case 0x05:
+            *dst = ~(*dst) & ~src;
+            break;
+        case 0x0A:
+            *dst &= ~src;
+            break;
+        case 0x0F:
+            *dst = ~src;
+            break;
+        case 0x50:
+            *dst = src & ~(*dst);
+            break;
+        case 0x55:
+            *dst = ~*dst;
+            break;
+        case 0x5A:
+            *dst ^= src;
+            break;
+        case 0x5F:
+            *dst = ~src | ~(*dst);
+            break;
+        case 0xB8:
+            *dst = (((src ^ *dst) & nonpattern_src) ^ src);
+            break;
+        case 0xA0:
+            *dst &= src;
+            break;
+        case 0xA5:
+            *dst ^= ~src;
+            break;
+        case 0xAA:
+            break; /* No-op. */
+        case 0xAF:
+            *dst |= ~src;
+            break;
+        case 0xF0:
+            *dst = src;
+            break;
+        case 0xF5:
+            *dst = src | ~(*dst);
+            break;
+        case 0xFA:
+            *dst |= src;
+            break;
+        case 0xFF:
+            *dst = 0xFF;
+            break;
+    }
+}
+
+void
+sis_do_rop_15bpp_patterned(uint16_t *dst, uint16_t src, uint8_t nonpattern_src, uint8_t rop)
+{
+    uint16_t orig_dst = *dst & 0x8000;
+    switch (rop) {
+        case 0x00:
+            *dst = 0;
+            break;
+        case 0x05:
+            *dst = ~(*dst) & ~src;
+            break;
+        case 0x0A:
+            *dst &= ~src;
+            break;
+        case 0x0F:
+            *dst = ~src;
+            break;
+        case 0x50:
+            *dst = src & ~(*dst);
+            break;
+        case 0x55:
+            *dst = ~*dst;
+            break;
+        case 0x5A:
+            *dst ^= src;
+            break;
+        case 0x5F:
+            *dst = ~src | ~(*dst);
+            break;
+        case 0xB8:
+            *dst = (((src ^ *dst) & nonpattern_src) ^ src);
+            break;
+        case 0xA0:
+            *dst &= src;
+            break;
+        case 0xA5:
+            *dst ^= ~src;
+            break;
+        case 0xAA:
+            break; /* No-op. */
+        case 0xAF:
+            *dst |= ~src;
+            break;
+        case 0xF0:
+            *dst = src;
+            break;
+        case 0xF5:
+            *dst = src | ~(*dst);
+            break;
+        case 0xFA:
+            *dst |= src;
+            break;
+        case 0xFF:
+            *dst = 0xFF;
+            break;
+    }
+    *dst &= 0x7FFF;
+    *dst |= orig_dst;
+}
+
+void
+sis_do_rop_16bpp_patterned(uint16_t *dst, uint16_t src, uint8_t nonpattern_src, uint8_t rop)
+{
+    switch (rop) {
+        case 0x00:
+            *dst = 0;
+            break;
+        case 0x05:
+            *dst = ~(*dst) & ~src;
+            break;
+        case 0x0A:
+            *dst &= ~src;
+            break;
+        case 0x0F:
+            *dst = ~src;
+            break;
+        case 0x50:
+            *dst = src & ~(*dst);
+            break;
+        case 0x55:
+            *dst = ~*dst;
+            break;
+        case 0x5A:
+            *dst ^= src;
+            break;
+        case 0x5F:
+            *dst = ~src | ~(*dst);
+            break;
+        case 0xB8:
+            *dst = (((src ^ *dst) & nonpattern_src) ^ src);
+            break;
+        case 0xA0:
+            *dst &= src;
+            break;
+        case 0xA5:
+            *dst ^= ~src;
+            break;
+        case 0xAA:
+            break; /* No-op. */
+        case 0xAF:
+            *dst |= ~src;
+            break;
+        case 0xF0:
+            *dst = src;
+            break;
+        case 0xF5:
+            *dst = src | ~(*dst);
+            break;
+        case 0xFA:
+            *dst |= src;
+            break;
+        case 0xFF:
+            *dst = 0xFF;
+            break;
+    }
+}
+
+void
+sis_do_rop_24bpp_patterned(uint32_t *dst, uint32_t src, uint8_t nonpattern_src, uint8_t rop)
+{
+    uint32_t orig_dst = *dst & 0xFF000000;
+    switch (rop) {
+        case 0x00:
+            *dst = 0;
+            break;
+        case 0x05:
+            *dst = ~(*dst) & ~src;
+            break;
+        case 0x0A:
+            *dst &= ~src;
+            break;
+        case 0x0F:
+            *dst = ~src;
+            break;
+        case 0x50:
+            *dst = src & ~(*dst);
+            break;
+        case 0x55:
+            *dst = ~*dst;
+            break;
+        case 0x5A:
+            *dst ^= src;
+            break;
+        case 0x5F:
+            *dst = ~src | ~(*dst);
+            break;
+        case 0xB8:
+            *dst = (((src ^ *dst) & nonpattern_src) ^ src);
+            break;
+        case 0xA0:
+            *dst &= src;
+            break;
+        case 0xA5:
+            *dst ^= ~src;
+            break;
+        case 0xAA:
+            break; /* No-op. */
+        case 0xAF:
+            *dst |= ~src;
+            break;
+        case 0xF0:
+            *dst = src;
+            break;
+        case 0xF5:
+            *dst = src | ~(*dst);
+            break;
+        case 0xFA:
+            *dst |= src;
+            break;
+        case 0xFF:
+            *dst = 0xFF;
+            break;
+    }
+    *dst &= 0xFFFFFF;
+    *dst |= orig_dst;
+}
+
+void
+sis_expand_color_font(sis_t *sis)
+{
+    int      xdir;
+    int      ydir;
+    int      dx                    = 0;
+    int      dy                    = 0;
+    uint16_t width                 = sis->accel_cur.rect_width + 1;
+    uint16_t height                = sis->accel_cur.rect_height + 1;
+    int32_t  dest_addr             = sis->accel_cur.dst_start_address;
+    uint32_t src_addr              = sis->accel_cur.src_start_address;
+    uint32_t src_addr_pattern_vram = sis->accel_cur.src_start_address;
+    uint16_t orig_width            = width;
+
+    xdir = sis->accel_cur.cmd_status & (0x10 << 16) ? 1 : -1;
+    ydir = sis->accel_cur.cmd_status & (0x20 << 16) ? 1 : -1;
+    pclog("bg_color_rop = 0x%08X, fg_color_rop = 0x%08X, cmd_status = 0x%08X, src_pitch = %d, dst_pitch = %d, width = %d, height = %d (color/font expand)\n", sis->accel_cur.bg_color_rop, sis->accel_cur.fg_color_rop, sis->accel_cur.cmd_status, sis->accel_cur.src_pitch, sis->accel_cur.dst_pitch, width, height);
+
+    while (height) {
+        width = orig_width;
+        dx    = 0;
+        while (width) {
+            switch (sis->svga.bpp) {
+                case 15:
+                case 16:
+                    {
+                        uint16_t *dst = (uint16_t *) &sis->svga.vram[dest_addr + (dy * sis->accel_cur.dst_pitch * 2) + (dx * 2)];
+                        /* TODO: Check this later. */
+                        break;
+                    }
+                case 8:
+                    uint8_t *dst         = (uint8_t *) &sis->svga.vram[dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx)];
+                    uint8_t *src_pattern = ((sis->accel_cur.cmd_status >> 24) & 0x20) ? (uint8_t *) &sis->svga.vram[src_addr_pattern_vram + (dy * sis->accel_cur.src_pitch) + (dx)] : sis->accel_cur.pattern;
+                    uint8_t  src         = 0;
+                    uint8_t  srcrop      = 0;
+                    uint8_t  pat         = 0;
+                    uint8_t  patrop      = 0;
+                    switch ((sis->accel_cur.cmd_status >> 18) & 0x3) {
+                        case 0x0:
+                            pat    = sis->accel_cur.bg_color_rop & 0xFF;
+                            patrop = (sis->accel_cur.bg_color_rop >> 24);
+                            break;
+                        case 0x1:
+                            pat    = sis->accel_cur.fg_color_rop & 0xFF;
+                            patrop = (sis->accel_cur.fg_color_rop >> 24);
+                            break;
+                        case 0x2:
+                            pat = *(uint32_t *) (&sis->accel_cur.pattern[(dy & 0xF) * 4]);
+                            break;
+                    }
+                    switch ((sis->accel_cur.cmd_status >> 16) & 0x3) {
+                        case 0x0:
+                            src    = sis->accel_cur.bg_color_rop & 0xFF;
+                            srcrop = sis->accel_cur.bg_color_rop >> 24;
+                            break;
+                        case 0x1:
+                            src    = sis->accel_cur.fg_color_rop & 0xFF;
+                            srcrop = sis->accel_cur.fg_color_rop >> 24;
+                            break;
+                        case 0x2:
+                            srcrop = 0xCC;
+                            src    = *(uint8_t *) &sis->svga.vram[src_addr + (dy * sis->accel_cur.src_pitch) + (dx)];
+                            break;
+                    }
+
+                    if (src_pattern[(dy * sis->accel_cur.src_pitch) + (dx / 8)] & 1 << (dx & 7)) {
+                        if ((patrop & 0xF) != (patrop >> 4))
+                            sis_do_rop_8bpp_patterned(dst, pat, src, patrop);
+                        else
+                            sis_do_rop_8bpp(dst, pat, patrop);
+                    } else {
+                        sis_do_rop_8bpp_patterned(dst, (((sis->accel_cur.cmd_status >> 16) & 0x3) == 0x0) ? (sis->accel_cur.fg_color_rop & 0xFF) : (sis->accel_cur.bg_color_rop & 0xFF), src, pat >> 24);
+                    }
+                    break;
+            }
+            dx += xdir;
+            width--;
+        }
+        dy += ydir;
+        height--;
+    }
 }
 
 void
@@ -479,29 +809,39 @@ sis_draw_line(sis_t *sis)
     }
 
     while (y >= 0) {
+        if (sis->accel_line_cur.cmd_status & (0x0040 << 16)) {
+            if (sis->accel_line_cur.cmd_status & (0x0080 << 16) && (dx >= sis->accel_line_cur.left_clip && dy >= sis->accel_line_cur.top_clip && dx <= sis->accel_line_cur.right_clip && dy <= sis->accel_line_cur.bottom_clip)) {
+                goto advance;
+            }
+            if (!(sis->accel_line_cur.cmd_status & (0x0080 << 16)) && (dx < sis->accel_line_cur.left_clip && dy < sis->accel_line_cur.top_clip && dx > sis->accel_line_cur.right_clip && dy > sis->accel_line_cur.bottom_clip)) {
+                goto advance;
+            }
+        }
         switch (sis->svga.bpp) {
             case 16:
             case 15:
                 {
-                    uint16_t *dst = (uint16_t *) &sis->svga.vram[(dy * logical_width * 2) + (dx * 2)];
-                    uint16_t  src = sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop & 0xFFFF) : (sis->accel_line_cur.bg_color_rop & 0xFFFF);
+                    // uint16_t *dst = (uint16_t *) &sis->svga.vram[(dy * logical_width * 2) + (dx * 2)];
+                    uint16_t dst = svga_readw_linear((dy * logical_width * 2) + (dx * 2), &sis->svga);
+                    uint16_t src = sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop & 0xFFFF) : (sis->accel_line_cur.bg_color_rop & 0xFFFF);
                     if (sis->svga.bpp == 16)
-                        sis_do_rop_16bpp(dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
+                        sis_do_rop_16bpp(&dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
                     else
-                        sis_do_rop_15bpp(dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
-
+                        sis_do_rop_15bpp(&dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
+                    svga_writew_linear((dy * logical_width * 2) + (dx * 2), dst, &sis->svga);
                     break;
                 }
             case 8:
                 {
-                    uint8_t *dst = (uint8_t *) &sis->svga.vram[(dy * logical_width) + (dx)];
-                    uint8_t  src = sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop & 0xFF) : (sis->accel_line_cur.bg_color_rop & 0xFF);
-                    sis_do_rop_8bpp(dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
-
+                    uint8_t dst = svga_readb_linear((dy * logical_width) + (dx), &sis->svga);
+                    uint8_t src = sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop & 0xFF) : (sis->accel_line_cur.bg_color_rop & 0xFF);
+                    sis_do_rop_8bpp(&dst, src, sis->accel_line_cur.line_style & (1 << (y & 15)) ? (sis->accel_line_cur.fg_color_rop >> 24) : (sis->accel_line_cur.bg_color_rop >> 24));
+                    svga_writeb_linear((dy * logical_width) + (dx), dst, &sis->svga);
                     break;
                 }
         }
 
+advance:
         if (!y) {
             break;
         }
@@ -520,26 +860,147 @@ sis_draw_line(sis_t *sis)
 }
 
 void
+sis_bitblt(sis_t *sis)
+{
+    int      xdir;
+    int      ydir;
+    int      dx         = 0;
+    int      dy         = 0;
+    uint16_t width      = sis->accel_cur.rect_width + 1;
+    uint16_t height     = sis->accel_cur.rect_height + 1;
+    int32_t  dest_addr  = sis->accel_cur.dst_start_address;
+    uint32_t src_addr   = sis->accel_cur.src_start_address;
+    uint16_t orig_width = width;
+    pclog("bg_color_rop = 0x%08X, fg_color_rop = 0x%08X, cmd_status = 0x%08X, src_pitch = %d, dst_pitch = %d, width = %d, height = %d (BitBlt, discarded)\n", sis->accel_cur.bg_color_rop, sis->accel_cur.fg_color_rop, sis->accel_cur.cmd_status, sis->accel_cur.src_pitch, sis->accel_cur.dst_pitch, width, height);
+
+    xdir = sis->accel_cur.cmd_status & (0x10 << 16) ? 1 : -1;
+    ydir = sis->accel_cur.cmd_status & (0x20 << 16) ? 1 : -1;
+
+    while (height) {
+        width = orig_width;
+        dx    = 0;
+        while (width) {
+            switch (sis->svga.bpp) {
+                case 8:
+                    uint8_t  src            = 0;
+                    uint8_t  srcrop         = 0;
+                    uint8_t  pat            = 0;
+                    uint8_t  patrop         = 0;
+                    uint32_t real_dest_addr = dest_addr + (dy * sis->accel_cur.dst_pitch) + dx;
+                    uint8_t  dst_dat        = svga_readb_linear(dest_addr + (dy * sis->accel_cur.dst_pitch) + dx, &sis->svga);
+                    // uint8_t* dst = &sis->svga.vram[dest_addr + (dy * sis->accel_cur.dst_pitch) + dx];
+                    switch ((sis->accel_cur.cmd_status >> 16) & 3) {
+                        case 0:
+                            src    = sis->accel_cur.bg_color_rop & 0xFF;
+                            srcrop = sis->accel_cur.bg_color_rop >> 24;
+                            break;
+                        case 1:
+                            src    = sis->accel_cur.fg_color_rop & 0xFF;
+                            srcrop = sis->accel_cur.fg_color_rop >> 24;
+                            break;
+                        case 2:
+                            src    = svga_readb_linear(src_addr + (dy * sis->accel_cur.src_pitch) + dx, &sis->svga);
+                            srcrop = 0xCC;
+                            break;
+                    }
+                    switch ((sis->accel_cur.cmd_status >> 18) & 3) {
+                        case 0:
+                            pat    = sis->accel_cur.bg_color_rop & 0xFF;
+                            patrop = sis->accel_cur.bg_color_rop >> 24;
+                            break;
+                        case 1:
+                            pat    = sis->accel_cur.fg_color_rop & 0xFF;
+                            patrop = sis->accel_cur.fg_color_rop >> 24;
+                            break;
+                        case 2:
+                            pat    = sis->accel_cur.pattern[4 * (dy & 7) + (dx & 3)];
+                            patrop = 0xCC;
+                            break;
+                    }
+                    if ((patrop & 0xF) != (patrop >> 4)) {
+                        sis_do_rop_8bpp_patterned(&dst_dat, pat, src, patrop);
+                    } else {
+                        sis_do_rop_8bpp(&dst_dat, src, patrop);
+                    }
+                    svga_writeb_linear(real_dest_addr, dst_dat, &sis->svga);
+                    // if (srcrop ==)
+                    // if (src)
+                    break;
+            }
+            width--;
+            dx += xdir;
+        }
+        height--;
+        dy += ydir;
+    }
+}
+
+void
+sis_cpu_bitblt(sis_t *sis, uint32_t dst, uint32_t src)
+{
+    int      xdir;
+    int      ydir;
+    int cpu_pixel_count = sis->cpu_pixel_count;
+
+    if (cpu_pixel_count && sis->svga.bpp == 8) {
+        uint8_t pat     = 0;
+        uint8_t patrop  = 0;
+        uint8_t dst_dat = svga_readb_linear(dst, &sis->svga);
+        switch ((sis->accel_cur.cmd_status >> 18) & 3) {
+            case 0:
+                pat    = sis->accel_cur.bg_color_rop & 0xFF;
+                patrop = sis->accel_cur.bg_color_rop >> 24;
+                break;
+            case 1:
+                pat    = sis->accel_cur.fg_color_rop & 0xFF;
+                patrop = sis->accel_cur.fg_color_rop >> 24;
+                break;
+            case 2:
+                //pat    = sis->accel_cur.pattern[4 * (dy & 7) + (dx & 3)];
+                //patrop = 0xCC;
+                break;
+        }
+        if ((patrop & 0xF) != (patrop >> 4)) {
+            sis_do_rop_8bpp_patterned(&dst_dat, pat, src, patrop);
+        } else {
+            sis_do_rop_8bpp(&dst_dat, src, patrop);
+        }
+        svga_writeb_linear(dst_dat, src, &sis->svga);
+        cpu_pixel_count--;
+        if (cpu_pixel_count == 0)
+            sis->engine_active = 0;
+    }
+}
+
+void
 sis_accel_thread(void *p)
 {
     sis_t *sis = (sis_t *) p;
 
     while (!sis->quit) {
         if (FIFO_ENTRIES(sis)) {
-            sis->accel_cur = sis->accel_queue[sis->accel_fifo_read_idx];
+            sis->accel_cur           = sis->accel_queue[sis->accel_fifo_read_idx];
             sis->accel_fifo_read_idx = (sis->accel_fifo_read_idx + 1) & 0x1f;
-            sis->engine_active = 1;
+            sis->engine_active       = 1;
             switch ((sis->accel_cur.cmd_status >> 24) & 3) {
+                case 0:
+                    sis_bitblt(sis);
+                    break;
                 case 3:
                     sis_draw_line(sis);
                     break;
+                /*case 2:
+                    sis_expand_color_font(sis);
+                    break;*/
                 default:
-                    pclog("bg_color_rop = 0x%08X, fg_color_rop = 0x%08X, cmd_status = 0x%08X (discarded)\n", sis->accel_cur.bg_color_rop, sis->accel_cur.fg_color_rop, sis->accel_cur.cmd_status);
+                    pclog("bg_color_rop = 0x%08X, fg_color_rop = 0x%08X, cmd_status = 0x%08X, src_pitch = %d, dst_pitch = %d (discarded)\n", sis->accel_cur.bg_color_rop, sis->accel_cur.fg_color_rop, sis->accel_cur.cmd_status, sis->accel_cur.src_pitch, sis->accel_cur.dst_pitch);
                     break;
             }
         }
         if (!FIFO_ENTRIES(sis)) {
             sis->engine_active = 0;
+            thread_wait_event(sis->fifo_event, -1);
+            thread_reset_event(sis->fifo_event);
         }
     }
 }
@@ -800,7 +1261,7 @@ sis_pci_write(int func, int addr, uint8_t val, void *p)
 uint8_t
 sis_mmio_read(uint32_t addr, void *p)
 {
-    sis_t *sis = (sis_t *) p;
+    sis_t  *sis = (sis_t *) p;
     uint8_t val = 0xFF;
     if ((addr & 0xFFFF) >= 0x8280) {
         val = sis->accel_regs[((addr & 0xFFFF) - 0x8280)];
@@ -818,7 +1279,7 @@ sis_mmio_read(uint32_t addr, void *p)
 uint16_t
 sis_mmio_readw(uint32_t addr, void *p)
 {
-    sis_t *sis = (sis_t *) p;
+    sis_t   *sis = (sis_t *) p;
     uint16_t val = 0xFFFF;
     if ((addr & 0xFFFF) >= 0x8280) {
         val = sis->accel_regs_w[((addr & 0xFFFF) - 0x8280) / 2];
@@ -836,7 +1297,7 @@ sis_mmio_readw(uint32_t addr, void *p)
 uint32_t
 sis_mmio_readl(uint32_t addr, void *p)
 {
-    sis_t *sis = (sis_t *) p;
+    sis_t   *sis = (sis_t *) p;
     uint32_t val = 0xFFFFFFFF;
     if ((addr & 0xFFFF) >= 0x8280) {
         val = sis->accel_regs_l[((addr & 0xFFFF) - 0x8280) / 4];
@@ -858,8 +1319,18 @@ sis_mmio_write(uint32_t addr, uint8_t val, void *p)
     if ((addr & 0xFFFF) >= 0x8280) {
         sis->accel_regs[((addr & 0xFFFF) - 0x8280)] = val;
         if ((addr & 0xFFFF) == 0x82AB) {
+            if (((sis->accel.cmd_status >> 16) & 3) == 3) {
+                /*while (sis->engine_active) {
+                }
+                sis->engine_active = 1;
+                sis->accel_cur     = sis->accel;
+                sis->cpu_pixel_count = (sis->accel_cur.rect_width + 1) * (sis->accel_cur.rect_height + 1);*/
+                return;
+            }
+            sis->engine_active                          = 1;
             sis->accel_queue[sis->accel_fifo_write_idx] = sis->accel;
-            sis->accel_fifo_write_idx = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            sis->accel_fifo_write_idx                   = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            thread_set_event(sis->fifo_event);
         }
     }
 }
@@ -871,8 +1342,18 @@ sis_mmio_writew(uint32_t addr, uint16_t val, void *p)
     if ((addr & 0xFFFF) >= 0x8280) {
         sis->accel_regs_w[((addr & 0xFFFF) - 0x8280) / 2] = val;
         if ((addr & 0xFFFF) == 0x82AA) {
+            if (((sis->accel.cmd_status >> 16) & 3) == 3) {
+                /*while (sis->engine_active) {
+                }
+                sis->engine_active = 1;
+                sis->accel_cur     = sis->accel;
+                sis->cpu_pixel_count = (sis->accel_cur.rect_width + 1) * (sis->accel_cur.rect_height + 1);*/
+                return;
+            }
+            sis->engine_active                          = 1;
             sis->accel_queue[sis->accel_fifo_write_idx] = sis->accel;
-            sis->accel_fifo_write_idx = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            sis->accel_fifo_write_idx                   = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            thread_set_event(sis->fifo_event);
         }
     }
 }
@@ -884,8 +1365,19 @@ sis_mmio_writel(uint32_t addr, uint32_t val, void *p)
     if ((addr & 0xFFFF) >= 0x8280) {
         sis->accel_regs_l[((addr & 0xFFFF) - 0x8280) / 4] = val;
         if ((addr & 0xFFFF) == 0x82AA || (addr & 0xFFFF) == 0x82A8) {
+            if (((sis->accel.cmd_status >> 16) & 3) == 3) {
+                /* FIXME: Freezes */
+                /*while (sis->engine_active) {
+                }
+                sis->engine_active = 1;
+                sis->accel_cur     = sis->accel;
+                sis->cpu_pixel_count = (sis->accel_cur.rect_width + 1) * (sis->accel_cur.rect_height + 1);*/
+                return;
+            }
+            sis->engine_active                          = 1;
             sis->accel_queue[sis->accel_fifo_write_idx] = sis->accel;
-            sis->accel_fifo_write_idx = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            sis->accel_fifo_write_idx                   = (sis->accel_fifo_write_idx + 1) & 0x1f;
+            thread_set_event(sis->fifo_event);
         }
     }
 }
@@ -1040,6 +1532,54 @@ sis_writel(uint32_t addr, uint32_t val, void *p)
     svga_writel(addr, val, p);
 }
 
+void
+sis_writeb_linear(uint32_t addr, uint8_t val, void *p)
+{
+    svga_t *svga = (svga_t *) p;
+    sis_t  *sis  = (sis_t *) svga->p;
+
+    if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
+        sis_cpu_bitblt(sis, addr, val);
+    } else
+        svga_writeb_linear(addr, val, p);
+}
+
+void
+sis_writew_linear(uint32_t addr, uint16_t val, void *p)
+{
+    svga_t *svga = (svga_t *) p;
+    sis_t  *sis  = (sis_t *) svga->p;
+
+    if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
+        if (sis->svga.bpp == 8) {
+            sis_cpu_bitblt(sis, addr, val);
+            sis_cpu_bitblt(sis, addr + 1, val >> 8);
+        } else {
+            sis_cpu_bitblt(sis, addr, val);
+        }
+    } else
+        svga_writew_linear(addr, val, p);
+}
+
+void
+sis_writel_linear(uint32_t addr, uint32_t val, void *p)
+{
+    svga_t *svga = (svga_t *) p;
+    sis_t  *sis  = (sis_t *) svga->p;
+
+    if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
+        if (sis->svga.bpp == 8) {
+            sis_cpu_bitblt(sis, addr, val);
+            sis_cpu_bitblt(sis, addr + 1, val >> 8);
+            sis_cpu_bitblt(sis, addr + 2, val >> 16);
+            sis_cpu_bitblt(sis, addr + 3, val >> 24);
+        } else {
+            sis_cpu_bitblt(sis, addr, val);
+        }
+    } else
+        svga_writel_linear(addr, val, p);
+}
+
 static void *
 sis_init(const device_t *info)
 {
@@ -1065,13 +1605,15 @@ sis_init(const device_t *info)
     sis->svga.miscout          = 1;
     sis->svga.recalctimings_ex = sis_recalctimings;
 
-    mem_mapping_add(&sis->linear_mapping, 0, 0, svga_readb_linear, svga_readw_linear, svga_readl_linear, svga_writeb_linear, svga_writew_linear, svga_writel_linear, NULL, MEM_MAPPING_EXTERNAL, sis);
+    mem_mapping_add(&sis->linear_mapping, 0, 0, svga_readb_linear, svga_readw_linear, svga_readl_linear, sis_writeb_linear, sis_writew_linear, sis_writel_linear, NULL, MEM_MAPPING_EXTERNAL, sis);
     mem_mapping_add(&sis->mmio_mapping, 0, 0, sis_mmio_read, sis_mmio_readw, sis_mmio_readl, sis_mmio_write, sis_mmio_writew, sis_mmio_writel, NULL, MEM_MAPPING_EXTERNAL, sis);
     mem_mapping_set_handler(&sis->svga.mapping, sis_read, sis_readw, sis_readl, sis_write, sis_writew, sis_writel);
 
-    sis->quit          = 0;
-    sis->engine_active = 0;
-    sis->accel_thread  = thread_create(sis_accel_thread, (void *) sis);
+    sis->quit            = 0;
+    sis->engine_active   = 0;
+    sis->fifo_event      = thread_create_event();
+    sis->fifo_data_event = thread_create_event();
+    sis->accel_thread    = thread_create(sis_accel_thread, (void *) sis);
 
     return sis;
 }
@@ -1088,6 +1630,7 @@ sis_close(void *p)
     sis_t *sis = (sis_t *) p;
 
     sis->quit = 1;
+    thread_set_event(sis->fifo_event);
     thread_wait(sis->accel_thread);
     svga_close(&sis->svga);
 
