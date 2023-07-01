@@ -717,7 +717,7 @@ sis_expand_color_font(sis_t *sis)
                         break;
                     }
                 case 8:
-                    uint8_t *dst         = (uint8_t *) &sis->svga.vram[dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx)];
+                    uint8_t dst         = svga_readb_linear(dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx), &sis->svga);
                     uint8_t *src_pattern = ((sis->accel_cur.cmd_status >> 24) & 0x20) ? (uint8_t *) &sis->svga.vram[src_addr_pattern_vram + (dy * sis->accel_cur.src_pitch) + (dx)] : sis->accel_cur.pattern;
                     uint8_t  src         = 0;
                     uint8_t  srcrop      = 0;
@@ -747,18 +747,20 @@ sis_expand_color_font(sis_t *sis)
                             break;
                         case 0x2:
                             srcrop = 0xCC;
-                            src    = *(uint8_t *) &sis->svga.vram[src_addr + (dy * sis->accel_cur.src_pitch) + (dx)];
+                            src    = svga_readb_linear(src_addr + (dy * sis->accel_cur.src_pitch) + (dx), &sis->svga);
                             break;
                     }
 
                     if (src_pattern[(dy * sis->accel_cur.src_pitch) + (dx / 8)] & 1 << (dx & 7)) {
                         if ((patrop & 0xF) != (patrop >> 4))
-                            sis_do_rop_8bpp_patterned(dst, pat, src, patrop);
+                            sis_do_rop_8bpp_patterned(&dst, pat, src, patrop);
                         else
-                            sis_do_rop_8bpp(dst, pat, patrop);
+                            sis_do_rop_8bpp(&dst, pat, patrop);
                     } else {
-                        sis_do_rop_8bpp_patterned(dst, (((sis->accel_cur.cmd_status >> 16) & 0x3) == 0x0) ? (sis->accel_cur.fg_color_rop & 0xFF) : (sis->accel_cur.bg_color_rop & 0xFF), src, pat >> 24);
+                        
+                        //sis_do_rop_8bpp_patterned(&dst, (((sis->accel_cur.cmd_status >> 16) & 0x3) == 0x0) ? (sis->accel_cur.fg_color_rop & 0xFF) : (sis->accel_cur.bg_color_rop & 0xFF), src, pat >> 24);
                     }
+                    svga_writeb_linear(dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx), dst, &sis->svga);
                     break;
             }
             dx += xdir;
@@ -989,9 +991,9 @@ sis_accel_thread(void *p)
                 case 3:
                     sis_draw_line(sis);
                     break;
-                /*case 2:
+                case 2:
                     sis_expand_color_font(sis);
-                    break;*/
+                    break;
                 default:
                     pclog("bg_color_rop = 0x%08X, fg_color_rop = 0x%08X, cmd_status = 0x%08X, src_pitch = %d, dst_pitch = %d (discarded)\n", sis->accel_cur.bg_color_rop, sis->accel_cur.fg_color_rop, sis->accel_cur.cmd_status, sis->accel_cur.src_pitch, sis->accel_cur.dst_pitch);
                     break;
