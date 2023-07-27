@@ -1853,6 +1853,7 @@ eepro100_init(const device_t* info)
     s->eeprom_data = (eepro100_eeprom_t*)nmc93cxx_eeprom_data(s->eeprom);
     
     rom_init(&s->expansion_rom, "roms/network/eepro100/ipxe.rom", 0, 0x20000, 0x1FFFF, 0, MEM_MAPPING_EXTERNAL);
+    mem_mapping_disable(&s->expansion_rom.mapping);
 
     eeprom_file = nvr_fopen("eepro100_eeprom.nvr", "rb");
     if (eeprom_file)
