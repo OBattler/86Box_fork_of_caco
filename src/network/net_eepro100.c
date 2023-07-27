@@ -320,15 +320,15 @@ static void e100_write_reg2(EEPRO100State *s, E100RegisterOffset addr,
                             uint16_t val)
 {
     assert(!((uintptr_t)&s->mem[addr] & 1));
-    s->mem[addr] = val;
+    *((uint16_t*)&s->mem[addr]) = val;
 }
 
-/* Read a 32 bit control/status (CSR) register. */
+/* Write a 32 bit control/status (CSR) register. */
 static void e100_write_reg4(EEPRO100State *s, E100RegisterOffset addr,
                             uint32_t val)
 {
     assert(!((uintptr_t)&s->mem[addr] & 3));
-    s->mem[addr] = val;
+    *((uint32_t*)&s->mem[addr]) = val;
 }
 
 enum scb_stat_ack {
