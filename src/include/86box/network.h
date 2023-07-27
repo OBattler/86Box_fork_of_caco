@@ -182,7 +182,7 @@ extern void       netcard_close(netcard_t *card);
 extern void       network_close(void);
 extern void       network_reset(void);
 extern int        network_available(void);
-extern void       network_tx(netcard_t *card, uint8_t *, int);
+extern void       network_tx(netcard_t *card, uint8_t *bufp, int len);
 
 extern int net_pcap_prepare(netdev_t *);
 extern int net_vde_prepare(void);

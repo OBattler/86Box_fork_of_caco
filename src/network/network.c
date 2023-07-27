@@ -94,6 +94,8 @@ static const device_t net_none_device = {
     .config        = NULL
 };
 
+extern const device_t eepro100_device;
+
 static const device_t *net_cards[] = {
     &net_none_device,
     &threec501_device,
@@ -116,6 +118,7 @@ static const device_t *net_cards[] = {
     &pcnet_am79c970a_device,
     &rtl8029as_device,
     &pcnet_am79c960_vlb_device,
+    &eepro100_device,
     NULL
 };
 
