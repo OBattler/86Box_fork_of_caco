@@ -1156,6 +1156,7 @@ static uint8_t eepro100_read1(uint32_t addr, void* p)
 {
     uint8_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
+    addr &= PCI_MEM_SIZE - 1;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = s->mem[addr];
     }
@@ -1203,6 +1204,7 @@ static uint16_t eepro100_read2(uint32_t addr, void* p)
 {
     uint16_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
+    addr &= PCI_MEM_SIZE - 1;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = e100_read_reg2(s, addr);
     }
@@ -1229,6 +1231,7 @@ static uint32_t eepro100_read4(uint32_t addr, void* p)
 {
     uint32_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
+    addr &= PCI_MEM_SIZE - 1;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = e100_read_reg4(s, addr);
     }
@@ -1837,6 +1840,57 @@ static E100PCIDeviceInfo eepro100_plus_info = {
     .power_management = true,
 };
 
+static void
+rom_write(uint32_t addr, uint8_t val, void *priv)
+{
+    const rom_t *rom = (rom_t *) priv;
+
+#ifdef ROM_TRACE
+    if (rom->mapping.base == ROM_TRACE)
+        rom_log("ROM: read byte from BIOS at %06lX\n", addr);
+#endif
+
+    if (addr < rom->mapping.base)
+        return;
+    if (addr >= (rom->mapping.base + rom->sz))
+        return;
+    rom->rom[(addr - rom->mapping.base) & rom->mask] = val;
+}
+
+static void
+rom_writew(uint32_t addr, uint16_t val, void *priv)
+{
+    rom_t *rom = (rom_t *) priv;
+
+#ifdef ROM_TRACE
+    if (rom->mapping.base == ROM_TRACE)
+        rom_log("ROM: read word from BIOS at %06lX\n", addr);
+#endif
+
+    if (addr < (rom->mapping.base - 1))
+        return;
+    if (addr >= (rom->mapping.base + rom->sz))
+        return;
+    *(uint16_t *) &rom->rom[(addr - rom->mapping.base) & rom->mask] = val;
+}
+
+static void
+rom_writel(uint32_t addr, uint32_t val, void *priv)
+{
+    rom_t *rom = (rom_t *) priv;
+
+#ifdef ROM_TRACE
+    if (rom->mapping.base == ROM_TRACE)
+        rom_log("ROM: read long from BIOS at %06lX\n", addr);
+#endif
+
+    if (addr < (rom->mapping.base - 3))
+        return;
+    if (addr >= (rom->mapping.base + rom->sz))
+        return;
+   *(uint32_t *) &rom->rom[(addr - rom->mapping.base) & rom->mask] = val;
+}
+
 static void*
 eepro100_init(const device_t* info)
 {
@@ -1871,7 +1925,9 @@ eepro100_init(const device_t* info)
 
     mem_mapping_add(&s->mmio_bar, 0, 0, eepro100_read1, eepro100_read2, eepro100_read4, eepro100_write1, eepro100_write2, eepro100_write4, NULL, MEM_MAPPING_EXTERNAL, s);
     /* Need to *absolutely* fix this... */
-    mem_mapping_add(&s->flash_bar, 0, 0, eepro100_read1, eepro100_read2, eepro100_read4, eepro100_write1, eepro100_write2, eepro100_write4, NULL, MEM_MAPPING_EXTERNAL, s);
+    mem_mapping_add(&s->flash_bar, 0, 0, rom_read, rom_readw, rom_readl, rom_write, rom_writew, rom_writel, NULL, MEM_MAPPING_EXTERNAL, &s->expansion_rom);
+
+    pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s);
 
     return s;
 }
