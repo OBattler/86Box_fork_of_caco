@@ -542,6 +542,7 @@ static void nic_reset(void *opaque)
     EEPRO100State *s = opaque;
     /* TODO: Clearing of hash register for selective reset, too? */
     memset(&s->mult[0], 0, sizeof(s->mult));
+    memcpy(s->macaddr, s->eeprom_data->mac_addr, 6);
     nic_selective_reset(s);
 }
 
