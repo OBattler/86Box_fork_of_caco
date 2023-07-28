@@ -1927,7 +1927,7 @@ eepro100_init(const device_t* info)
     /* Need to *absolutely* fix this... */
     mem_mapping_add(&s->flash_bar, 0, 0, rom_read, rom_readw, rom_readl, rom_write, rom_writew, rom_writel, NULL, MEM_MAPPING_EXTERNAL, &s->expansion_rom);
 
-    pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s);
+    s->dev = pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s);
 
     return s;
 }
