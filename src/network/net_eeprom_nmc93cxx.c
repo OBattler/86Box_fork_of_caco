@@ -54,7 +54,7 @@ nmc93cxx_eeprom_init_params(const device_t *info, void* params)
 {
     uint16_t nwords = 64;
     uint8_t addrbits = 6;
-    nmc93cxx_eeprom_t* eeprom = calloc(1, sizeof(nmc93cxx_eeprom_t));
+    nmc93cxx_eeprom_t* eeprom = NULL;
     if (!params)
         return NULL;
 
@@ -74,6 +74,9 @@ nmc93cxx_eeprom_init_params(const device_t *info, void* params)
         addrbits = 6;
         break;
     }
+    eeprom = calloc(1, sizeof(nmc93cxx_eeprom_t) + ((nwords + 1) * 2));
+    if (!eeprom)
+        return NULL;
     eeprom->size = nwords;
     eeprom->addrbits = addrbits;
     /* Output DO is tristate, read results in 1. */
