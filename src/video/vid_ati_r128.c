@@ -244,21 +244,49 @@ void r128_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
             break;
         
         case 0x15:
-            io_removehandler(r128->pci_regs[addr & 0xFF], 256, r128_in, NULL, NULL, r128_out, NULL, NULL, r128);
+            io_removehandler(r128->pci_regs[addr & 0xFF], 256, r128_ext_in, NULL, NULL, r128_ext_out, NULL, NULL, r128);
             r128->pci_regs[addr & 0xFF] = val & 0xff;
             if (r128->pci_regs[PCI_REG_COMMAND] & PCI_COMMAND_IO)
-                io_sethandler(r128->pci_regs[addr & 0xFF], 256, r128_in, NULL, NULL, r128_out, NULL, NULL, r128);
+                io_sethandler(r128->pci_regs[addr & 0xFF], 256, r128_ext_in, NULL, NULL, r128_ext_out, NULL, NULL, r128);
+            break;
+        
+        case 0x19:
+            r128->pci_regs[addr & 0xFF] = val & 0xc0;
+            if (r128->pci_regs[PCI_REG_COMMAND] & PCI_COMMAND_MEM)
+                mem_mapping_set_addr(&r128->reg_base, (r128->pci_regs[0x19] << 8) | (r128->pci_regs[0x1a] << 16) | (r128->pci_regs[0x1b] << 24), (1 << 14) - 1);
             break;
             
         case 0x04:
-            io_removehandler(r128->pci_regs[addr & 0xFF], 256, r128_in, NULL, NULL, r128_out, NULL, NULL, r128);
+            io_removehandler(r128->pci_regs[addr & 0xFF], 256, r128_ext_in, NULL, NULL, r128_ext_out, NULL, NULL, r128);
             mem_mapping_disable(&r128->linear_mapping);
             mem_mapping_disable(&r128->svga.mapping);
+            mem_mapping_disable(&r128->reg_base);
             r128->pci_regs[addr & 0xFF] = val & 0xff;
             if (r128->pci_regs[PCI_REG_COMMAND] & PCI_COMMAND_MEM){
-                mem_mapping_set_addr(&r128->linear_mapping, r128->pci_regs[addr & 0xFF] << 24, (1 << 27) - 1);
+                mem_mapping_enable(&r128->linear_mapping);
                 mem_mapping_enable(&r128->svga.mapping);
+                mem_mapping_enable(&r128->reg_base);
             }
+            break;
+        
+        case 0x3c:
+            r128->pci_regs[addr & 0xFF] = val;
+            break;
+        
+        case 0x58:
+            r128->pci_regs[addr & 0xFF] = val & 3;
+            break;
+
+        case 0x59:
+            r128->pci_regs[addr & 0xFF] = val & 3;
+            break;
+
+        case 0x5b:
+            r128->pci_regs[addr & 0xFF] = val;
+            break;
+
+        case 0x4c ... 0x4f:
+            r128->pci_regs[addr & 0xFF] = val;
             break;
     }
 }
