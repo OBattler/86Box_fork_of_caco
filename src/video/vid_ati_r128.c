@@ -220,13 +220,13 @@ r128_pci_read(UNUSED(int func), int addr, void *priv)
 }
 
 uint8_t
-r128_in(uint16_t addr, void *priv)
+r128_ext_in(uint16_t addr, void *priv)
 {
     r128_t* r128 = (r128_t*)priv;
 }
 
 void
-r128_out(uint16_t addr, uint8_t val, void *priv)
+r128_ext_out(uint16_t addr, uint8_t val, void *priv)
 {
     r128_t* r128 = (r128_t*)priv;
 }
