@@ -573,6 +573,9 @@ extern const device_t velocity_200_agp_device;
 /* Wyse 700 */
 extern const device_t wy700_device;
 
+/* Rendition */
+extern const device_t v2200_device;
+
 #endif
 
 #endif /*EMU_VIDEO_H*/
