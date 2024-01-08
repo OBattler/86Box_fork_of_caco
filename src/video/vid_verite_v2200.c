@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #define HAVE_STDARG_H
 #include <86box/86box.h>
 #include <86box/device.h>
@@ -20,6 +21,7 @@
 #include <86box/vid_ddc.h>
 #include <86box/vid_svga.h>
 #include <86box/vid_svga_render.h>
+#include <86box/bswap.h>
 
 static video_timings_t timing_banshee     = { .type = VIDEO_PCI, .write_b = 2, .write_w = 2, .write_l = 1, .read_b = 20, .read_w = 20, .read_l = 21 };
 
@@ -408,7 +410,6 @@ static const char *pixel_register_names[256] =
 
 };
 
-#pragma pack(push, 1)
 typedef struct v2200_t
 {
     svga_t svga;
@@ -422,15 +423,31 @@ typedef struct v2200_t
 
     mem_mapping_t linear_mapping;
     mem_mapping_t reg_mapping;
+	mem_mapping_t vesa_mapping; /* Called as such because it's VESA VBE 2.0 related. */
     rom_t bios_rom;
     uint32_t linear_base, reg_base;
     uint32_t io_base;
 
     /* RISC regs */
-    uint32_t risc_pc;
+    atomic_uint risc_pc, risc_old_pc;
+	atomic_uint risc_ir;
+	atomic_uint risc_s1; /* Whatever is read from S1 in the instruction. */
+
+	atomic_uint pending_ir; /* STATEDATA-written IR */
+	uint32_t statedata;
+	uint8_t stateindex;
+	bool stateindex_or_data;
+	uint32_t risc_regs[256];
+	uint32_t jump_ir;
+	uint32_t mhz66, subsys;
+	bool jump_pending;
+
     uint8_t slot;
+
+	atomic_bool stop_threads;
+	atomic_uint flags;
+	thread_t*   risc_thread;
 } v2200_t;
-#pragma pack(pop)
 
 static void get_pixel_register_name(char *dest, uint32_t opcode)
 {
@@ -703,6 +720,12 @@ v2200_in(uint16_t addr, void *priv)
             else
                 temp = svga->crtc[svga->crtcreg];
             break;
+		case 0x3DE:
+			temp = (v2200->linear_base >> 24) & 0xFF;
+			break;		
+		case 0x3DF:
+			temp = (v2200->io_base >> 8) & 0xFF;
+			break;
         default:
             temp = svga_in(addr, svga);
             break;
@@ -725,127 +748,375 @@ v2200_recalcmapping(v2200_t *v2200)
         mem_mapping_disable(&svga->mapping);
         mem_mapping_disable(&v2200->linear_mapping);
         mem_mapping_disable(&v2200->reg_mapping);
+		mem_mapping_disable(&v2200->vesa_mapping);
         return;
     }
-    switch (svga->gdcreg[6] & 0xc) { /*Banked framebuffer*/
-        case 0x0: /*128k at A0000*/
-            mem_mapping_set_addr(&svga->mapping, 0xa0000, 0x20000);
-            svga->banked_mask = 0xffff;
-            break;
-        case 0x4: /*64k at A0000*/
-            mem_mapping_set_addr(&svga->mapping, 0xa0000, 0x10000);
-            svga->banked_mask = 0xffff;
-            break;
-        case 0x8: /*32k at B0000*/
-            mem_mapping_set_addr(&svga->mapping, 0xb0000, 0x08000);
-            svga->banked_mask = 0x7fff;
-            break;
-        case 0xC: /*32k at B8000*/
-            mem_mapping_set_addr(&svga->mapping, 0xb8000, 0x08000);
-            svga->banked_mask = 0x7fff;
-            break;
+	if ((v2200->regs[0x72] & 3) == 1) {
+		mem_mapping_disable(&svga->mapping);
+		mem_mapping_set_addr(&v2200->vesa_mapping, 0xa0000, 0x10000);
+	} else {
+		mem_mapping_disable(&v2200->vesa_mapping);
+		switch (svga->gdcreg[6] & 0xc) { /*Banked framebuffer*/
+			case 0x0: /*128k at A0000*/
+				mem_mapping_set_addr(&svga->mapping, 0xa0000, 0x20000);
+				svga->banked_mask = 0xffff;
+				break;
+			case 0x4: /*64k at A0000*/
+				mem_mapping_set_addr(&svga->mapping, 0xa0000, 0x10000);
+				svga->banked_mask = 0xffff;
+				break;
+			case 0x8: /*32k at B0000*/
+				mem_mapping_set_addr(&svga->mapping, 0xb0000, 0x08000);
+				svga->banked_mask = 0x7fff;
+				break;
+			case 0xC: /*32k at B8000*/
+				mem_mapping_set_addr(&svga->mapping, 0xb8000, 0x08000);
+				svga->banked_mask = 0x7fff;
+				break;
 
-        default:
-            break;
-    }
-    mem_mapping_set_addr(&v2200->linear_mapping, v2200->linear_base, 1 << 24);
+			default:
+				break;
+		}
+	}
+    mem_mapping_set_addr(&v2200->linear_mapping, v2200->linear_base & 0xFF000000, 1 << 24);
     mem_mapping_set_addr(&v2200->reg_mapping, v2200->reg_base, 1 << 18);
 }
 
-uint8_t
-v2200_pci_read(UNUSED(int func), int addr, void *priv)
+static uint32_t
+v2200_readl_linear(uint32_t addr, void *priv);
+
+static uint8_t
+v2200_readb_linear(uint32_t addr, void *priv)
 {
-    const v2200_t *v2200 = (v2200_t *) priv;
+    const svga_t *svga = (svga_t *) priv;
 
-    addr &= 0xff;
+    cycles -= svga->monitor->mon_video_timing_read_b;
 
-    switch (addr) {
-        case 0x00:
-            return 0x63; /* Rendition */
-        case 0x01:
-            return 0x11;
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return 0xff;
 
-        case 0x02:
-            return 0x00;
-        case 0x03:
-            return 0x20;
+    return svga->vram[addr & svga->vram_mask];
+}
 
-        case PCI_REG_COMMAND:
-            return v2200->pci_regs[PCI_REG_COMMAND] & 0x27; /* Respond to IO and memory accesses */
+static uint16_t
+v2200_readw_linear(uint32_t addr, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
 
-        case 0x07:
-            return 1 << 1; /* Medium DEVSEL timing */
+    cycles -= svga->monitor->mon_video_timing_read_w;
 
-        case 0x08:
-            return 0; /* Revision ID */
-        case 0x09:
-            return 0; /* Programming interface */
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return 0xffff;
 
-        case 0x0a:
-            return 0x00; /* Supports VGA interface */
-        case 0x0b:
-            return 0x03;
+	switch (v2200->regs[0x43] & 3)
+	{
+		case 0x00:
+			break;
+		case 0x01:
+			{
+				uint32_t ret = v2200_readl_linear(addr & ~3, priv);	
+				if (addr & 2)
+					ret >>= 16;
+				return ret & 0xFFFF;
+			}
+			break;
+		case 0x02:
+			return bswap16(*(uint16_t *) &svga->vram[addr & svga->vram_mask]);
+		default:
+			fatal("memendian 0x%X\n", v2200->regs[0x43] & 3);
+	}
 
-        case 0x10:
-            return 0x00; /* Linear frame buffer address */
-        case 0x11:
-            return 0x00;
-        case 0x12:
-            return 0x00;
-        case 0x13:
-            return (v2200->linear_base >> 24);
+    return *(uint16_t *) &svga->vram[addr & svga->vram_mask];
+}
 
-        case 0x14:
-            return 0x01;
+static uint32_t
+v2200_readl_linear(uint32_t addr, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
 
-        case 0x15:
-        case 0x16:
-        case 0x17:
-            return v2200->pci_regs[addr & 0xFF];
-        
-        case 0x18:
-        case 0x19:
-            return 0x00;
-        case 0x1a:
-            return (v2200->reg_base >> 16) & 0xfc;
-        case 0x1b:
-            return (v2200->reg_base >> 24);
+    cycles -= svga->monitor->mon_video_timing_read_l;
 
-        case 0x30:
-            return v2200->pci_regs[0x30] & 0x01; /* BIOS ROM address */
-        case 0x31:
-            return v2200->pci_regs[0x31];
-        case 0x32:
-            return v2200->pci_regs[0x32];
-        case 0x33:
-            return v2200->pci_regs[0x33];
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return 0xffffffff;
 
-        default:
-            break;
-    }
+	switch (v2200->regs[0x43] & 3)
+	{
+		case 0x00:
+			break;
+		case 0x01:
+			return bswap32(*(uint16_t *) &svga->vram[addr & svga->vram_mask]);
+		default:
+			fatal("memendian 0x%X\n", v2200->regs[0x43] & 3);
+	}
 
-    return 0;
+    return *(uint32_t *) &svga->vram[addr & svga->vram_mask];
+}
+
+static void
+v2200_writeb_linear(uint32_t addr, uint8_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+
+    cycles -= svga->monitor->mon_video_timing_write_b;
+
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return;
+    addr &= svga->vram_mask;
+    svga->changedvram[addr >> 12] = svga->monitor->mon_changeframecount;
+    svga->vram[addr]              = val;
+}
+
+static void
+v2200_writew_linear(uint32_t addr, uint16_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+    cycles -= svga->monitor->mon_video_timing_write_w;
+
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return;
+    addr &= svga->vram_mask;
+    svga->changedvram[addr >> 12]   = svga->monitor->mon_changeframecount;
+    *(uint16_t *) &svga->vram[addr] = val;
+}
+
+static void
+v2200_writel_linear(uint32_t addr, uint32_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+    cycles -= svga->monitor->mon_video_timing_write_l;
+
+    addr &= svga->decode_mask;
+    if (addr >= svga->vram_max)
+        return;
+    addr &= svga->vram_mask;
+    svga->changedvram[addr >> 12]   = svga->monitor->mon_changeframecount;
+	switch (v2200->regs[0x43] & 3)
+	{
+		case 0x00:
+			break;
+		case 0x01:
+			*(uint32_t *) &svga->vram[addr] = bswap32(val);
+			break;
+		default:
+			fatal("memendian 0x%X\n", v2200->regs[0x43] & 3);
+	}
+    *(uint32_t *) &svga->vram[addr] = val;
+}
+
+static uint8_t
+v2200_readb(uint32_t addr, void *priv)
+{
+    const svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.read_b((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, &v2200->bios_rom);
+	else
+		return v2200_readb_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, svga);
+}
+
+static uint16_t
+v2200_readw(uint32_t addr, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.read_w((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, &v2200->bios_rom);
+	else
+		return v2200_readw_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, svga);
+}
+
+static uint32_t
+v2200_readl(uint32_t addr, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.read_l((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, &v2200->bios_rom);
+	else
+		return v2200_readl_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, svga);
+}
+
+/* XXX: Potential crashes when attempts to program the ROM are made. */
+static void
+v2200_writeb(uint32_t addr, uint8_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.write_b((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, &v2200->bios_rom);
+	else
+		return v2200_writeb_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, svga);
+}
+
+static void
+v2200_writew(uint32_t addr, uint16_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.write_w((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, &v2200->bios_rom);
+	else
+		return v2200_writew_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, svga);
+}
+
+static void
+v2200_writel(uint32_t addr, uint32_t val, void *priv)
+{
+    svga_t *svga = (svga_t *) priv;
+	v2200_t *v2200 = (v2200_t *) svga->priv;
+
+	if (v2200->regs[0x74 >> 2] & 0x80000000)
+		return v2200->bios_rom.mapping.write_l((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, &v2200->bios_rom);
+	else
+		return v2200_writel_linear((addr & 0xFFFF) + v2200->regs[0x74 >> 2] & 0xFFE000, val, svga);
+}
+
+void
+v2200_statedata_process_out(v2200_t* v2200)
+{
+	switch (v2200->stateindex)
+	{
+		case 0x80: /* Decode IR */
+			/* TODO: Figure out how to handle Xorg driver later. */
+			v2200->risc_ir = v2200->statedata;
+			break;
+	}
+}
+
+uint32_t
+v2200_statedata_process_in(v2200_t* v2200)
+{
+	switch (v2200->stateindex)
+	{
+		case 0x80: /* Decode IR */
+			/* TODO: Figure out how to handle Xorg driver later. */
+			return v2200->risc_ir;
+	}
+	return 0;
 }
 
 uint8_t
 v2200_reg_in(uint32_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+	uint8_t ret = 0x00;
+	switch (addr & 0xFF)
+	{
+		default:
+			fatal("%s, 0x%08X\n", __func__, addr);
+			break;
+		case 0x43:
+			ret = v2200->regs[addr & 0xFF];
+			break;
+		case 0x44 ... 0x47: /* Interrupt. */
+			ret = v2200->regs[addr & 0xFF];
+			break;
+		case 0x60:
+			ret = v2200->stateindex;
+			break;
+		case 0x64:
+		case 0x65:
+		case 0x66:
+		case 0x67:
+			ret = v2200_statedata_process_in(v2200) >> ((addr & 3) * 8);
+			break;
+		case 0x72:
+		case 0x73:
+		case 0x74:
+		case 0x75:
+		case 0x76:
+		case 0x77:
+		case 0x84:
+		case 0x85:
+		case 0x86:
+		case 0x87:
+			ret = v2200->regs[addr & 0xFF];
+			break;
+		case 0xa0:
+			ret = 0b10000001;
+			break;
+		case 0xa1:
+			ret = 0b11111;
+			break;
+		case 0xa2:
+			ret = v2200->regs[0xa2];
+			break;
+		case 0xa3:
+			ret = 0x0;
+			break;
+		case 0xa4:
+		case 0xa5:
+			ret = v2200->regs[addr & 0xFF];
+			break;
+		case 0xa6:
+		case 0xa7:
+			ret = 0x00;
+			break;
+		case 0x48:
+			ret = v2200->regs[0x48];
+			break;
+		case 0x70:
+			ret = v2200->regs_w[0x70];
+			break;
+		case 0x71:
+			ret = v2200->regs_w[0x70] >> 8;
+			break;
+		case 0xb2:
+			ret = v2200_in(0x3c6, v2200);
+			break;
+		case 0xb1:
+			ret = v2200_in(0x3c9, v2200);
+			break;
+		case 0xb0:
+			ret = v2200_in(0x3c8, v2200);
+			break;
+		case 0xF0 ... 0xFF:
+			ret = 0x00;
+			break; /* No idea what is this supposed to be. */
+	}
+    return ret;
 }
 
 uint16_t
 v2200_reg_inw(uint32_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+    fatal("%s, 0x%08X\n", __func__, addr);
 }
 
 uint32_t
 v2200_reg_inl(uint32_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+	uint32_t ret;
+	switch (addr & 0xFF)
+	{
+		case 0xa0:
+			ret = v2200->regs_l[addr & 0xFF];
+			break;
+		default:
+    		ret = (v2200_reg_in(addr, v2200)) |
+					(v2200_reg_in(addr + 1, v2200) << 8) |
+					(v2200_reg_in(addr + 2, v2200) << 16) |
+					(v2200_reg_in(addr + 3, v2200) << 24);
+			break;
+	}
+	return ret;
 }
 
 void
@@ -854,13 +1125,73 @@ v2200_reg_out(uint32_t addr, uint8_t val, void *priv)
     v2200_t *v2200 = (v2200_t *) priv;
 	switch (addr & 0xFF)
 	{
-		case 0x72:
-			if (val) {
-				v2200->svga.read_bank = (val - 1) << 13;
-				v2200->svga.write_bank = (val - 1) << 13;
+		case 0x60:
+			v2200->stateindex = val;
+			if (v2200->stateindex_or_data) {
+				v2200_statedata_process_out(v2200);
+				v2200->stateindex_or_data = 0;
+			} else {
+				v2200->stateindex_or_data = 1;
 			}
+			break;
+		case 0x43:
 			v2200->regs[addr & 0xFF] = val;
 			break;
+		case 0x44:
+			v2200->regs[addr & 0xFF] &= ~val;
+			break;
+		case 0xb2:
+			v2200_out(0x3c6, val, v2200);
+			break;
+		case 0xb1:
+			v2200_out(0x3c9, val, v2200);
+			break;
+		case 0xb0:
+			v2200_out(0x3c8, val, v2200);
+			break;
+		case 0x48:
+			v2200->regs[addr & 0xFF] = val;
+			break;
+		case 0x4b:
+			v2200->regs[addr & 0xFF] = val;
+			break;
+		case 0x70:
+			v2200->regs[addr & 0xFF] = val;
+			break;
+		case 0x71:
+			v2200->regs[addr & 0xFF] = val;
+			break;
+		case 0x72:
+			v2200->regs[addr & 0xFF] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		
+		case 0x73:
+			v2200->regs[addr & 0xFF] = val;
+			break;
+
+		case 0x76:
+			v2200->regs[addr & 0xFF] = val;
+			v2200_recalcmapping(v2200);
+			break;
+
+		case 0xb6:
+			v2200->regs[addr & 0xFF] = val;
+			svga_set_ramdac_type(&v2200->svga, (val & 2) ? RAMDAC_8BIT : RAMDAC_6BIT);
+			break;
+		
+		case 0xb8:
+			v2200->regs[addr & 0xFF] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		
+		case 0xb9:
+			/* What does 'sparse' indexing mean? */
+			v2200->regs[addr & 0xFF] = val;
+			break;
+
+		case 0xF0 ... 0xFF:
+			break; /* No idea what is this supposed to be. */
 
 		default:
 			fatal("%s, 0x%08X, 0x%02X\n", __func__, addr, val);
@@ -876,6 +1207,7 @@ v2200_reg_outw(uint32_t addr, uint16_t val, void *priv)
 	{
 		case 0x70:
 			v2200->regs_w[addr >> 1] = val;
+			svga_recalctimings(&v2200->svga); /* implicitly calls v2200_recalcmapping due to mode/banking switch. */
 			break;
 		default:
     		fatal("%s, 0x%08X, 0x%04X\n", __func__, addr, val);
@@ -887,28 +1219,92 @@ void
 v2200_reg_outl(uint32_t addr, uint32_t val, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal("%s, 0x%08X, 0x%08X\n", __func__, addr, val);
+	switch (addr & 0xFF)
+	{
+		case 0x64:
+			v2200->statedata = val;
+			if (v2200->stateindex_or_data) {
+				v2200_statedata_process_out(v2200);
+				v2200->stateindex_or_data = 0;
+			} else {
+				v2200->stateindex_or_data = 1;
+			}
+			break;
+		case 0x44:
+			v2200->regs_l[(addr & 0xFF) >> 2] &= ~val;
+			break;
+		case 0xA0:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			break;
+		case 0x84:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		/* TODO: Pixel clocking. */
+		case 0xC0:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			break;
+		case 0x68:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			break;
+		/* Need to handle mode switching. */
+		case 0x70:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val; 
+			svga_recalctimings(&v2200->svga); /* implicitly calls v2200_recalcmapping due to mode/banking switch. */
+			break;
+		case 0x74:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			v2200_recalcmapping(v2200);
+			break;
+		case 0x88:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			break;
+		case 0x8C:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		case 0x90:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		case 0x94:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		case 0x98:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			svga_recalctimings(&v2200->svga);
+			break;
+		case 0xa4:
+			v2200->regs_l[(addr & 0xFF) >> 2] = val;
+			/* Implement access disabling? */
+			break;
+		default:
+			fatal("%s, 0x%08X, 0x%08X\n", __func__, addr, val);
+			break;
+	}
+    
 }
 
 uint8_t
 v2200_ext_in(uint16_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+    return v2200_reg_in(addr, priv);
 }
 
 uint16_t
 v2200_ext_inw(uint16_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+    return v2200_reg_inw(addr, priv);
 }
 
 uint32_t
 v2200_ext_inl(uint16_t addr, void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
-    fatal(__func__);
+    return v2200_reg_inl(addr, priv);
 }
 
 void
@@ -951,6 +1347,102 @@ v2200_io_set(v2200_t *v2200)
     io_sethandler(0x03c0, 0x0020, v2200_in, NULL, NULL, v2200_out, NULL, NULL, v2200);
 
     io_sethandler(v2200->io_base, 0x100, v2200_ext_in, v2200_ext_inw, v2200_ext_inl, v2200_ext_out, v2200_ext_outw, v2200_ext_outl, v2200);
+}
+
+uint8_t
+v2200_pci_read(UNUSED(int func), int addr, void *priv)
+{
+    const v2200_t *v2200 = (v2200_t *) priv;
+
+    addr &= 0xff;
+
+    switch (addr) {
+        case 0x00:
+            return 0x63; /* Rendition */
+        case 0x01:
+            return 0x11;
+
+        case 0x02:
+            return 0x00;
+        case 0x03:
+            return 0x20;
+
+        case PCI_REG_COMMAND:
+            return v2200->pci_regs[PCI_REG_COMMAND] & 0x27; /* Respond to IO and memory accesses */
+
+		case 0x06:
+			return (!!(v2200->mhz66)) << 5;
+
+        case 0x07:
+            return 1 << 1; /* Medium DEVSEL timing */
+
+        case 0x08:
+            return 0; /* Revision ID */
+        case 0x09:
+            return 0; /* Programming interface */
+
+        case 0x0a:
+            return 0x00; /* Supports VGA interface */
+        case 0x0b:
+            return 0x03;
+
+        case 0x10:
+            return 0x00; /* Linear frame buffer address */
+        case 0x11:
+            return 0x00;
+        case 0x12:
+            return 0x00;
+        case 0x13:
+            return (v2200->linear_base >> 24);
+
+        case 0x14:
+            return 0x01;
+
+        case 0x15:
+        case 0x16:
+        case 0x17:
+            return v2200->pci_regs[addr & 0xFF];
+        
+        case 0x18:
+        case 0x19:
+            return 0x00;
+        case 0x1a:
+            return (v2200->reg_base >> 16) & 0xfc;
+        case 0x1b:
+            return (v2200->reg_base >> 24);
+
+		case 0x2c:
+			return v2200->subsys & 0xFF;
+
+		case 0x2d:
+			return (v2200->subsys & 0xFF00) >> 8;
+
+		case 0x2e:
+			return (v2200->subsys & 0xFF0000) >> 16;
+
+		case 0x2f:
+			return (v2200->subsys & 0xFF000000) >> 24;
+
+        case 0x30:
+            return v2200->pci_regs[0x30] & 0x01; /* BIOS ROM address */
+        case 0x31:
+            return v2200->pci_regs[0x31];
+        case 0x32:
+            return v2200->pci_regs[0x32];
+        case 0x33:
+            return v2200->pci_regs[0x33];
+
+		case 0x3c:
+			return v2200->pci_regs[0x3c];
+		
+		case 0x3d:
+			return PCI_INTA;
+
+        default:
+            break;
+    }
+
+    return 0;
 }
 
 void
@@ -1013,9 +1505,292 @@ v2200_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
         v2200_recalcmapping(v2200);
         break;
 
+	case 0x3c:
+		v2200->pci_regs[addr] = val;
+		break;
+
     default:
         break;
     }
+}
+
+// RISC engine functions.
+uint32_t
+v2200_risc_fetch(v2200_t *v2200, uint32_t addr)
+{
+	if (addr >= 0x0 && addr <= 0xFFFFFF)
+		return *(uint32_t*) (&v2200->svga.vram[addr]);
+	else if (addr >= 0xFFFE0000 && addr <= 0xFFFFFFFF)
+		return *(uint32_t*) (&v2200->bios_rom.rom[addr & v2200->bios_rom.mask]);
+	else
+		fatal("Unknown address 0x%08X\n", addr);
+	return 0x0;
+}
+
+void
+v2200_risc_store(v2200_t *v2200, uint32_t addr, uint32_t val)
+{
+	val = bswap32(val);
+	if (addr >= 0x0 && addr <= 0xFFFFFF)
+		*(uint32_t*) (&v2200->svga.vram[addr]) = val;
+	else if (addr >= 0xFFFE0000 && addr <= 0xFFFFFFFF)
+		*(uint32_t*) (&v2200->bios_rom.rom[addr & v2200->bios_rom.mask]) = val;
+	else if (addr == 0xFFE00700)
+		v2200->subsys = bswap32(val);
+	else if (addr == 0xFFE00704)
+		v2200->mhz66 = bswap32(val);
+	else
+		fatal("Unknown address 0x%08X\n", addr);
+}
+
+#define FETCH_REGS() \
+{					 \
+	d = (v2200->risc_ir & OPCODE_D_MASK) >> OPCODE_D_SHIFT; 	\
+	s2 = (v2200->risc_ir & OPCODE_S2_MASK) >> OPCODE_S2_SHIFT;	\
+	s1 = (v2200->risc_ir & OPCODE_S1_MASK) >> OPCODE_S1_SHIFT;	\
+																\
+	d_reg = v2200_risc_reg_read(v2200, d);						\
+	s1_reg = v2200_risc_reg_read(v2200, s1);					\
+	s2_reg = v2200_risc_reg_read(v2200, s2);					\
+}
+
+uint32_t
+v2200_risc_reg_read(v2200_t *v2200, uint8_t risc_reg)
+{
+	switch (risc_reg)
+	{
+		case 57:
+			return 0xFFFFF800;
+		case 56:
+			return 0xFFFFF000;
+		case 22 ... 31:
+			return 0x0000B000 + (risc_reg - 22) * 0x800;
+		case 21:
+			return 0x00020000;
+		case 20:
+			return 0x00800000;
+		case 19:
+			return 0x02000000;
+		case 18:
+			return 0x007FFFFF;
+		case 17:
+			return 0x00010000;
+		case 16:
+			return 0xFFFFFFFF;
+		case 15:
+			return 0x00010000;
+		case 8: /* h0msk*/
+			return 0xFFFF0000;
+		case 9:
+			return 0x0000FFFF;
+		case 10:
+			return 0xFF00FF00;
+		case 11:
+			return 0x00FF00FF;
+		case 13:
+			return 0xFFFFFFFF;
+		case 0:
+		case 1:
+		case 12:
+		case 14:
+			return 0x00000000;
+		case 4 ... 7:
+			return 0xFF << (8 * (risc_reg & 3));
+		default:
+			return v2200->risc_regs[risc_reg];
+	}
+	return v2200->risc_regs[risc_reg];
+}
+
+void
+v2200_risc_reg_write(v2200_t *v2200, uint8_t risc_reg, uint32_t val)
+{
+	//pclog("Write 0x%08X to %d\n", val, risc_reg);
+	v2200->risc_regs[risc_reg] = val;
+}
+
+void
+v2200_risc_advance(v2200_t *v2200)
+{
+	v2200->risc_old_pc = v2200->risc_pc;
+	if (v2200->jump_pending)
+	{
+		uint8_t d = 0;
+		uint8_t s2 = 0;
+		uint8_t s1 = 0;
+
+		uint32_t d_reg = 0, s1_reg = 0, s2_reg = 0;
+
+		v2200->jump_pending = 0;
+		switch (v2200->jump_ir >> 24)
+		{
+			case 0x6C:
+			{
+				v2200->risc_pc = (v2200->jump_ir & 0xFFFFFF) << 2;
+				break;
+			}
+			case 0x6F:
+			{
+				s1 = (v2200->jump_ir & OPCODE_S1_MASK) >> OPCODE_S1_SHIFT;
+				d = (v2200->jump_ir & OPCODE_D_MASK) >> OPCODE_D_SHIFT;
+				s1_reg = v2200_risc_reg_read(v2200, s1);
+				v2200->risc_pc = s1_reg;
+				//pclog("RISC: Jump to 0x%08X\n", v2200->risc_pc);
+				v2200_risc_reg_write(v2200, d, v2200->risc_pc);
+				break;
+			}
+		}
+	}
+	else if (v2200->risc_pc == 0xFFFFFFFC)
+		v2200->risc_pc = 0xFFFE0000;
+	else if (v2200->risc_pc == 0x00FFFFFC)
+		v2200->risc_pc = 0x0;
+	else
+		v2200->risc_pc += 4;
+}
+
+// RISC engine thread.
+void
+v2200_risc_thread(void* param)
+{
+	v2200_t *v2200 = param;
+
+	while (1)
+	{
+		if (v2200->stop_threads)
+			break;
+		if (((v2200->regs[0x48] & 0x2) || (v2200->regs[0x4a] & 1)) && !(v2200->regs[0x48] & 0x4)) {
+			plat_delay_ms(1);
+			continue;
+		}
+		if (!(v2200->regs[0x48] & 0x4))
+		{ /* Stepping mode not enabled. */
+			v2200->risc_ir = v2200_risc_fetch(v2200, v2200->risc_pc);
+		} else {
+			pclog("Stepping opcode 0x%08X\n", v2200->risc_ir);
+			v2200->regs[0x4a] &= ~1;
+		}
+		/* Is this right to call when stepping? */
+		v2200_risc_advance(v2200);
+
+		if (v2200->risc_ir == 0) {
+			v2200->regs[0x48] &= ~0x4;
+			continue;
+		}
+		uint8_t d = 0;
+		uint8_t s2 = 0;
+		uint8_t s1 = 0;
+
+		uint32_t d_reg = 0, s1_reg = 0, s2_reg = 0;
+		switch (atomic_load(&v2200->risc_ir) >> 24)
+		{
+			case 0x00: /* add, D, S2, #immed8 */
+			{
+				FETCH_REGS();
+				d_reg = s2_reg + ((atomic_load(&v2200->risc_ir)) & OPCODE_INT_IMM_MASK);
+				v2200_risc_reg_write(v2200, d, d_reg);
+				break;
+			}
+			case 0x45: /* sl, D, S2, #immed8 */
+			{
+				FETCH_REGS();
+				d_reg = s2_reg << ((atomic_load(&v2200->risc_ir)) & 0x1f);
+				v2200_risc_reg_write(v2200, d, d_reg);
+				break;
+			}
+			case 0x76: /* li, D, #immed16 - Load immediate */
+			{
+				d = (v2200->risc_ir & OPCODE_D_MASK) >> OPCODE_D_SHIFT;
+				v2200_risc_reg_write(v2200, d, (v2200->risc_ir & OPCODE_IMM_MASK));
+				break;
+			}
+			case 0x77: /* lui, D, #immed16 - Load upper immediate */
+			{
+				d = (v2200->risc_ir & OPCODE_D_MASK) >> OPCODE_D_SHIFT;
+				v2200_risc_reg_write(v2200, d, (v2200->risc_ir & OPCODE_IMM_MASK) << 16);
+				break;
+			}
+			case 0x15: /* or D, S2, S1 - OR (scalar) */
+			{
+				FETCH_REGS();
+
+				//pclog("S1 = 0x%08X, S2 = 0x%08X\n", s1_reg, s2_reg);
+
+				d_reg = s1_reg | s2_reg;
+				v2200_risc_reg_write(v2200, d, d_reg);
+				break;
+			}
+			case 0x05: /* or D, S2, #immed - OR (immediate) */
+			{
+				FETCH_REGS();
+
+				//pclog("S1 = 0x%08X, S2 = 0x%08X\n", s1_reg, s2_reg);
+
+				d_reg = (v2200->risc_ir & OPCODE_INT_IMM_MASK) | s2_reg;
+				v2200_risc_reg_write(v2200, d, d_reg);
+				break;
+			}
+			case 0x02: /* andn D, S2, S1 - AND NOT (scalar) */
+			{
+				FETCH_REGS();
+
+				d_reg = ~s1_reg & s2_reg;
+				v2200_risc_reg_write(v2200, d, d_reg);
+				break;
+			}
+			case 0x6C: /* jmp addr */
+			case 0x6F: /* jmprl */
+			{
+				v2200->jump_pending = 1;
+				v2200->jump_ir = atomic_load(&v2200->risc_ir);
+				break;
+			}
+			case 0x7A: /* sw */
+			{
+				uint8_t offset = ((atomic_load(&v2200->risc_ir) & OPCODE_STORE_OFFSET_MASK) >> OPCODE_STORE_OFFSET_SHIFT);
+				FETCH_REGS();
+				v2200_risc_store(v2200, s1_reg + offset * 4, (s2_reg));
+				break;
+			}
+			case 0x6D: /* halt */
+			{
+				v2200->regs[0x4a] |= 1;
+				break;
+			}
+			default:
+				disassemble_opcode(v2200->risc_ir, v2200->risc_old_pc);
+				fatal("\nV2200: Unknown instruction 0x%08X\n", atomic_load(&v2200->risc_ir));
+				break;
+		}
+		v2200->regs[0x48] &= ~0x4;
+		if (v2200->stop_threads)
+			break;
+	}
+}
+
+void
+v2200_recalctimings(svga_t* svga)
+{
+	v2200_t *v2200 = (v2200_t*)svga->priv;
+	if (!(v2200->regs[0x72] & 2))
+	{
+		switch ((v2200->regs[0xb8] >> 5) & 3)
+		{
+			case 0:
+				svga->bpp = 32;
+				svga->render = svga_render_32bpp_highres;
+				break;
+			case 1:
+				svga->bpp = 16;
+				svga->render = svga_render_16bpp_highres;
+				break;
+			case 2:
+				svga->bpp = 8;
+				svga->render = svga_render_8bpp_highres;
+				break;
+		}
+	}
+	v2200_recalcmapping(v2200);
 }
 
 static void *
@@ -1023,16 +1798,17 @@ v2200_init(const device_t *info)
 {
     v2200_t *v2200 = calloc(1, sizeof(v2200_t));
 
-    rom_init(&v2200->bios_rom, "roms/video/rendition/BIOS144.ROM", 0xc0000, 0x8000, 0x7fff, 0x0000, MEM_MAPPING_EXTERNAL);
+    rom_init(&v2200->bios_rom, "roms/video/rendition/supergrace8mbagp.VBI", 0xc0000, 0x8000, 0x7fff, 0x0000, MEM_MAPPING_EXTERNAL);
     mem_mapping_disable(&v2200->bios_rom.mapping);
 
     mem_mapping_add(&v2200->reg_mapping, 0, 0, v2200_reg_in, v2200_reg_inw, v2200_reg_inl, v2200_reg_out, v2200_reg_outw, v2200_reg_outl, NULL, MEM_MAPPING_EXTERNAL, v2200);
-    mem_mapping_add(&v2200->linear_mapping, 0, 0, svga_readb_linear, svga_readw_linear, svga_readl_linear, svga_writeb_linear, svga_writew_linear, svga_writel_linear, NULL, MEM_MAPPING_EXTERNAL, v2200);
+    mem_mapping_add(&v2200->linear_mapping, 0, 0, v2200_readb_linear, v2200_readw_linear, v2200_readl_linear, v2200_writeb_linear, v2200_writew_linear, v2200_writel_linear, NULL, MEM_MAPPING_EXTERNAL, v2200);
+	mem_mapping_add(&v2200->vesa_mapping, 0, 0, v2200_readb, v2200_readw, v2200_readl, v2200_writeb, v2200_writew, v2200_writel, NULL, MEM_MAPPING_EXTERNAL, v2200);
 
     video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_banshee);
 
     svga_init(info, &v2200->svga, v2200, 1 << 24,
-              NULL,
+              v2200_recalctimings,
               v2200_in, v2200_out,
               NULL,
               NULL);
@@ -1043,7 +1819,11 @@ v2200_init(const device_t *info)
 
     v2200->svga.bpp     = 8;
     v2200->svga.miscout = 1;
-	v2200->svga.render     = svga_render_blank;
+	v2200->svga.render  = svga_render_blank;
+	v2200->svga.decode_mask = v2200->svga.vram_mask;
+
+	v2200->risc_pc		= 0xfffffff0;
+	v2200->risc_thread  = thread_create(v2200_risc_thread, v2200);
 
     return v2200;
 }
@@ -1053,6 +1833,8 @@ v2200_close(void *priv)
 {
     v2200_t *v2200 = (v2200_t *) priv;
 
+	v2200->stop_threads = 1;
+	thread_wait(v2200->risc_thread);
     svga_close(&v2200->svga);
 
     free(v2200);
@@ -1061,7 +1843,7 @@ v2200_close(void *priv)
 int
 v2200_available(void)
 {
-    return rom_present("roms/video/rendition/BIOS144.ROM");
+    return rom_present("roms/video/rendition/supergrace8mbagp.VBI");
 }
 
 const device_t v2200_device = {
