@@ -664,8 +664,10 @@ v2200_out(uint16_t addr, uint8_t val, void *priv)
     v2200_t  *v2200  = (v2200_t *) priv;
     svga_t *svga = &v2200->svga;
     uint8_t old;
+	if (!(v2200->regs[0x42] & (0x2 | 0x1)))
+		return;
 
-    if (((addr & 0xfff0) == 0x3d0 || (addr & 0xfff0) == 0x3b0) && !(svga->miscout & 1))
+    if ((((addr & 0xFFF0) == 0x3D0 || (addr & 0xFFF0) == 0x3B0) && addr < 0x3de) && !(svga->miscout & 1))
         addr ^= 0x60;
 
     switch (addr) {
@@ -707,7 +709,10 @@ v2200_in(uint16_t addr, void *priv)
     svga_t *svga = &v2200->svga;
     uint8_t temp;
 
-    if (((addr & 0xfff0) == 0x3d0 || (addr & 0xfff0) == 0x3b0) && !(svga->miscout & 1))
+	if (!(v2200->regs[0x42] & (0x2 | 0x1)))
+		return 0xff;
+
+    if ((((addr & 0xFFF0) == 0x3D0 || (addr & 0xFFF0) == 0x3B0) && addr < 0x3de) && !(svga->miscout & 1))
         addr ^= 0x60;
 
     switch (addr) {
@@ -816,13 +821,6 @@ v2200_readw_linear(uint32_t addr, void *priv)
 		case 0x00:
 			break;
 		case 0x01:
-			{
-				uint32_t ret = v2200_readl_linear(addr & ~3, priv);	
-				if (addr & 2)
-					ret >>= 16;
-				return ret & 0xFFFF;
-			}
-			break;
 		case 0x02:
 			return bswap16(*(uint16_t *) &svga->vram[addr & svga->vram_mask]);
 		default:
@@ -885,6 +883,16 @@ v2200_writew_linear(uint32_t addr, uint16_t val, void *priv)
         return;
     addr &= svga->vram_mask;
     svga->changedvram[addr >> 12]   = svga->monitor->mon_changeframecount;
+	switch (v2200->regs[0x43] & 3)
+	{
+		case 0x00:
+			break;
+		case 0x01:
+			*(uint32_t *) &svga->vram[addr] = bswap32(val);
+			break;
+		default:
+			fatal("memendian 0x%X\n", v2200->regs[0x43] & 3);
+	}
     *(uint16_t *) &svga->vram[addr] = val;
 }
 
@@ -1085,7 +1093,10 @@ v2200_reg_in(uint32_t addr, void *priv)
 		case 0xb0:
 			ret = v2200_in(0x3c8, v2200);
 			break;
-		case 0xF0 ... 0xFF:
+		case 0xf0:
+			ret = 0x40;
+			break;
+		case 0xF1 ... 0xFF:
 			ret = 0x00;
 			break; /* No idea what is this supposed to be. */
 	}
@@ -1206,7 +1217,7 @@ v2200_reg_outw(uint32_t addr, uint16_t val, void *priv)
 	switch (addr & 0xFF)
 	{
 		case 0x70:
-			v2200->regs_w[addr >> 1] = val;
+			v2200->regs_w[(addr & 0xFF) >> 1] = val;
 			svga_recalctimings(&v2200->svga); /* implicitly calls v2200_recalcmapping due to mode/banking switch. */
 			break;
 		default:
@@ -1438,6 +1449,9 @@ v2200_pci_read(UNUSED(int func), int addr, void *priv)
 		case 0x3d:
 			return PCI_INTA;
 
+		case 0x50:
+			return v2200->pci_regs[0x50];
+
         default:
             break;
     }
@@ -1465,6 +1479,7 @@ v2200_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
         break;
     
     case 0x13:
+        v2200->pci_regs[addr] = val;
         v2200->linear_base = (v2200->pci_regs[0x13] << 24);
         v2200_recalcmapping(v2200);
         break;
@@ -1507,6 +1522,10 @@ v2200_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
 
 	case 0x3c:
 		v2200->pci_regs[addr] = val;
+		break;
+
+	case 0x50:
+		v2200->pci_regs[0x50] = val;
 		break;
 
     default:
@@ -1667,7 +1686,7 @@ v2200_risc_thread(void* param)
 		{ /* Stepping mode not enabled. */
 			v2200->risc_ir = v2200_risc_fetch(v2200, v2200->risc_pc);
 		} else {
-			pclog("Stepping opcode 0x%08X\n", v2200->risc_ir);
+			//pclog("Stepping opcode 0x%08X\n", v2200->risc_ir);
 			v2200->regs[0x4a] &= ~1;
 		}
 		/* Is this right to call when stepping? */
@@ -1793,6 +1812,16 @@ v2200_recalctimings(svga_t* svga)
 	v2200_recalcmapping(v2200);
 }
 
+void
+v2200_reset(void *priv)
+{
+	v2200_t *v2200 = (v2200_t*)priv;
+
+	v2200->regs[0x42] = 0x2;
+	svga_recalctimings(&v2200->svga);
+	v2200->risc_pc	= 0xfffffff0;
+}
+
 static void *
 v2200_init(const device_t *info)
 {
@@ -1805,13 +1834,13 @@ v2200_init(const device_t *info)
     mem_mapping_add(&v2200->linear_mapping, 0, 0, v2200_readb_linear, v2200_readw_linear, v2200_readl_linear, v2200_writeb_linear, v2200_writew_linear, v2200_writel_linear, NULL, MEM_MAPPING_EXTERNAL, v2200);
 	mem_mapping_add(&v2200->vesa_mapping, 0, 0, v2200_readb, v2200_readw, v2200_readl, v2200_writeb, v2200_writew, v2200_writel, NULL, MEM_MAPPING_EXTERNAL, v2200);
 
-    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_banshee);
-
     svga_init(info, &v2200->svga, v2200, 1 << 24,
               v2200_recalctimings,
               v2200_in, v2200_out,
               NULL,
               NULL);
+
+    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_banshee);
 
     io_sethandler(0x03c0, 0x0020, v2200_in, NULL, NULL, v2200_out, NULL, NULL, v2200);
 
@@ -1824,6 +1853,7 @@ v2200_init(const device_t *info)
 
 	v2200->risc_pc		= 0xfffffff0;
 	v2200->risc_thread  = thread_create(v2200_risc_thread, v2200);
+	v2200_reset(v2200);
 
     return v2200;
 }
@@ -1853,7 +1883,7 @@ const device_t v2200_device = {
     .local         = 0,
     .init          = v2200_init,
     .close         = v2200_close,
-    .reset         = NULL,
+    .reset         = v2200_reset,
     { .available = v2200_available },
     .speed_changed = NULL,
     .force_redraw  = NULL,
