@@ -1,0 +1,1 @@
+add_library(usb usb_desc.c usb_packet.c usb_endpoint.c usb_msos.c)

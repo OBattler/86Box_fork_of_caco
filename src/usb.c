@@ -492,7 +492,7 @@ usb_parse_control_endpoint(usb_device_t* usb_device, uint8_t* data, uint32_t *le
     }
     return ret;
 #else
-    return USB_ERROR_STALL;
+    return USB_RET_STALL;
 #endif
 }
 
@@ -569,6 +569,54 @@ usb_detach_device(uint16_t port)
             return;
     }
     return;
+}
+
+const USBDesc *usb_device_get_usb_desc(USBDevice *dev)
+{
+    return dev->usb_desc;
+}
+
+void usb_device_handle_control(USBDevice *dev, USBPacket *p, int request,
+                               int value, int index, int length, uint8_t *data)
+{
+    if (dev->handle_control)
+        dev->handle_control(dev, p, request, value, index, length, data);
+}
+
+void usb_device_handle_data(USBDevice *dev, USBPacket *p)
+{
+    if (dev->handle_control)
+        dev->handle_data(dev, p);
+}
+
+void usb_device_init(USBDevice *dev, const char* product_desc)
+{
+    memset(dev->product_desc, 0, sizeof(dev->product_desc));
+    strncpy(dev->product_desc, product_desc, sizeof(dev->product_desc));
+
+    dev->auto_attach = 1;
+    QLIST_INIT(&dev->strings);
+    usb_ep_init(dev);
+}
+
+
+void usb_device_set_interface(USBDevice *dev, int interface,
+                              int alt_old, int alt_new)
+{
+    if (dev->set_interface)
+        dev->set_interface(dev, interface, alt_old, alt_new);
+}
+
+void usb_device_reset(USBDevice *dev)
+{
+    if (dev == NULL || !dev->attached) {
+        return;
+    }
+    if (dev->handle_reset)
+        dev->handle_reset(dev);
+    dev->remote_wakeup = 0;
+    dev->addr = 0;
+    dev->state = USB_STATE_DEFAULT;
 }
 
 static void *

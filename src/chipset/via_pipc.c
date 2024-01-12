@@ -358,6 +358,8 @@ pipc_reset_hard(void *priv)
         dev->usb_regs[i][0x3d] = 0x04;
 
         dev->usb_regs[i][0x60] = 0x10;
+        dev->usb_regs[i][0x6a] = 0x01;
+        dev->usb_regs[i][0x6b] = 0x00;
         if (dev->local >= VIA_PIPC_686A) {
             dev->usb_regs[i][0x80] = 0x01;
             dev->usb_regs[i][0x82] = 0x02;

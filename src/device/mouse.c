@@ -95,6 +95,7 @@ static mouse_t mouse_devices[] = {
     { &mouse_msserial_device     },
     { &mouse_ltserial_device     },
     { &mouse_ps2_device          },
+    { &wacom_penp_usb_device     },
 #ifdef USE_USB_MOUSE
     { &mouse_usb_device          },
 #endif

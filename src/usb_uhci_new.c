@@ -115,7 +115,11 @@ typedef struct {
   int count;
 } QhDb;
 
-static void qhdb_reset(QhDb *db) { db->count = 0; }
+static void qhdb_reset(QhDb *db)
+{
+  memset(db, 0, sizeof(*db));
+  db->count = 0;
+}
 
 /* Add QH to DB. Returns 1 if already present or DB is full. */
 static int qhdb_insert(QhDb *db, uint32_t addr) {
@@ -141,7 +145,11 @@ static void uhci_update_irq(UHCIState *s) {
       (s->status & UHCI_STS_HSERR) || (s->status & UHCI_STS_HCPERR)) {
     level = 1;
   }
-  pci_irq(dev->params.pci_slot, PCI_INTD, 0, level, &s->irq_state);
+  if (level)
+    pci_set_irq(dev->params.pci_slot, PCI_INTD, &s->irq_state);
+  else
+    pci_clear_irq(dev->params.pci_slot, PCI_INTD, &s->irq_state);
+  //pci_irq(dev->params.pci_slot, PCI_INTD, 0, level, &s->irq_state);
 }
 
 static void uhci_resume (void *opaque)
@@ -175,7 +183,8 @@ void uhci_reset(usb_t *dev) {
       usb_device_t* usbdev = s->ports[i].dev;
       uhci_detach(s, i);
       uhci_attach(s, usbdev, i);
-      s->ports[i].dev->device_reset(s->ports[i].dev->priv);
+      
+      usb_device_reset(s->ports[i].dev);
     }
   }
   uhci_update_irq(s);
@@ -252,7 +261,7 @@ void uhci_reg_write(uint16_t addr, uint8_t val, void *priv) {
   switch (addr) {
   case 0x00:
     if ((val & UHCI_CMD_RS) && !(s->cmd & UHCI_CMD_RS)) {
-      timer_on_auto(&s->frame_timer, (11936 + s->sof_timing) / 12000.);
+      timer_on_auto(&s->frame_timer, ((11936 + s->sof_timing) / 12000.) * 1000.);
       s->status &= ~UHCI_STS_HCHALTED;
     } else if (!(val & UHCI_CMD_RS)) {
       timer_disable(&s->frame_timer);
@@ -265,8 +274,7 @@ void uhci_reg_write(uint16_t addr, uint8_t val, void *priv) {
       /* send reset on the USB bus */
       for (i = 0; i < 2; i++) {
         port = &s->ports[i];
-        if (port->dev)
-        port->dev->device_reset(port->dev->priv);
+        usb_device_reset(port->dev);
       }
       uhci_reset(dev);
       return;
@@ -314,7 +322,7 @@ void uhci_reg_writew(uint16_t addr, uint16_t val, void *priv) {
   switch (addr) {
   case 0x00:
     if ((val & UHCI_CMD_RS) && !(s->cmd & UHCI_CMD_RS)) {
-      timer_on_auto(&s->frame_timer, (11936 + s->sof_timing) / 12000.);
+      timer_on_auto(&s->frame_timer, ((11936 + s->sof_timing) / 12000.) * 1000.);
     } else if (!(val & UHCI_CMD_RS)) {
       timer_disable(&s->frame_timer);
       s->status |= UHCI_STS_HCHALTED;
@@ -326,8 +334,7 @@ void uhci_reg_writew(uint16_t addr, uint16_t val, void *priv) {
       /* send reset on the USB bus */
       for (i = 0; i < 2; i++) {
         port = &s->ports[i];
-        if (port->dev)
-        port->dev->device_reset(port->dev->priv);
+        usb_device_reset(port->dev);
       }
       uhci_reset(dev);
       return;
@@ -387,7 +394,7 @@ void uhci_reg_writew(uint16_t addr, uint16_t val, void *priv) {
     if (dev) {
       /* port reset */
       if ((val & UHCI_PORT_RESET) && !(port->ctrl & UHCI_PORT_RESET)) {
-        dev->device_reset(dev->priv);
+        usb_device_reset(dev);
       }
     }
     port->ctrl &= UHCI_PORT_READ_ONLY;
@@ -431,21 +438,23 @@ static int uhci_handle_td_error(UHCIState *s, UHCI_TD *td, uint32_t td_addr,
 
   //pclog("UHCI ERROR %d\n", status);
   switch (status) {
-  case USB_ERROR_NAK:
+  case USB_RET_NAK:
     td->ctrl |= TD_CTRL_NAK;
     return TD_RESULT_NEXT_QH;
 
-  case USB_ERROR_STALL:
+  case USB_RET_STALL:
     td->ctrl |= TD_CTRL_STALL;
     ret = TD_RESULT_NEXT_QH;
     break;
 
-  case USB_ERROR_OVERRUN:
+  case USB_RET_BABBLE:
     td->ctrl |= TD_CTRL_BABBLE | TD_CTRL_STALL;
     /* frame interrupted */
     ret = TD_RESULT_STOP_FRAME;
     break;
 
+  case USB_RET_IOERROR:
+  case USB_RET_NODEV:
   default:
     td->ctrl |= TD_CTRL_TIMEOUT;
     td->ctrl &= ~(3 << TD_CTRL_ERROR_SHIFT);
@@ -462,8 +471,8 @@ static int uhci_handle_td_error(UHCIState *s, UHCI_TD *td, uint32_t td_addr,
   return ret;
 }
 
-static int uhci_complete_td(UHCIState *s, UHCI_TD *td, int status,
-                            uint8_t *data, uint32_t pktlen, uint32_t td_addr,
+static int uhci_complete_td(UHCIState *s, UHCI_TD *td,
+                            uint8_t *data, USBPacket* packet, uint32_t td_addr,
                             uint32_t *int_mask) {
   int len = 0, max_len;
   uint8_t pid;
@@ -474,10 +483,10 @@ static int uhci_complete_td(UHCIState *s, UHCI_TD *td, int status,
   if (td->ctrl & TD_CTRL_IOS)
     td->ctrl &= ~TD_CTRL_ACTIVE;
 
-  if (status != USB_ERROR_NO_ERROR)
-    return uhci_handle_td_error(s, td, td_addr, status, int_mask);
+  if (packet->status != USB_RET_SUCCESS)
+    return uhci_handle_td_error(s, td, td_addr, packet->status, int_mask);
 
-  len = pktlen;
+  len = packet->actual_length;
   td->ctrl = (td->ctrl & ~0x7ff) | ((len - 1) & 0x7ff);
 
   /* The NAK bit may have been set by a previous frame, so clear it
@@ -505,7 +514,7 @@ static usb_device_t *uhci_find_device(UHCIState *s, uint8_t addr) {
       continue;
     if (!s->ports[i].dev)
       continue;
-    if (s->ports[i].dev->address == addr)
+    if (s->ports[i].dev->addr == addr)
       return s->ports[i].dev;
   }
   //pclog("None found.\n");
@@ -515,11 +524,13 @@ static usb_device_t *uhci_find_device(UHCIState *s, uint8_t addr) {
 static int uhci_handle_td(UHCIState *s, uint32_t qh_addr, UHCI_TD *td,
                           uint32_t td_addr, uint32_t *int_mask) {
   int ret = 0;
-  uint8_t result = USB_ERROR_NO_ERROR;
+  uint8_t result = USB_RET_SUCCESS;
   uint32_t max_len = 0;
   bool spd = false;
   uint8_t pid = td->token & 0xff;
   usb_device_t *dev = NULL;
+  USBEndpoint* ep = NULL;
+  USBPacket packet;
   uint8_t *buf = NULL;
 
   /* Is active ? */
@@ -546,24 +557,34 @@ static int uhci_handle_td(UHCIState *s, uint32_t qh_addr, UHCI_TD *td,
   if (dev == NULL) {
     return uhci_handle_td_error(s, td, td_addr, -1, int_mask);
   }
+
+  ep = usb_ep_get(dev, pid, (td->token >> 15) & 0xf);  
   max_len = ((td->token >> 21) + 1) & 0x7ff;
   spd = (pid == USB_PID_IN && (td->ctrl & TD_CTRL_SPD) != 0);
   buf = calloc(1, max_len);
+
+  usb_packet_setup(&packet, pid, ep, 0, td_addr, spd,
+                    (td->ctrl & TD_CTRL_IOC) != 0);
 
   switch (pid) {
   case USB_PID_OUT:
   case USB_PID_SETUP: {
       dma_bm_read(td->buffer, (uint8_t *)buf, max_len, 4);
-      result = dev->device_process(dev->priv, buf, &max_len, pid,
-                                   (td->token >> 15) & 0xf, spd);
+      usb_packet_addbuf(&packet, buf, max_len);
+      usb_handle_packet(ep->dev, &packet);
+      if (packet.status == USB_RET_SUCCESS) {
+          packet.actual_length = max_len;
+      }
+
       break;
     }
   case USB_PID_IN:
-    result = dev->device_process(dev->priv, buf, &max_len, pid,
-                                 (td->token >> 15) & 0xf, spd);
-    break;
+      usb_packet_addbuf(&packet, buf, max_len);
+      usb_handle_packet(ep->dev, &packet);
+      memcpy(buf, packet.iov.ptr, max_len);
+      break;
   }
-  ret = uhci_complete_td(s, td, result, buf, max_len, td_addr, int_mask);
+  ret = uhci_complete_td(s, td, buf, &packet, td_addr, int_mask);
   return ret;
 }
 
@@ -612,7 +633,8 @@ static void uhci_process_frame(UHCIState *s) {
     old_td_ctrl = td.ctrl;
     ret = uhci_handle_td(s, curr_qh, &td, link, &int_mask);
 
-    if (old_td_ctrl != td.ctrl) {
+    if (old_td_ctrl != td.ctrl)
+    {
       dma_bm_write((link & ~0xf) + 4, (uint8_t *)&td.ctrl, sizeof(td.ctrl), 4);
     }
 
@@ -671,7 +693,7 @@ void uhci_frame_timer(void *opaque) {
   }
   s->pending_int_mask = 0;
 
-  timer_on_auto(&s->frame_timer, (11936 + s->sof_timing) / 12000.);
+  timer_on_auto(&s->frame_timer, ((11936 + s->sof_timing) / 12000.) * 1000.);
 }
 
 void uhci_attach(UHCIState *s, usb_device_t* device, int index)
@@ -682,10 +704,14 @@ void uhci_attach(UHCIState *s, usb_device_t* device, int index)
     port->ctrl |= UHCI_PORT_CCS | UHCI_PORT_CSC;
 
     /* update speed */
+    if (device->speed == USB_SPEED_LOW)
     {
-        //port->ctrl |= UHCI_PORT_LSDA;
+        port->ctrl |= UHCI_PORT_LSDA;
     }
     port->dev = device;
+    device->state = USB_STATE_DEFAULT;
+    if (device->handle_attach)
+        device->handle_attach(device);
     uhci_resume(s);
 }
 
@@ -703,6 +729,7 @@ void uhci_detach(UHCIState *s, int index)
         port->ctrl &= ~UHCI_PORT_EN;
         port->ctrl |= UHCI_PORT_ENC;
     }
+    port->dev->state = USB_STATE_NOTATTACHED;
     port->dev = NULL;
     uhci_resume(s);
 }
