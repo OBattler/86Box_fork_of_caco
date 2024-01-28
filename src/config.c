@@ -2772,7 +2772,7 @@ load_manager_settings_global()
 
 /* Global config section. */
 void
-load_manager_vms_global()
+load_manager_vms_global(void)
 {
     char          temp[1024] = { 0 };
     char          vms_path_default[1024] = { 0 };
@@ -2824,7 +2824,7 @@ load_manager_vms_global()
 }
 
 void
-save_manager_vms_global()
+save_manager_vms_global(void)
 {
     char          temp[1024] = { 0 };
     char          vms_path_default[1024] = { 0 };
