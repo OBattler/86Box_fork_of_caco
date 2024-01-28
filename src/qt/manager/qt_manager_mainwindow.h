@@ -66,6 +66,8 @@ private slots:
 
     void on_actionCreate_a_desktop_shortcut_triggered();
 
+    void on_tableWidget_itemActivated(QTableWidgetItem *item);
+
 private:
     Ui::ManagerMainWindow *ui;
     QLocalServer* server;

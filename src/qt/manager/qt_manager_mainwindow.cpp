@@ -732,3 +732,15 @@ void ManagerMainWindow::on_actionCreate_a_desktop_shortcut_triggered()
 #endif
 }
 
+
+void ManagerMainWindow::on_tableWidget_itemActivated(QTableWidgetItem *item)
+{
+    selectedVMIndex = item->data(Qt::UserRole).toInt();
+    if (processes[selectedVMIndex].state() == QProcess::Running && !blocked[selectedVMIndex]) {
+        if (paused[selectedVMIndex])
+            ui->pushButtonPause->click();
+        else
+            ui->pushButtonStartStop->click();
+    }
+}
+
