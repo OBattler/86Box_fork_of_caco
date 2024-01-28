@@ -741,6 +741,8 @@ void ManagerMainWindow::on_tableWidget_itemActivated(QTableWidgetItem *item)
             ui->pushButtonPause->click();
         else
             ui->pushButtonStartStop->click();
+    } else if (processes[selectedVMIndex].state() == QProcess::NotRunning) {
+        ui->pushButtonStartStop->click();
     }
 }
 
