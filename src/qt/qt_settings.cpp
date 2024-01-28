@@ -193,7 +193,7 @@ Settings::save()
 void
 Settings::accept()
 {
-    if (confirm_save && !settings_only) {
+    if (confirm_save && !settings_only && !manager_mode) {
         QMessageBox questionbox(QMessageBox::Icon::Question, "86Box",
                                 QStringLiteral("%1\n\n%2").arg(tr("Do you want to save the settings?"),
                                 tr("This will hard reset the emulated machine.")),

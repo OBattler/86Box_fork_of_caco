@@ -134,8 +134,33 @@ typedef struct config_t {
 } config_t;
 #endif
 
+typedef struct config_manager_vm_t
+{
+    char name[256];
+    char description[4096];
+    char path[4096];
+} config_manager_vm_t;
+
+typedef struct config_manager_t
+{
+    char vms_path[1024];
+    char logging_path[1024];
+    struct config_manager_vm_t vm[256];
+
+    unsigned int minimize_to_tray_icon;
+    unsigned int close_to_tray_icon;
+    unsigned int minimize_when_vm_started;
+
+    unsigned int enable_grid_lines;
+    unsigned int enable_logging;
+} config_manager_t;
+
+extern config_manager_t manager_config;
+
 extern void config_load(void);
 extern void config_save(void);
+extern void config_load_global(void);
+extern void config_save_global(void);
 
 #ifdef EMU_INI_H
 extern ini_t config_get_ini(void);

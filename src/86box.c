@@ -204,6 +204,11 @@ int      video_fullscreen_scale_maximized       = 0;              /* (C) Whether
 int      do_auto_pause                          = 0;              /* (C) Auto-pause the emulator on focus
                                                                          loss */
 
+
+int      manager_mode                           = 0;
+
+config_manager_t manager_config;
+
 /* Statistics. */
 extern int mmuflush;
 extern int readlnum;
@@ -217,9 +222,10 @@ extern int CPUID;
 extern int output;
 int        atfullspeed;
 
-char  exe_path[2048]; /* path (dir) of executable */
-char  usr_path[1024]; /* path (dir) of user data */
-char  cfg_path[1024]; /* full path of config file */
+char  exe_path[2048];        /* path (dir) of executable */
+char  usr_path[1024];        /* path (dir) of user data */
+char  cfg_path[1024];        /* full path of config file */
+char  cfg_global_path[1024]; /* full path of config file */
 FILE *stdlog = NULL;  /* file to log output to */
 #if 0
 int   scrnsz_x = SCREEN_RES_X; /* current screen size, X */
@@ -452,6 +458,7 @@ pc_init(int argc, char *argv[])
     char            *ppath = NULL;
     char            *rpath = NULL;
     char            *cfg = NULL;
+    char            *global_cfg = NULL;
     char            *p;
     char             temp[2048];
     char            *fn[FDD_NUM] = { NULL };
@@ -547,6 +554,7 @@ usage:
 #ifndef USE_SDL_UI
             printf("-S or --settings        - show only the settings dialog\n");
 #endif
+            printf("-U or --globalconfig    - set 'path' to be global config file\n");
             printf("-V or --vmname name     - overrides the name of the running VM\n");
             printf("-X or --clear what      - clears the 'what' (cmos/flash/both)\n");
             printf("-Y or --donothing       - do not show any UI or run the emulation\n");
@@ -589,6 +597,11 @@ usage:
                 goto usage;
 
             cfg = argv[++c];
+        } else if (!strcasecmp(argv[c], "--globalconfig") || !strcasecmp(argv[c], "-U")) {
+            if ((c + 1) == argc || plat_dir_check(argv[c + 1]))
+                goto usage;
+
+            global_cfg = argv[++c];
         } else if (!strcasecmp(argv[c], "--image") || !strcasecmp(argv[c], "-I")) {
             if ((c + 1) == argc)
                 goto usage;
@@ -725,7 +738,8 @@ usage:
            create it. */
         if (!plat_dir_check(usr_path))
             plat_dir_create(usr_path);
-    }
+    } else
+        manager_mode = 1;
 
     // Add the VM-local ROM path.
     path_append_filename(temp, usr_path, "roms");
@@ -808,6 +822,15 @@ usage:
     /* At this point, we can safely create the full path name. */
     path_append_filename(cfg_path, usr_path, p);
 
+    cfg_global_path[0] = 0;
+    if (global_cfg == NULL) {
+        plat_get_global_config_dir(cfg_global_path);
+        path_slash(cfg_global_path);
+        strncat(cfg_global_path, CONFIG_FILE, sizeof(CONFIG_FILE));
+    } else {
+        strncpy(cfg_global_path, global_cfg, sizeof(cfg_global_path) - 1);
+    }
+
     /*
      * Get the current directory's name
      *
@@ -837,7 +860,8 @@ usage:
         pclog("# ROM path: %s\n", rom_path->path);
     }
 
-    pclog("# Configuration file: %s\n#\n\n", cfg_path);
+    pclog("# Configuration file: %s\n", cfg_path);
+    pclog("# Global configuration file: %s\n#\n\n", cfg_global_path);
     /*
      * We are about to read the configuration file, which MAY
      * put data into global variables (the hard- and floppy

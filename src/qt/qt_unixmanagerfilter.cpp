@@ -18,6 +18,9 @@
  */
 
 #include "qt_unixmanagerfilter.hpp"
+#include "qt_mainwindow.hpp"
+
+extern MainWindow* main_window;
 
 UnixManagerSocket::UnixManagerSocket(QObject *obj)
     : QLocalSocket(obj)
@@ -32,6 +35,17 @@ UnixManagerSocket::readyToRead()
         QByteArray line = readLine();
         if (line.size()) {
             line.resize(line.size() - 1);
+            if (line != "shutdownnoprompt") {
+                /* TODO: This needs a better solution. */
+                auto eFlags = main_window->windowFlags();
+                main_window->setWindowFlags(eFlags | Qt::WindowStaysOnTopHint);
+                main_window->show();
+                main_window->setWindowFlags(eFlags);
+                main_window->show();
+
+                main_window->raise(); //bring window from minimized state on OSX
+                main_window->activateWindow(); //bring window to front/unminimize on windows
+            }
             if (line == "showsettings") {
                 emit showsettings();
             } else if (line == "pause") {
@@ -54,9 +68,9 @@ UnixManagerSocket::eventFilter(QObject *obj, QEvent *event)
 {
     if (state() == QLocalSocket::ConnectedState) {
         if (event->type() == QEvent::WindowBlocked) {
-            write(QByteArray { "1" });
+            write(QByteArray { "1\n" });
         } else if (event->type() == QEvent::WindowUnblocked) {
-            write(QByteArray { "0" });
+            write(QByteArray { "0\n" });
         }
     }
 

@@ -82,7 +82,7 @@ static int   cx;
 static int   cy;
 static int   cw;
 static int   ch;
-static ini_t config;
+static ini_t config, config_global;
 
 #ifdef ENABLE_CONFIG_LOG
 int config_do_log = ENABLE_CONFIG_LOG;
@@ -1534,6 +1534,7 @@ void
 config_load(void)
 {
     int i;
+    int default_create = 0;
 
     config_log("Loading config file '%s'..\n", cfg_path);
 
@@ -1548,6 +1549,32 @@ config_load(void)
 
     if (!config) {
         config         = ini_new();
+        default_create = 1;
+
+        config_changed = 1;
+    }
+
+    load_general();                 /* General */
+    for (i = 0; i < MONITORS_NUM; i++)
+        load_monitor(i);            /* Monitors */
+    load_machine();                 /* Machine */
+    load_video();                   /* Video */
+    load_input_devices();           /* Input devices */
+    load_sound();                   /* Sound */
+    load_network();                 /* Network */
+    load_ports();                   /* Ports (COM & LPT) */
+    load_storage_controllers();     /* Storage controllers */
+    load_hard_disks();              /* Hard disks */
+    load_floppy_and_cdrom_drives(); /* Floppy and CD-ROM drives */
+    load_other_removable_devices(); /* Other removable devices */
+    load_other_peripherals();       /* Other peripherals */
+
+    /* Mark the configuration as changed. */
+    config_changed = 1;
+
+    if (!default_create) {
+        config_log("Config loaded.\n\n");
+    } else {
         config_changed = 1;
 
         cpu_f = (cpu_family_t *) &cpu_families[0];
@@ -1605,31 +1632,13 @@ config_load(void)
         cassette_append       = 0;
         cassette_pcm          = 0;
         cassette_ui_writeprot = 0;
-
-        config_log("Config file not present or invalid!\n");
-    } else {
-        load_general();                 /* General */
-        for (i = 0; i < MONITORS_NUM; i++)
-            load_monitor(i);            /* Monitors */
-        load_machine();                 /* Machine */
-        load_video();                   /* Video */
-        load_input_devices();           /* Input devices */
-        load_sound();                   /* Sound */
-        load_network();                 /* Network */
-        load_ports();                   /* Ports (COM & LPT) */
-        load_storage_controllers();     /* Storage controllers */
-        load_hard_disks();              /* Hard disks */
-        load_floppy_and_cdrom_drives(); /* Floppy and CD-ROM drives */
-        load_other_removable_devices(); /* Other removable devices */
-        load_other_peripherals();       /* Other peripherals */
-
-        /* Mark the configuration as changed. */
-        config_changed = 1;
-
-        config_log("Config loaded.\n\n");
+        config_log("Config file not present or invalid!\n\n");
     }
 
     video_copy = (video_grayscale || invert_display) ? video_transform_copy : memcpy;
+
+    if (!manager_mode)
+        config_load_global();
 }
 
 /* Save "General" section. */
@@ -2730,6 +2739,204 @@ config_save(void)
     save_other_peripherals();       /* Other peripherals */
 
     ini_write(config, cfg_path);
+
+    if (!manager_mode)
+        config_save_global();
+}
+
+void
+load_manager_settings_global()
+{
+    char          temp[1024] = { 0 };
+    int           i = 0, c = 0;
+    char         *p = NULL;
+    ini_section_t section = NULL;
+
+    /* This only matters when running in manager mode. */
+    if (!manager_mode) {
+        memset(&manager_config, 0, sizeof(manager_config));
+        return;
+    }
+
+    section = ini_find_or_create_section(config_global, "Manager");
+
+    manager_config.close_to_tray_icon = !!ini_section_get_int(section, "close_to_tray_icon", 0);
+    manager_config.minimize_to_tray_icon = !!ini_section_get_int(section, "minimize_to_tray_icon", 0);
+    manager_config.minimize_when_vm_started = !!ini_section_get_int(section, "minimize_when_vm_started", 0);
+    manager_config.enable_grid_lines = !!ini_section_get_int(section, "enable_grid_lines", 0);
+    manager_config.enable_logging = !!ini_section_get_int(section, "enable_logging", 0);
+
+    manager_config.logging_path[0] = 0;
+    strncpy(manager_config.logging_path, ini_section_get_string(section, "logging_path", ""), sizeof(manager_config.logging_path));
+}
+
+/* Global config section. */
+void
+load_manager_vms_global()
+{
+    char          temp[1024] = { 0 };
+    char          vms_path_default[1024] = { 0 };
+    int           i = 0, c = 0;
+    char         *p = NULL;
+    ini_section_t section = NULL;
+    
+    /* This only matters when running in manager mode. */
+    if (!manager_mode) {
+        memset(&manager_config, 0, sizeof(manager_config));
+        return;
+    }
+    plat_get_global_config_dir(vms_path_default);
+    path_slash(vms_path_default);
+    strncat(vms_path_default, "86Box VMs", sizeof(vms_path_default) - 1);
+    strncat(vms_path_default, path_get_slash(vms_path_default), sizeof(vms_path_default) - 1);
+    
+    memset(manager_config.vm, 0, sizeof(manager_config.vm));
+    memset(manager_config.vms_path, 0, sizeof(manager_config.vms_path));
+
+    section = ini_find_or_create_section(config_global, "Manager");
+    strncpy(manager_config.vms_path, ini_section_get_string(section, "vms_path", vms_path_default), sizeof(manager_config.vms_path));
+
+    for (i = 0; i < 256; i++) {
+        temp[0] = 0;
+        snprintf(temp, sizeof(temp) - 1, "VM #%d", i + 1);
+        section = ini_find_section(config_global, temp);
+        if (section) {
+            if (ini_section_get_string(section, "name", "")[0] != 0) {
+                p = ini_section_get_string(section, "name", "");
+                strncpy(manager_config.vm[c].name, p, sizeof(manager_config.vm[0].name));
+                p = ini_section_get_string(section, "description", "");
+                strncpy(manager_config.vm[c].description, p, sizeof(manager_config.vm[0].description));
+                p = ini_section_get_string(section, "path", "");
+                manager_config.vm[c].path[0] = 0;
+                if (p[0] == 0) {
+                    strncat(manager_config.vm[c].path, vms_path_default, sizeof(manager_config.vm[c].path));
+                    path_slash(manager_config.vm[c].path);
+                    strncat(manager_config.vm[c].path, manager_config.vm[c].name, sizeof(manager_config.vm[c].path));
+                    path_slash(manager_config.vm[c].path);
+                } else {
+                    strncpy(manager_config.vm[c].path, p, sizeof(manager_config.vm[c].path));
+                    path_slash(manager_config.vm[c].path);
+                }
+                c++;
+            }
+        }
+    }
+}
+
+void
+save_manager_vms_global()
+{
+    char          temp[1024] = { 0 };
+    char          vms_path_default[1024] = { 0 };
+    ini_section_t section = NULL;
+    int           i = 0, c = 0;
+
+    /* This only matters when running in manager mode. */
+    if (!manager_mode) {
+        return;
+    }
+    plat_get_global_config_dir(vms_path_default);
+    path_slash(vms_path_default);
+    strncat(vms_path_default, "86Box VMs", sizeof(vms_path_default) - 1);
+    strncat(vms_path_default, path_get_slash(vms_path_default), sizeof(vms_path_default) - 1);
+
+    section = ini_find_or_create_section(config_global, "Manager");
+
+    if (strncmp(manager_config.vms_path, vms_path_default, 1024)) {
+        ini_section_set_string(section, "vms_path", manager_config.vms_path);
+    } else {
+        ini_section_delete_var(section, "vms_path");
+    }
+
+    ini_delete_section_if_empty(config_global, section);
+
+    for (i = 0; i < 256; i++) {
+        temp[0] = 0;
+        snprintf(temp, sizeof(temp) - 1, "VM #%d", c + 1);
+        section = ini_find_or_create_section(config_global, temp);
+        if (manager_config.vm[i].name[0]) {
+            ini_section_set_string(section, "name", manager_config.vm[i].name);
+            if (manager_config.vm[i].description[0]) {
+                ini_section_set_string(section, "description", manager_config.vm[i].description);
+            } else {
+                ini_section_delete_var(section, "description");
+            }
+            /* Always save paths. */
+            ini_section_set_string(section, "path", manager_config.vm[i].path);
+            c++;
+        } else {
+            ini_section_delete_var(section, "name");
+            ini_section_delete_var(section, "description");
+            ini_section_delete_var(section, "path");
+        }
+        ini_delete_section_if_empty(config_global, section);
+    }
+}
+
+void
+save_manager_settings_global()
+{
+    char          temp[1024] = { 0 };
+    int           i = 0, c = 0;
+    char         *p = NULL;
+    ini_section_t section = NULL;
+
+    /* This only matters when running in manager mode. */
+    if (!manager_mode) {
+        return;
+    }
+
+    section = ini_find_or_create_section(config_global, "Manager");
+
+    if (manager_config.close_to_tray_icon == 0)
+        ini_section_delete_var(section, "close_to_tray_icon");
+    else
+        ini_section_set_int(section, "close_to_tray_icon", manager_config.close_to_tray_icon);
+
+    if (manager_config.minimize_to_tray_icon == 0)
+        ini_section_delete_var(section, "minimize_to_tray_icon");
+    else
+        ini_section_set_int(section, "minimize_to_tray_icon", manager_config.minimize_to_tray_icon);
+
+    if (manager_config.minimize_when_vm_started == 0)
+        ini_section_delete_var(section, "minimize_when_vm_started");
+    else
+        ini_section_set_int(section, "minimize_when_vm_started", manager_config.minimize_when_vm_started);
+
+    if (manager_config.enable_grid_lines == 0)
+        ini_section_delete_var(section, "enable_grid_lines");
+    else
+        ini_section_set_int(section, "enable_grid_lines", manager_config.enable_grid_lines);
+
+    if (manager_config.enable_logging == 0)
+        ini_section_delete_var(section, "enable_logging");
+    else
+        ini_section_set_int(section, "enable_logging", manager_config.enable_logging);
+
+    if (manager_config.logging_path[0] == 0)
+        ini_section_delete_var(section, "logging_path");
+    else
+        ini_section_set_string(section, "logging_path", manager_config.logging_path);
+
+    ini_delete_section_if_empty(config_global, section);
+}
+
+/* Load global config. */
+void
+config_load_global()
+{
+    config_global = ini_read(cfg_global_path);
+    load_manager_settings_global();
+    load_manager_vms_global();
+}
+
+/* Save global config. */
+void
+config_save_global()
+{
+    save_manager_settings_global();
+    save_manager_vms_global();
+    ini_write(config_global, cfg_global_path);
 }
 
 ini_t

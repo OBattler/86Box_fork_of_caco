@@ -262,7 +262,7 @@ target_link_libraries(
 
 target_link_libraries(
     ui
-    PRIVATE
+    PUBLIC
     Qt${QT_MAJOR}::Widgets
     Qt${QT_MAJOR}::Gui
     Qt${QT_MAJOR}::OpenGL
@@ -443,3 +443,6 @@ foreach(po_file ${po_files})
 endforeach()
 configure_file(qt_translations.qrc ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 target_sources(ui PRIVATE ${QM_FILES} ${CMAKE_CURRENT_BINARY_DIR}/qt_translations.qrc)
+
+# Manager
+add_subdirectory(manager)

@@ -71,6 +71,8 @@ extern "C" {
 #include "qt_styleoverride.hpp"
 #include "qt_unixmanagerfilter.hpp"
 
+#include "./manager/qt_manager_mainwindow.h"
+
 // Void Cast
 #define VC(x) const_cast<wchar_t *>(x)
 
@@ -154,6 +156,7 @@ main_thread_fn()
 
 static std::thread *main_thread;
 
+UnixManagerSocket* managerSocket = nullptr;
 int
 main(int argc, char *argv[])
 {
@@ -215,6 +218,12 @@ main(int argc, char *argv[])
     if (!pc_init_modules()) {
         ui_msgbox_header(MBX_FATAL, (void *) IDS_2121, (void *) IDS_2056);
         return 6;
+    }
+
+    if (manager_mode) {
+        ManagerMainWindow manager_main_window;
+        manager_main_window.show();
+        return app.exec();
     }
 
     if (settings_only) {
@@ -294,19 +303,19 @@ main(int argc, char *argv[])
     }
 #endif
 
-    UnixManagerSocket socket;
+    managerSocket = new UnixManagerSocket(qApp);
     if (qgetenv("86BOX_MANAGER_SOCKET").size()) {
-        QObject::connect(&socket, &UnixManagerSocket::showsettings, main_window, &MainWindow::showSettings);
-        QObject::connect(&socket, &UnixManagerSocket::pause, main_window, &MainWindow::togglePause);
-        QObject::connect(&socket, &UnixManagerSocket::resetVM, main_window, &MainWindow::hardReset);
-        QObject::connect(&socket, &UnixManagerSocket::request_shutdown, main_window, &MainWindow::close);
-        QObject::connect(&socket, &UnixManagerSocket::force_shutdown, []() {
+        QObject::connect(managerSocket, &UnixManagerSocket::showsettings, main_window, &MainWindow::showSettings);
+        QObject::connect(managerSocket, &UnixManagerSocket::pause, main_window, &MainWindow::togglePause);
+        QObject::connect(managerSocket, &UnixManagerSocket::resetVM, main_window, &MainWindow::hardReset);
+        QObject::connect(managerSocket, &UnixManagerSocket::request_shutdown, main_window, &MainWindow::close);
+        QObject::connect(managerSocket, &UnixManagerSocket::force_shutdown, []() {
             do_stop();
             emit main_window->close();
         });
-        QObject::connect(&socket, &UnixManagerSocket::ctrlaltdel, []() { pc_send_cad(); });
-        main_window->installEventFilter(&socket);
-        socket.connectToServer(qgetenv("86BOX_MANAGER_SOCKET"));
+        QObject::connect(managerSocket, &UnixManagerSocket::ctrlaltdel, []() { pc_send_cad(); });
+        main_window->installEventFilter(managerSocket);
+        managerSocket->connectToServer(qgetenv("86BOX_MANAGER_SOCKET"));
     }
 
     // pc_reset_hard_init();
@@ -355,6 +364,6 @@ main(int argc, char *argv[])
     pc_close(nullptr);
     endblit();
 
-    socket.close();
+    managerSocket->close();
     return ret;
 }

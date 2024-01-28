@@ -144,6 +144,7 @@ extern int      confirm_reset;              /* (C) enable reset confirmation */
 extern int      confirm_exit;               /* (C) enable exit confirmation */
 extern int      confirm_save;               /* (C) enable save confirmation */
 extern int      enable_discord;             /* (C) enable Discord integration */
+extern int      manager_mode;               /* (C) manager mode */
 
 extern int    fixed_size_x;
 extern int    fixed_size_y;
@@ -165,10 +166,11 @@ extern uint16_t key_prefix_2_2;
 extern uint16_t key_uncapture_1;
 extern uint16_t key_uncapture_2;
 
-extern char exe_path[2048];    /* path (dir) of executable */
-extern char usr_path[1024];    /* path (dir) of user data */
-extern char cfg_path[1024];    /* full path of config file */
-extern int  open_dir_usr_path; /* default file open dialog directory of usr_path */
+extern char exe_path[2048];        /* path (dir) of executable */
+extern char usr_path[1024];        /* path (dir) of user data */
+extern char cfg_path[1024];        /* full path of config file */
+extern char cfg_global_path[1024]; /* full path of global config file */
+extern int  open_dir_usr_path;     /* default file open dialog directory of usr_path */
 #ifndef USE_NEW_DYNAREC
 extern FILE *stdlog; /* file to log output to */
 #endif

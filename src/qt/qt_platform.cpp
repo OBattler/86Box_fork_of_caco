@@ -48,6 +48,7 @@
 #include "qt_mainwindow.hpp"
 #include "qt_progsettings.hpp"
 #include "qt_util.hpp"
+#include "qt_unixmanagerfilter.hpp"
 
 #ifdef Q_OS_UNIX
 #    include <pthread.h>
@@ -365,6 +366,7 @@ plat_munmap(void *ptr, size_t size)
 #endif
 }
 
+extern UnixManagerSocket* managerSocket;
 void
 plat_pause(int p)
 {
@@ -377,6 +379,8 @@ plat_pause(int p)
         if (source_hwnd)
             PostMessage((HWND) (uintptr_t) source_hwnd, WM_SENDSTATUS, (WPARAM) !!p, (LPARAM) (HWND) main_window->winId());
 #endif
+        if (managerSocket)
+            managerSocket->write(QByteArray{ !!p ? "3\n" : "2\n" });
         return;
     }
 
@@ -407,6 +411,8 @@ plat_pause(int p)
     if (source_hwnd)
         PostMessage((HWND) (uintptr_t) source_hwnd, WM_SENDSTATUS, (WPARAM) !!p, (LPARAM) (HWND) main_window->winId());
 #endif
+    if (managerSocket)
+        managerSocket->write(QByteArray{ !!p ? "3\n" : "2\n" });
 }
 
 void

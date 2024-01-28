@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ManagerMainWindow</class>
+ <widget class="QMainWindow" name="ManagerMainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1156</width>
+    <height>588</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>86Box</string>
+  </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>true</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="1" column="0">
+     <widget class="QTableWidget" name="tableWidget">
+      <property name="selectionMode">
+       <enum>QAbstractItemView::SingleSelection</enum>
+      </property>
+      <property name="selectionBehavior">
+       <enum>QAbstractItemView::SelectRows</enum>
+      </property>
+      <property name="cornerButtonEnabled">
+       <bool>false</bool>
+      </property>
+      <property name="rowCount">
+       <number>0</number>
+      </property>
+      <property name="columnCount">
+       <number>4</number>
+      </property>
+      <attribute name="horizontalHeaderCascadingSectionResizes">
+       <bool>false</bool>
+      </attribute>
+      <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+       <bool>true</bool>
+      </attribute>
+      <attribute name="horizontalHeaderStretchLastSection">
+       <bool>true</bool>
+      </attribute>
+      <attribute name="verticalHeaderVisible">
+       <bool>false</bool>
+      </attribute>
+      <column>
+       <property name="text">
+        <string>Name</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Status</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Description</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Path</string>
+       </property>
+      </column>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QFrame" name="frame">
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="4">
+        <widget class="QPushButton" name="pushButtonStartStop">
+         <property name="text">
+          <string>Start</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="8">
+        <widget class="QPushButton" name="pushButtonReset">
+         <property name="toolTip">
+          <string>Reset this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Reset</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="3">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Minimum</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>30</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="9">
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="6">
+        <widget class="QPushButton" name="pushButtonPause">
+         <property name="toolTip">
+          <string>Pause this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Pause</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="5">
+        <widget class="QPushButton" name="pushButtonConfigure">
+         <property name="toolTip">
+          <string>Change the configuration of this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Configure</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="pushButtonEdit">
+         <property name="toolTip">
+          <string>Edit the properties of this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Edit</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButtonAdd">
+         <property name="toolTip">
+          <string>Add a new or an existing virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Add</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="pushButtonRemove">
+         <property name="toolTip">
+          <string>Remove this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>Remove</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="7">
+        <widget class="QPushButton" name="pushButtonCAD">
+         <property name="toolTip">
+          <string>Send the CTRL+ALT+DEL keystroke to this virtual machine</string>
+         </property>
+         <property name="text">
+          <string>C+A+D</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="11">
+        <widget class="QPushButton" name="pushButtonAbout">
+         <property name="text">
+          <string>About</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="10">
+        <widget class="QPushButton" name="pushButtonSettings">
+         <property name="toolTip">
+          <string>Open manager-related settings</string>
+         </property>
+         <property name="text">
+          <string>Settings</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1156</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuOptions">
+    <property name="title">
+     <string>Options</string>
+    </property>
+    <addaction name="actionStart"/>
+    <addaction name="actionConfigure"/>
+    <addaction name="actionPause"/>
+    <addaction name="actionSend_CTRL_ALT_DEL"/>
+    <addaction name="actionHard_reset"/>
+    <addaction name="separator"/>
+    <addaction name="actionKill"/>
+    <addaction name="actionWipe"/>
+    <addaction name="separator"/>
+    <addaction name="actionEdit"/>
+    <addaction name="actionClone"/>
+    <addaction name="actionRemove"/>
+    <addaction name="actionOpen_folder_of_VM"/>
+    <addaction name="actionOpen_config_file"/>
+    <addaction name="actionCreate_a_desktop_shortcut"/>
+   </widget>
+   <addaction name="menuOptions"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionStart">
+   <property name="text">
+    <string>Start</string>
+   </property>
+  </action>
+  <action name="actionConfigure">
+   <property name="text">
+    <string>Configure</string>
+   </property>
+  </action>
+  <action name="actionPause">
+   <property name="text">
+    <string>Pause</string>
+   </property>
+  </action>
+  <action name="actionSend_CTRL_ALT_DEL">
+   <property name="text">
+    <string>Send CTRL+ALT+DEL</string>
+   </property>
+  </action>
+  <action name="actionHard_reset">
+   <property name="text">
+    <string>Hard reset</string>
+   </property>
+  </action>
+  <action name="actionKill">
+   <property name="text">
+    <string>Kill</string>
+   </property>
+  </action>
+  <action name="actionWipe">
+   <property name="text">
+    <string>Wipe</string>
+   </property>
+  </action>
+  <action name="actionEdit">
+   <property name="text">
+    <string>Edit</string>
+   </property>
+  </action>
+  <action name="actionClone">
+   <property name="text">
+    <string>Clone</string>
+   </property>
+  </action>
+  <action name="actionRemove">
+   <property name="text">
+    <string>Remove</string>
+   </property>
+  </action>
+  <action name="actionOpen_folder_of_VM">
+   <property name="text">
+    <string>Open folder of VM</string>
+   </property>
+  </action>
+  <action name="actionOpen_config_file">
+   <property name="text">
+    <string>Open config file</string>
+   </property>
+  </action>
+  <action name="actionCreate_a_desktop_shortcut">
+   <property name="text">
+    <string>Create a desktop shortcut</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
