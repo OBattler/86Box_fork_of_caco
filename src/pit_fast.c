@@ -91,8 +91,9 @@ pitf_ctr_set_load_func(void *data, int counter_id, void (*func)(uint8_t new_m, i
 static uint16_t
 pitf_ctr_get_count(void *data, int counter_id)
 {
-    pitf_t *pit = (pitf_t *) data;
-    ctrf_t *ctr = &pit->counters[counter_id];
+    const pitf_t *pit = (pitf_t *) data;
+    const ctrf_t *ctr = &pit->counters[counter_id];
+
     return (uint16_t) ctr->l;
 }
 
@@ -207,6 +208,9 @@ pitf_ctr_load(ctrf_t *ctr)
         case 5: /*Hardware triggered stobe*/
             ctr->enabled = 1;
             break;
+
+        default:
+            break;
     }
 
     if (ctr->load_func != NULL)
@@ -265,6 +269,9 @@ pitf_set_gate_no_timer(ctrf_t *ctr, int gate)
                 ctr->thit = 0;
             }
             ctr->enabled = gate;
+            break;
+
+        default:
             break;
     }
     ctr->gate    = gate;
@@ -327,7 +334,10 @@ pitf_over(ctrf_t *ctr)
                 if (ctr->using_timer)
                     timer_advance_u64(&ctr->timer, (uint64_t) (((l + 1) >> 1) * PITCONST));
             }
-            //                if (!t) pclog("pit_over: square wave mode c=%x  %lli  %f\n", pit.c[t], tsc, PITCONST);
+#if 0
+            if (!t)
+                pclog("pit_over: square wave mode c=%x  %lli  %f\n", pit.c[t], tsc, PITCONST);
+#endif
             break;
         case 4: /*Software triggered strove*/
             if (!ctr->thit) {
@@ -356,6 +366,9 @@ pitf_over(ctrf_t *ctr)
             if (ctr->using_timer)
                 timer_advance_u64(&ctr->timer, (uint64_t) (0xffff * PITCONST));
             break;
+
+        default:
+            break;
     }
     ctr->running = ctr->enabled && ctr->using_timer && !ctr->disabled;
     if (ctr->using_timer && !ctr->running)
@@ -366,8 +379,10 @@ static __inline void
 pitf_ctr_latch_count(ctrf_t *ctr)
 {
     ctr->rl = pitf_read_timer(ctr);
-    //                        pclog("Timer latch %f %04X %04X\n",pit->c[0],pit->rl[0],pit->l[0]);
-    // pit->ctrl |= 0x30;
+#if 0
+    pclog("Timer latch %f %04X %04X\n",pit->c[0],pit->rl[0],pit->l[0]);
+    pit->ctrl |= 0x30;
+#endif
     ctr->rereadlatch = 0;
     ctr->rm          = 3;
     ctr->latched     = 1;
@@ -388,6 +403,8 @@ pitf_write(uint16_t addr, uint8_t val, void *priv)
     ctrf_t *ctr;
 
     pit_log("[%04X:%08X] pit_write(%04X, %02X, %08X)\n", CS, cpu_state.pc, addr, val, priv);
+
+    cycles -= ISA_CYCLES(8);
 
     switch (addr & 3) {
         case 3: /* control */
@@ -472,9 +489,51 @@ pitf_write(uint16_t addr, uint8_t val, void *priv)
                     ctr->l |= val;
                     ctr->wm = 0;
                     break;
+
+                default:
+                    break;
             }
             break;
+
+        default:
+            break;
     }
+}
+
+uint8_t
+pitf_read_reg(void *priv, uint8_t reg)
+{
+    pitf_t *dev = (pitf_t *) priv;
+    uint8_t ret = 0xff;
+
+    switch (reg) {
+        case 0x00:
+        case 0x02:
+        case 0x04:
+            ret = dev->counters[reg >> 1].l & 0xff;
+            break;
+        case 0x01:
+        case 0x03:
+        case 0x05:
+            ret = (dev->counters[reg >> 1].l >> 8) & 0xff;
+            break;
+        case 0x06:
+            ret = dev->ctrl;
+            break;
+        case 0x07:
+            /* The SiS 551x datasheet is unclear about how exactly
+               this register is structured.
+               Update: But the SiS 5571 datasheet is clear. */
+            ret = (dev->counters[0].rm & 0x80) ? 0x01 : 0x00;
+            ret |= (dev->counters[1].rm & 0x80) ? 0x02 : 0x00;
+            ret |= (dev->counters[2].rm & 0x80) ? 0x04 : 0x00;
+            ret |= (dev->counters[0].wm & 0x80) ? 0x08 : 0x00;
+            ret |= (dev->counters[1].wm & 0x80) ? 0x10 : 0x00;
+            ret |= (dev->counters[2].wm & 0x80) ? 0x20 : 0x00;
+            break;
+    }
+
+    return ret;
 }
 
 static uint8_t
@@ -484,6 +543,8 @@ pitf_read(uint16_t addr, void *priv)
     uint8_t ret = 0xff;
     int     t   = (addr & 3);
     ctrf_t *ctr;
+
+    cycles -= ISA_CYCLES(8);
 
     switch (addr & 3) {
         case 3: /* Control. */
@@ -530,7 +591,13 @@ pitf_read(uint16_t addr, void *priv)
                     else
                         ctr->rm = 0;
                     break;
+
+                default:
+                    break;
             }
+            break;
+
+        default:
             break;
     }
 
@@ -540,9 +607,9 @@ pitf_read(uint16_t addr, void *priv)
 }
 
 static void
-pitf_timer_over(void *p)
+pitf_timer_over(void *priv)
 {
-    ctrf_t *ctr = (ctrf_t *) p;
+    ctrf_t *ctr = (ctrf_t *) priv;
     pitf_over(ctr);
 }
 
@@ -627,7 +694,7 @@ pitf_init(const device_t *info)
 const device_t i8253_fast_device = {
     .name          = "Intel 8253/8253-5 Programmable Interval Timer",
     .internal_name = "i8253_fast",
-    .flags         = DEVICE_ISA,
+    .flags         = DEVICE_ISA | DEVICE_PIT,
     .local         = PIT_8253,
     .init          = pitf_init,
     .close         = pitf_close,
@@ -641,7 +708,7 @@ const device_t i8253_fast_device = {
 const device_t i8254_fast_device = {
     .name          = "Intel 8254 Programmable Interval Timer",
     .internal_name = "i8254_fast",
-    .flags         = DEVICE_ISA,
+    .flags         = DEVICE_ISA | DEVICE_PIT,
     .local         = PIT_8254,
     .init          = pitf_init,
     .close         = pitf_close,

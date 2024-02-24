@@ -8,5 +8,7 @@ SDL2
 zlib
 libpng
 rtmidi
+libslirp
+fluidsynth
 qt5-static
 qt5-translations

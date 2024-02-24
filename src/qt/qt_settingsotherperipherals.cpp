@@ -23,6 +23,7 @@ extern "C" {
 #include <86box/machine.h>
 #include <86box/isamem.h>
 #include <86box/isartc.h>
+#include <86box/unittester.h>
 }
 
 #include "qt_deviceconfig.hpp"
@@ -41,11 +42,14 @@ SettingsOtherPeripherals::onCurrentMachineChanged(int machineId)
 {
     this->machineId = machineId;
 
-    ui->checkBoxISABugger->setChecked(bugger_enabled > 0 ? true : false);
+    bool machineHasIsa = (machine_has_bus(machineId, MACHINE_BUS_ISA) > 0);
+    ui->checkBoxISABugger->setChecked((machineHasIsa && (bugger_enabled > 0)) ? true : false);
     ui->checkBoxPOSTCard->setChecked(postcard_enabled > 0 ? true : false);
-    ui->checkBoxISABugger->setEnabled(machine_has_bus(machineId, MACHINE_BUS_ISA));
-    ui->comboBoxRTC->setEnabled(machine_has_bus(machineId, MACHINE_BUS_ISA));
-    ui->pushButtonConfigureRTC->setEnabled(machine_has_bus(machineId, MACHINE_BUS_ISA));
+    ui->checkBoxUnitTester->setChecked(unittester_enabled > 0 ? true : false);
+    ui->checkBoxISABugger->setEnabled(machineHasIsa);
+    ui->pushButtonConfigureUT->setEnabled(unittester_enabled > 0);
+    ui->comboBoxRTC->setEnabled(machineHasIsa);
+    ui->pushButtonConfigureRTC->setEnabled(machineHasIsa);
 
     ui->comboBoxCard1->clear();
     ui->comboBoxCard2->clear();
@@ -97,8 +101,8 @@ SettingsOtherPeripherals::onCurrentMachineChanged(int machineId)
         }
         cbox->setCurrentIndex(-1);
         cbox->setCurrentIndex(selectedRow);
-        cbox->setEnabled(machine_has_bus(machineId, MACHINE_BUS_ISA));
-        findChild<QPushButton *>(QString("pushButtonConfigureCard%1").arg(c + 1))->setEnabled(isamem_type[c] != 0 && machine_has_bus(machineId, MACHINE_BUS_ISA));
+        cbox->setEnabled(machineHasIsa);
+        findChild<QPushButton *>(QString("pushButtonConfigureCard%1").arg(c + 1))->setEnabled(isamem_type[c] != 0 && machineHasIsa);
     }
 }
 
@@ -111,9 +115,10 @@ void
 SettingsOtherPeripherals::save()
 {
     /* Other peripherals category */
-    bugger_enabled   = ui->checkBoxISABugger->isChecked() ? 1 : 0;
-    postcard_enabled = ui->checkBoxPOSTCard->isChecked() ? 1 : 0;
-    isartc_type      = ui->comboBoxRTC->currentData().toInt();
+    bugger_enabled     = ui->checkBoxISABugger->isChecked() ? 1 : 0;
+    postcard_enabled   = ui->checkBoxPOSTCard->isChecked() ? 1 : 0;
+    unittester_enabled = ui->checkBoxUnitTester->isChecked() ? 1 : 0;
+    isartc_type        = ui->comboBoxRTC->currentData().toInt();
 
     /* ISA memory boards. */
     for (int i = 0; i < ISAMEM_MAX; i++) {
@@ -195,4 +200,16 @@ void
 SettingsOtherPeripherals::on_pushButtonConfigureCard4_clicked()
 {
     DeviceConfig::ConfigureDevice(isamem_get_device(ui->comboBoxCard4->currentData().toInt()), 4, qobject_cast<Settings *>(Settings::settings));
+}
+
+void
+SettingsOtherPeripherals::on_checkBoxUnitTester_stateChanged(int arg1)
+{
+    ui->pushButtonConfigureUT->setEnabled(arg1 != 0);
+}
+
+void
+SettingsOtherPeripherals::on_pushButtonConfigureUT_clicked()
+{
+    DeviceConfig::ConfigureDevice(&unittester_device);
 }

@@ -28,12 +28,19 @@
 #include <86box/io.h>
 #include <86box/mem.h>
 #include <86box/pci.h>
+#include <86box/plat_fallthrough.h>
+#include <86box/plat_unused.h>
 #include <86box/smram.h>
 #include <86box/spd.h>
 
 #include <86box/chipset.h>
 
 typedef struct ali1621_t {
+    uint8_t pci_slot;
+    uint8_t pad;
+    uint8_t pad0;
+    uint8_t pad1;
+
     uint8_t pci_conf[256];
 
     smram_t *smram[2];
@@ -107,9 +114,11 @@ ali1621_smram_recalc(uint8_t val, ali1621_t *dev)
             switch (val & 0x30) {
                 case 0x10: /* Open. */
                     access_normal = ACCESS_SMRAM_RX;
-                    /* FALLTHROUGH */
+                    fallthrough;
                 case 0x30: /* Protect. */
                     access_smm |= ACCESS_SMRAM_R;
+                    break;
+                default:
                     break;
             }
         }
@@ -118,9 +127,11 @@ ali1621_smram_recalc(uint8_t val, ali1621_t *dev)
             switch (val & 0x30) {
                 case 0x10: /* Open. */
                     access_normal |= ACCESS_SMRAM_W;
-                    /* FALLTHROUGH */
+                    fallthrough;
                 case 0x30: /* Protect. */
                     access_smm |= ACCESS_SMRAM_W;
+                    break;
+                default:
                     break;
             }
 
@@ -137,7 +148,7 @@ ali1621_smram_recalc(uint8_t val, ali1621_t *dev)
 }
 
 static void
-ali1621_shadow_recalc(int cur_reg, ali1621_t *dev)
+ali1621_shadow_recalc(UNUSED(int cur_reg), ali1621_t *dev)
 {
     int      r_bit;
     int      w_bit;
@@ -207,8 +218,8 @@ ali1621_mask_bar(ali1621_t *dev)
     uint32_t mask;
 
     switch (dev->pci_conf[0xbc] & 0x0f) {
-        case 0x00:
         default:
+        case 0x00:
             mask = 0x00000000;
             break;
         case 0x01:
@@ -246,7 +257,7 @@ ali1621_mask_bar(ali1621_t *dev)
 }
 
 static void
-ali1621_write(int func, int addr, uint8_t val, void *priv)
+ali1621_write(UNUSED(int func), int addr, uint8_t val, void *priv)
 {
     ali1621_t *dev = (ali1621_t *) priv;
 
@@ -565,14 +576,17 @@ ali1621_write(int func, int addr, uint8_t val, void *priv)
         case 0xf0 ... 0xff:
             dev->pci_conf[addr] = val;
             break;
+
+        default:
+            break;
     }
 }
 
 static uint8_t
-ali1621_read(int func, int addr, void *priv)
+ali1621_read(UNUSED(int func), int addr, void *priv)
 {
-    ali1621_t *dev = (ali1621_t *) priv;
-    uint8_t    ret = 0xff;
+    const ali1621_t *dev = (ali1621_t *) priv;
+    uint8_t          ret = 0xff;
 
     ret = dev->pci_conf[addr];
 
@@ -653,12 +667,12 @@ ali1621_close(void *priv)
 }
 
 static void *
-ali1621_init(const device_t *info)
+ali1621_init(UNUSED(const device_t *info))
 {
     ali1621_t *dev = (ali1621_t *) malloc(sizeof(ali1621_t));
     memset(dev, 0, sizeof(ali1621_t));
 
-    pci_add_card(PCI_ADD_NORTHBRIDGE, ali1621_read, ali1621_write, dev);
+    pci_add_card(PCI_ADD_NORTHBRIDGE, ali1621_read, ali1621_write, dev, &dev->pci_slot);
 
     dev->smram[0] = smram_add();
     dev->smram[1] = smram_add();

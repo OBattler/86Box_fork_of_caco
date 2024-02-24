@@ -8,19 +8,14 @@
  *
  *          Implementation of the Intel 450KX Mars Chipset.
  *
+ *          i450GX is way more popular of an option but needs more stuff.
  *
+ * Authors: Miran Grca, <mgrca8@gmail.com>
+ *          Tiseno100,
  *
- * Authors: Tiseno100
- *
+ *          Copyright 2021-2024 Miran Grca.
  *          Copyright 2021 Tiseno100.
  */
-
-/*
-Note: i450KX PB manages PCI memory access with MC manages DRAM memory access.
-Due to 86Box limitations we can't manage them seperately thus it is dev branch till then.
-
-i450GX is way more popular of an option but needs more stuff.
-*/
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,6 +30,7 @@ i450GX is way more popular of an option but needs more stuff.
 #include <86box/device.h>
 #include <86box/mem.h>
 #include <86box/pci.h>
+#include <86box/plat_unused.h>
 #include <86box/smram.h>
 #include <86box/spd.h>
 #include <86box/chipset.h>
@@ -61,10 +57,15 @@ i450kx_log(const char *fmt, ...)
 typedef struct i450kx_t {
     smram_t *smram[2];
 
-    uint8_t pb_pci_conf[256], mc_pci_conf[256];
-    uint8_t mem_state[2][256];
-
     uint8_t bus_index;
+    uint8_t pb_slot;
+    uint8_t mc_slot;
+    uint8_t pad;
+
+    uint8_t pb_pci_conf[256];
+    uint8_t mc_pci_conf[256];
+
+    uint8_t mem_state[2][256];
 } i450kx_t;
 
 static void
@@ -88,20 +89,21 @@ i450kx_map(i450kx_t *dev, int bus, uint32_t addr, uint32_t size, int state)
 static void
 i450kx_smram_recalc(i450kx_t *dev, int bus)
 {
-    uint8_t *regs = bus ? dev->pb_pci_conf : dev->mc_pci_conf;
-    uint32_t addr;
-    uint32_t size;
+    const uint8_t *regs = bus ? dev->pb_pci_conf : dev->mc_pci_conf;
+    uint32_t       addr;
+    uint32_t       size;
+    int            enable = bus ? !(regs[0x57] & 0x08) : (regs[0x57] & 0x08);
 
     smram_disable(dev->smram[bus]);
 
     addr = ((uint32_t) regs[0xb8] << 16) | ((uint32_t) regs[0xb9] << 24);
     size = (((uint32_t) ((regs[0xbb] >> 4) & 0x0f)) << 16) + 0x00010000;
 
-    if ((addr != 0x00000000) && !!(regs[0x57] & 0x08)) {
+    if ((addr != 0x00000000) && enable) {
         if (bus)
-            smram_enable_ex(dev->smram[bus], addr, addr, size, 0, !!(regs[0x57] & 8), 0, 1);
+            smram_enable_ex(dev->smram[bus], addr, addr, size, 0, 0, 0, enable);
         else
-            smram_enable_ex(dev->smram[bus], addr, addr, size, !!(regs[0x57] & 8), 0, 1, 0);
+            smram_enable_ex(dev->smram[bus], addr, addr, size, 0, 0, enable, 0);
     }
 
     flushmmucache();
@@ -110,10 +112,10 @@ i450kx_smram_recalc(i450kx_t *dev, int bus)
 static void
 i450kx_vid_buf_recalc(i450kx_t *dev, int bus)
 {
-    uint8_t *regs = bus ? dev->pb_pci_conf : dev->mc_pci_conf;
+    const uint8_t *regs = bus ? dev->pb_pci_conf : dev->mc_pci_conf;
 
-    // int state = (regs[0x58] & 0x02) ? (MEM_READ_EXTANY | MEM_WRITE_EXTANY) : (MEM_READ_DISABLED | MEM_WRITE_DISABLED);
-    int state = (regs[0x58] & 0x02) ? (MEM_READ_INTERNAL | MEM_WRITE_INTERNAL) : (MEM_READ_EXTANY | MEM_WRITE_EXTANY);
+    int state = (regs[0x58] & 0x02) ? (MEM_READ_INTERNAL | MEM_WRITE_INTERNAL) :
+                                      (MEM_READ_EXTANY | MEM_WRITE_EXTANY);
 
     if (bus)
         mem_set_mem_state_bus_both(0x000a0000, 0x00020000, state);
@@ -128,10 +130,10 @@ pb_write(int func, int addr, uint8_t val, void *priv)
 {
     i450kx_t *dev = (i450kx_t *) priv;
 
-    // pclog("i450KX-PB: [W] dev->pb_pci_conf[%02X] = %02X POST: %02X\n", addr, val, inb(0x80));
-    i450kx_log("i450KX-PB: [W] dev->pb_pci_conf[%02X] = %02X POST: %02X\n", addr, val, inb(0x80));
+    if (func == 0) {
+        i450kx_log("[%04X:%08X] i450KX-PB: [W] dev->pb_pci_conf[%02X] = %02X\n", CS, cpu_state.pc,
+                   addr, val);
 
-    if (func == 0)
         switch (addr) {
             case 0x04:
                 dev->pb_pci_conf[addr] = (dev->pb_pci_conf[addr] & 0x04) | (val & 0x53);
@@ -167,8 +169,10 @@ pb_write(int func, int addr, uint8_t val, void *priv)
             case 0x4a:
             case 0x4b:
                 dev->pb_pci_conf[addr] = val;
-                // if (addr == 0x4a)
-                // pci_remap_bus(dev->bus_index, val);
+#if 0
+                if (addr == 0x4a)
+                    pci_remap_bus(dev->bus_index, val);
+#endif
                 break;
 
             case 0x4c:
@@ -320,13 +324,6 @@ pb_write(int func, int addr, uint8_t val, void *priv)
                 dev->pb_pci_conf[addr] = val & /*0x1a*/ 0x1f;
                 break;
 
-            case 0xb4:
-                dev->pb_pci_conf[addr] = val & 0xe0;
-                break;
-            case 0xb5:
-                dev->pb_pci_conf[addr] = val & 0x1f;
-                break;
-
             case 0xb8:
             case 0xb9:
                 dev->pb_pci_conf[addr] = val;
@@ -366,19 +363,25 @@ pb_write(int func, int addr, uint8_t val, void *priv)
             case 0xcb:
                 dev->pb_pci_conf[addr] = val;
                 break;
+
+            default:
+                break;
         }
+    }
 }
 
 static uint8_t
 pb_read(int func, int addr, void *priv)
 {
-    i450kx_t *dev = (i450kx_t *) priv;
+    const i450kx_t *dev = (i450kx_t *) priv;
     uint8_t   ret = 0xff;
 
-    if (func == 0)
+    if (func == 0) {
         ret = dev->pb_pci_conf[addr];
 
-    // pclog("i450KX-PB: [R] dev->pb_pci_conf[%02X] = %02X POST: %02X\n", addr, ret, inb(0x80));
+        i450kx_log("[%04X:%08X] i450KX-PB: [R] dev->pb_pci_conf[%02X] = %02X\n", CS, cpu_state.pc,
+                   addr, ret);
+    }
 
     return ret;
 }
@@ -401,10 +404,10 @@ mc_write(int func, int addr, uint8_t val, void *priv)
 {
     i450kx_t *dev = (i450kx_t *) priv;
 
-    // pclog("i450KX-MC: [W] dev->mc_pci_conf[%02X] = %02X POST: %02X\n", addr, val, inb(0x80));
-    i450kx_log("i450KX-MC: [W] dev->mc_pci_conf[%02X] = %02X POST: %02X\n", addr, val, inb(0x80));
+    if (func == 0) {
+        i450kx_log("[%04X:%08X] i450KX-MC: [W] dev->mc_pci_conf[%02X] = %02X\n", CS, cpu_state.pc,
+                   addr, val);
 
-    if (func == 0)
         switch (addr) {
             case 0x4c:
                 dev->mc_pci_conf[addr] = val & 0xdf;
@@ -590,19 +593,25 @@ mc_write(int func, int addr, uint8_t val, void *priv)
             case 0xcb:
                 dev->mc_pci_conf[addr] = val;
                 break;
+
+            default:
+                break;
         }
+    }
 }
 
 static uint8_t
 mc_read(int func, int addr, void *priv)
 {
-    i450kx_t *dev = (i450kx_t *) priv;
+    const i450kx_t *dev = (i450kx_t *) priv;
     uint8_t   ret = 0xff;
 
-    if (func == 0)
+    if (func == 0) {
         ret = dev->mc_pci_conf[addr];
 
-    // pclog("i450KX-MC: [R] dev->mc_pci_conf[%02X] = %02X POST: %02X\n", addr, ret, inb(0x80));
+        i450kx_log("[%04X:%08X] i450KX-MC: [R] dev->mc_pci_conf[%02X] = %02X\n", CS, cpu_state.pc,
+                   addr, ret);
+    }
 
     return ret;
 }
@@ -612,8 +621,6 @@ i450kx_reset(void *priv)
 {
     i450kx_t *dev = (i450kx_t *) priv;
     uint32_t  i;
-
-    // pclog("i450KX: i450kx_reset()\n");
 
     /* Defaults PB */
     dev->pb_pci_conf[0x00] = 0x86;
@@ -671,9 +678,11 @@ i450kx_reset(void *priv)
     dev->pb_pci_conf[0xa6] = 0xfe;
     dev->pb_pci_conf[0xa7] = 0x00;
     /* Note: Do NOT reset these two registers on programmed (TRC) hard reset! */
-    // dev->pb_pci_conf[0xb0] = 0x00;
-    // dev->pb_pci_conf[0xb1] = 0x00;
-    dev->pb_pci_conf[0xb4] = 0x00;
+#if 0
+    dev->pb_pci_conf[0xb0] = 0x00;
+    dev->pb_pci_conf[0xb1] = 0x00;
+#endif
+    dev->pb_pci_conf[0xb4] = 0xff;
     dev->pb_pci_conf[0xb5] = 0x00;
     dev->pb_pci_conf[0xb8] = 0x05;
     dev->pb_pci_conf[0xb9] = 0x00;
@@ -693,7 +702,9 @@ i450kx_reset(void *priv)
     dev->pb_pci_conf[0xca] = 0x00;
     dev->pb_pci_conf[0xcb] = 0x00;
 
-    // pci_remap_bus(dev->bus_index, 0x00);
+#if 0
+    pci_remap_bus(dev->bus_index, 0x00);
+#endif
     i450kx_smram_recalc(dev, 1);
     i450kx_vid_buf_recalc(dev, 1);
     pb_write(0, 0x59, 0x30, dev);
@@ -786,12 +797,12 @@ i450kx_close(void *priv)
 }
 
 static void *
-i450kx_init(const device_t *info)
+i450kx_init(UNUSED(const device_t *info))
 {
     i450kx_t *dev = (i450kx_t *) malloc(sizeof(i450kx_t));
     memset(dev, 0, sizeof(i450kx_t));
-    pci_add_card(PCI_ADD_NORTHBRIDGE, pb_read, pb_write, dev); /* Device 19h: Intel 450KX PCI Bridge PB */
-    pci_add_card(PCI_ADD_AGPBRIDGE, mc_read, mc_write, dev);   /* Device 14h: Intel 450KX Memory Controller MC */
+    pci_add_card(PCI_ADD_NORTHBRIDGE, pb_read, pb_write, dev, &dev->pb_slot);        /* Device 19h: Intel 450KX PCI Bridge PB */
+    pci_add_card(PCI_ADD_NORTHBRIDGE_SEC, mc_read, mc_write, dev, &dev->mc_slot);    /* Device 14h: Intel 450KX Memory Controller MC */
 
     dev->smram[0] = smram_add();
     dev->smram[1] = smram_add();

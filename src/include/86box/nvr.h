@@ -64,7 +64,8 @@
 typedef struct _nvr_ {
     char    *fn;   /* pathname of image file */
     uint16_t size; /* device configuration */
-    int8_t   irq, is_new;
+    int8_t   irq;
+    int8_t   is_new;
 
     uint8_t    onesec_cnt;
     pc_timer_t onesec_time;
@@ -84,6 +85,7 @@ extern int nvr_dosave;
 #ifdef EMU_DEVICE_H
 extern const device_t at_nvr_old_device;
 extern const device_t at_nvr_device;
+extern const device_t at_mb_nvr_device;
 extern const device_t ps_nvr_device;
 extern const device_t amstrad_nvr_device;
 extern const device_t amstrad_megapc_nvr_device;
@@ -120,10 +122,15 @@ extern void nvr_at_handler(int set, uint16_t base, nvr_t *nvr);
 extern void nvr_at_sec_handler(int set, uint16_t base, nvr_t *nvr);
 extern void nvr_at_index_read_handler(int set, uint16_t base, nvr_t *nvr);
 extern void nvr_read_addr_set(int set, nvr_t *nvr);
+extern uint8_t nvr_get_index(void *priv, uint8_t addr_id);
+extern void nvr_at_data_port(int set, nvr_t *nvr);
 extern void nvr_wp_set(int set, int h, nvr_t *nvr);
 extern void nvr_via_wp_set(int set, int reg, nvr_t *nvr);
 extern void nvr_bank_set(int base, uint8_t bank, nvr_t *nvr);
 extern void nvr_lock_set(int base, int size, int lock, nvr_t *nvr);
 extern void nvr_irq_set(int irq, nvr_t *nvr);
+extern void nvr_smi_enable(int enable, nvr_t *nvr);
+extern uint8_t nvr_smi_status(nvr_t *nvr);
+extern void nvr_smi_status_clear(nvr_t *nvr);
 
 #endif /*EMU_NVR_H*/

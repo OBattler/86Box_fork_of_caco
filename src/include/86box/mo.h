@@ -27,7 +27,9 @@
 
 #define MO_TIME  10.0
 
-typedef struct {
+#define MO_IMAGE_HISTORY 4
+
+typedef struct mo_type_t {
     uint32_t sectors;
     uint16_t bytes_per_sector;
 } mo_type_t;
@@ -35,21 +37,20 @@ typedef struct {
 #define KNOWN_MO_TYPES 10
 static const mo_type_t mo_types[KNOWN_MO_TYPES] = {
   // 3.5" standard M.O. disks
-    {248826,   512 },
-    { 446325,  512 },
-    { 1041500, 512 },
-    { 310352,  2048},
-    { 605846,  2048},
-    { 1063146, 2048},
+    { 248826,   512 },
+    { 446325,   512 },
+    { 1041500,  512 },
+    { 310352,  2048 },
+    { 605846,  2048 },
+    { 1063146, 2048 },
  // 5.25" M.O. disks
-    { 573624,  512 },
-    { 314568,  1024},
-    { 904995,  512 },
-    { 637041,  1024},
+    { 573624,   512 },
+    { 314568,  1024 },
+    { 904995,   512 },
+    { 637041,  1024 },
 };
 
-typedef struct
-{
+typedef struct mo_drive_type_t {
     const char vendor[9];
     const char model[16];
     const char revision[5];
@@ -59,7 +60,7 @@ typedef struct
 #define KNOWN_MO_DRIVE_TYPES 22
 static const mo_drive_type_t mo_drive_types[KNOWN_MO_DRIVE_TYPES] = {
     {"86BOX",     "MAGNETO OPTICAL", "1.00", { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }},
-    { "FUJITSU",  "M2512A",          "1314", { 1, 1, 0, 0, 0, 0, 0, 0, 0 }   },
+    { "FUJITSU",  "M2512A",          "1314", { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 }},
     { "FUJITSU",  "M2513-MCC3064SS", "1.00", { 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 }},
     { "FUJITSU",  "MCE3130SS",       "0070", { 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 }},
     { "FUJITSU",  "MCF3064SS",       "0030", { 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 }},
@@ -85,70 +86,100 @@ static const mo_drive_type_t mo_drive_types[KNOWN_MO_DRIVE_TYPES] = {
 enum {
     MO_BUS_DISABLED = 0,
     MO_BUS_ATAPI    = 5,
-    MO_BUS_SCSI,
-    MO_BUS_USB
+    MO_BUS_SCSI     = 6,
+    MO_BUS_USB      = 7
 };
 
-typedef struct {
+typedef struct mo_drive_t {
     uint8_t id;
 
     union {
-        uint8_t res, res0, /* Reserved for other ID's. */
-            res1,
-            ide_channel, scsi_device_id;
+        uint8_t res;
+        uint8_t res0; /* Reserved for other ID's. */
+        uint8_t res1;
+        uint8_t ide_channel;
+        uint8_t scsi_device_id;
     };
 
-    uint8_t bus_type, /* 0 = ATAPI, 1 = SCSI */
-        bus_mode,     /* Bit 0 = PIO suported;
-                         Bit 1 = DMA supportd. */
-        read_only,    /* Struct variable reserved for
-                         media status. */
-        pad, pad0;
+    uint8_t bus_type;  /* 0 = ATAPI, 1 = SCSI */
+    uint8_t bus_mode;  /* Bit 0 = PIO suported;
+                          Bit 1 = DMA supportd. */
+    uint8_t read_only; /* Struct variable reserved for
+                          media status. */
+    uint8_t pad;
+    uint8_t pad0;
 
-    FILE *f;
+    FILE *fp;
     void *priv;
 
-    char image_path[1024],
-        prev_image_path[1024];
+    char image_path[1024];
+    char prev_image_path[1024];
 
-    uint32_t type, medium_size,
-        base;
+    char *image_history[MO_IMAGE_HISTORY];
+
+    uint32_t type;
+    uint32_t medium_size;
+    uint32_t base;
     uint16_t sector_size;
 
 } mo_drive_t;
 
-typedef struct {
+typedef struct mo_t {
     mode_sense_pages_t ms_pages_saved;
 
     mo_drive_t *drv;
+#ifdef EMU_IDE_H
+    ide_tf_t *  tf;
+#else
+    void *      tf;
+#endif
 
-    uint8_t *buffer,
-        atapi_cdb[16],
-        current_cdb[16],
-        sense[256];
+    uint8_t *buffer;
+    uint8_t  atapi_cdb[16];
+    uint8_t  current_cdb[16];
+    uint8_t  sense[256];
 
-    uint8_t status, phase,
-        error, id,
-        features, cur_lun,
-        pad0, pad1;
+#ifdef ANCIENT_CODE
+    /* Task file. */
+    uint8_t features;
+    uint8_t phase;
+    uint16_t request_length;
+    uint8_t status;
+    uint8_t error;
+    uint16_t pad;
+    uint32_t pos;
+#endif
 
-    uint16_t request_length, max_transfer_len;
+    uint8_t id;
+    uint8_t cur_lun;
+    uint8_t pad0;
+    uint8_t pad1;
 
-    int requested_blocks, packet_status,
-        total_length, do_page_save,
-        unit_attention, request_pos,
-        old_len, pad3;
+    uint16_t max_transfer_len;
+    uint16_t pad2;
 
-    uint32_t sector_pos, sector_len,
-        packet_len, pos;
+    int requested_blocks;
+    int packet_status;
+    int total_length;
+    int do_page_save;
+    int unit_attention;
+    int request_pos;
+    int old_len;
+    int pad3;
+
+    uint32_t sector_pos;
+    uint32_t sector_len;
+    uint32_t packet_len;
 
     double callback;
 } mo_t;
 
 extern mo_t      *mo[MO_NUM];
 extern mo_drive_t mo_drives[MO_NUM];
+#if 0
 extern uint8_t    atapi_mo_drives[8];
 extern uint8_t    scsi_mo_drives[16];
+#endif
 
 #define mo_sense_error dev->sense[0]
 #define mo_sense_key   dev->sense[2]

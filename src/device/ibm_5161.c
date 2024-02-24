@@ -26,11 +26,11 @@
 #include <86box/pci.h>
 #include <86box/timer.h>
 #include <86box/pit.h>
+#include <86box/plat_unused.h>
 #include <86box/port_92.h>
 #include <86box/machine.h>
 
-typedef struct
-{
+typedef struct ibm_5161_t {
     uint8_t regs[8];
 } ibm_5161_t;
 
@@ -45,8 +45,8 @@ ibm_5161_out(uint16_t port, uint8_t val, void *priv)
 static uint8_t
 ibm_5161_in(uint16_t port, void *priv)
 {
-    ibm_5161_t *dev = (ibm_5161_t *) priv;
-    uint8_t     ret = 0xff;
+    const ibm_5161_t *dev = (ibm_5161_t *) priv;
+    uint8_t           ret = 0xff;
 
     ret = dev->regs[port & 0x0007];
 
@@ -73,8 +73,11 @@ ibm_5161_in(uint16_t port, void *priv)
                                     02-03 = not used
                                     04-07 = switch position
                                             1 = Off
-                                            0 =On */
-            ret = dev->regs[3] & 0x01;
+                                            0 = On */
+            ret = (dev->regs[3] & 0x01) | (((~(0xf - ((mem_size + isa_mem_size) >> 6))) & 0xf) << 4);
+            break;
+
+        default:
             break;
     }
 
@@ -82,18 +85,17 @@ ibm_5161_in(uint16_t port, void *priv)
 }
 
 static void
-ibm_5161_close(void *p)
+ibm_5161_close(void *priv)
 {
-    ibm_5161_t *dev = (ibm_5161_t *) p;
+    ibm_5161_t *dev = (ibm_5161_t *) priv;
 
     free(dev);
 }
 
 static void *
-ibm_5161_init(const device_t *info)
+ibm_5161_init(UNUSED(const device_t *info))
 {
-    ibm_5161_t *dev = (ibm_5161_t *) malloc(sizeof(ibm_5161_t));
-    memset(dev, 0, sizeof(ibm_5161_t));
+    ibm_5161_t *dev = (ibm_5161_t *) calloc(1, sizeof(ibm_5161_t));
 
     /* Extender Card Registers */
     io_sethandler(0x0210, 0x0004,

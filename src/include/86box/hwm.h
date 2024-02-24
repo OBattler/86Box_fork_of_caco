@@ -20,20 +20,21 @@
 
 #define RESISTOR_DIVIDER(v, r1, r2) (((v) * (r2)) / ((r1) + (r2)))
 
-typedef struct {
+typedef struct hwm_values_t {
     uint16_t fans[4];
     uint8_t  temperatures[4];
     uint16_t voltages[13];
 } hwm_values_t;
 
-typedef struct {
+typedef struct lm75_t {
     uint32_t      local;
     hwm_values_t *values;
     void         *as99127f;
 
     uint8_t regs[8];
     uint8_t addr_register;
-    uint8_t i2c_addr : 7, i2c_state : 2;
+    uint8_t i2c_addr : 7;
+    uint8_t i2c_state : 2;
     uint8_t i2c_enabled : 1;
 } lm75_t;
 
@@ -67,6 +68,8 @@ extern const device_t w83782d_device;
 
 extern const device_t gl518sm_2c_device;
 extern const device_t gl518sm_2d_device;
+extern const device_t gl520sm_2c_device;
+extern const device_t gl520sm_2d_device;
 
 extern const device_t via_vt82c686_hwm_device;
 

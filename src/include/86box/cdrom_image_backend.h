@@ -45,25 +45,32 @@ typedef struct SMSF {
 } TMSF;
 
 /* Track file struct. */
-typedef struct {
-    int (*read)(void *p, uint8_t *buffer, uint64_t seek, size_t count);
-    uint64_t (*get_length)(void *p);
-    void (*close)(void *p);
+typedef struct track_file_t {
+    int (*read)(void *priv, uint8_t *buffer, uint64_t seek, size_t count);
+    uint64_t (*get_length)(void *priv);
+    void (*close)(void *priv);
 
     char  fn[260];
-    FILE *file;
+    FILE *fp;
     void *priv;
 } track_file_t;
 
-typedef struct {
-    int number, track_number, attr, sector_size,
-        mode2, form, pre, pad;
-    uint64_t start, length,
-        skip;
+typedef struct track_t {
+    int           number;
+    int           track_number;
+    int           attr;
+    int           sector_size;
+    int           mode2;
+    int           form;
+    int           pre;
+    int           pad;
+    uint64_t      start;
+    uint64_t      length;
+    uint64_t      skip;
     track_file_t *file;
 } track_t;
 
-typedef struct {
+typedef struct cd_img_t {
     int      tracks_num;
     track_t *tracks;
 } cd_img_t;
@@ -90,9 +97,9 @@ extern int  cdi_has_data_track(cd_img_t *cdi);
 extern int  cdi_has_audio_track(cd_img_t *cdi);
 
 /* Virtual ISO functions. */
-extern int           viso_read(void *p, uint8_t *buffer, uint64_t seek, size_t count);
-extern uint64_t      viso_get_length(void *p);
-extern void          viso_close(void *p);
+extern int           viso_read(void *priv, uint8_t *buffer, uint64_t seek, size_t count);
+extern uint64_t      viso_get_length(void *priv);
+extern void          viso_close(void *priv);
 extern track_file_t *viso_init(const char *dirname, int *error);
 
 #endif /*CDROM_IMAGE_BACKEND_H*/

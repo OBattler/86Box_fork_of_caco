@@ -78,22 +78,18 @@ enum {
     NET_LINK_1000_FD   = (1 << 8),
 };
 
-/* Supported network cards. */
 enum {
-    NONE = 0,
-    NE1000,
-    NE2000,
-    RTL8019AS,
-    RTL8029AS
+    NET_NONE = 0,
+    NET_INTERNAL
 };
 
 enum {
-    NET_QUEUE_RX,
-    NET_QUEUE_TX_VM,
-    NET_QUEUE_TX_HOST
+    NET_QUEUE_RX      = 0,
+    NET_QUEUE_TX_VM   = 1,
+    NET_QUEUE_TX_HOST = 2
 };
 
-typedef struct {
+typedef struct netcard_conf_t {
     uint16_t device_num;
     int      net_type;
     char     host_dev_name[128];
@@ -111,7 +107,7 @@ typedef struct netpkt {
     int      len;
 } netpkt_t;
 
-typedef struct {
+typedef struct netqueue_t {
     netpkt_t packets[NET_QUEUE_LEN];
     int      head;
     int      tail;
@@ -168,11 +164,11 @@ extern "C" {
 #endif
 
 /* Global variables. */
-extern int      nic_do_log; /* config */
+extern int              nic_do_log;     // config
 extern network_devmap_t network_devmap;
-extern int      network_ndev;           // Number of pcap devices
+extern int              network_ndev;   // Number of pcap devices
 extern network_devmap_t network_devmap; // Bitmap of available network types
-extern netdev_t network_devs[NET_HOST_INTF_MAX];
+extern netdev_t         network_devs[NET_HOST_INTF_MAX];
 
 
 /* Function prototypes. */
@@ -194,14 +190,65 @@ extern int             network_dev_available(int);
 extern int             network_dev_to_id(char *);
 extern int             network_card_available(int);
 extern int             network_card_has_config(int);
-extern char           *network_card_get_internal_name(int);
+extern const char     *network_card_get_internal_name(int);
 extern int             network_card_get_from_internal_name(char *);
+#ifdef EMU_DEVICE_H
 extern const device_t *network_card_getdevice(int);
+#endif
 
 extern int network_tx_pop(netcard_t *card, netpkt_t *out_pkt);
 extern int network_tx_popv(netcard_t *card, netpkt_t *pkt_vec, int vec_size);
 extern int network_rx_put(netcard_t *card, uint8_t *bufp, int len);
 extern int network_rx_put_pkt(netcard_t *card, netpkt_t *pkt);
+
+#ifdef EMU_DEVICE_H
+/* 3Com Etherlink */
+extern const device_t threec501_device;
+extern const device_t threec503_device;
+
+/* Novell NE2000 and compatibles */
+extern const device_t ne1000_device;
+extern const device_t ne1000_compat_device;
+extern const device_t ne2000_device;
+extern const device_t ne2000_compat_device;
+extern const device_t ethernext_mc_device;
+extern const device_t rtl8019as_device;
+extern const device_t de220p_device;
+extern const device_t rtl8029as_device;
+
+/* AMD PCnet*/
+extern const device_t pcnet_am79c960_device;
+extern const device_t pcnet_am79c960_eb_device;
+extern const device_t pcnet_am79c960_vlb_device;
+extern const device_t pcnet_am79c961_device;
+extern const device_t pcnet_am79c970a_device;
+extern const device_t pcnet_am79c973_device;
+extern const device_t pcnet_am79c973_onboard_device;
+
+/* PLIP */
+#ifdef EMU_LPT_H
+extern const lpt_device_t lpt_plip_device;
+#endif
+extern const device_t     plip_device;
+
+/* Realtek RTL8139C+ */
+extern const device_t rtl8139c_plus_device;
+
+/* DEC Tulip */
+extern const device_t dec_tulip_device;
+extern const device_t dec_tulip_21140_device;
+extern const device_t dec_tulip_21140_vpc_device;
+extern const device_t dec_tulip_21040_device;
+
+/* WD 80x3 */
+extern const device_t wd8003e_device;
+extern const device_t wd8003eb_device;
+extern const device_t wd8013ebt_device;
+extern const device_t wd8003eta_device;
+extern const device_t wd8003ea_device;
+extern const device_t wd8013epa_device;
+#endif
+
 #ifdef __cplusplus
 }
 #endif

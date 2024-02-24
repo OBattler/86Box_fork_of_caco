@@ -33,6 +33,10 @@
 #include <86box/plat.h>
 #include <86box/sound.h>
 
+#define MCD_DEFAULT_IOPORT 0x310
+#define MCD_DEFAULT_IRQ    5
+#define MCD_DEFAULT_DMA    5
+
 #define RAW_SECTOR_SIZE    2352
 #define COOKED_SECTOR_SIZE 2048
 
@@ -86,8 +90,9 @@ enum {
     IRQ_ERROR     = 4
 };
 
-typedef struct {
-    int      dma, irq;
+typedef struct mcd_t {
+    int      dma;
+    int      irq;
     int      change;
     int      data;
     uint8_t  stat;
@@ -116,7 +121,9 @@ typedef struct {
 /* The addresses sent from the guest are absolute, ie. a LBA of 0 corresponds to a MSF of 00:00:00. Otherwise, the counter displayed by the guest is wrong:
    there is a seeming 2 seconds in which audio plays but counter does not move, while a data track before audio jumps to 2 seconds before the actual start
    of the audio while audio still plays. With an absolute conversion, the counter is fine. */
+#ifdef MSFtoLBA
 #undef MSFtoLBA
+#endif
 #define MSFtoLBA(m, s, f) ((((m * 60) + s) * 75) + f)
 
 #define CD_BCD(x)         (((x) % 10) | (((x) / 10) << 4))
@@ -242,9 +249,13 @@ mitsumi_cdrom_in(uint16_t port, void *priv)
                 ret |= FLAG_NOSTAT;
             pclog("Read port 1: ret = %02x\n", ret | FLAG_UNK);
             return ret | FLAG_UNK;
+        case 2:
+            break;
+        default:
+            break;
     }
 
-    return (0xff);
+    return 0xff;
 }
 
 static void
@@ -283,6 +294,8 @@ mitsumi_cdrom_out(uint16_t port, uint8_t val, void *priv)
                                     case 0x10:
                                         dev->enable_irq = val;
                                         break;
+                                    default:
+                                        break;
                                 }
                                 dev->cmdbuf[1]    = 0;
                                 dev->cmdbuf_count = 2;
@@ -296,6 +309,8 @@ mitsumi_cdrom_out(uint16_t port, uint8_t val, void *priv)
                                 dev->conf = val;
                                 if (dev->conf == 1)
                                     dev->cmdrd_count++;
+                                break;
+                            default:
                                 break;
                         }
                         break;
@@ -316,11 +331,16 @@ mitsumi_cdrom_out(uint16_t port, uint8_t val, void *priv)
                                 break;
                             case 5:
                                 dev->readmsf = 0;
+                                fallthrough;
                             case 4:
                             case 3:
                                 dev->readmsf |= CD_DCB(val) << ((dev->cmdrd_count - 3) << 3);
                                 break;
+                            default:
+                                break;
                         }
+                        break;
+                    default:
                         break;
                 }
                 if (!dev->cmdrd_count)
@@ -381,10 +401,10 @@ mitsumi_cdrom_out(uint16_t port, uint8_t val, void *priv)
                     }
                     break;
                 case CMD_GET_VER:
-                    dev->cmdbuf[1]    = 1;
-                    dev->cmdbuf[2]    = 'D';
-                    dev->cmdbuf[3]    = 0;
-                    dev->cmdbuf_count = 4;
+                    dev->cmdbuf[0]    = 1;
+                    dev->cmdbuf[1]    = 'D';
+                    dev->cmdbuf[2]    = 0;
+                    dev->cmdbuf_count = 3;
                     break;
                 case CMD_EJECT:
                     cdrom_stop(&cdrom);
@@ -406,21 +426,25 @@ mitsumi_cdrom_out(uint16_t port, uint8_t val, void *priv)
         case 1:
             mitsumi_cdrom_reset(dev);
             break;
+        case 2:
+            break;
+        default:
+            break;
     }
 }
 
 static void *
-mitsumi_cdrom_init(const device_t *info)
+mitsumi_cdrom_init(UNUSED(const device_t *info))
 {
     mcd_t *dev;
 
     dev = malloc(sizeof(mcd_t));
     memset(dev, 0x00, sizeof(mcd_t));
 
-    dev->irq = 5;
-    dev->dma = 5;
+    dev->irq = MCD_DEFAULT_IRQ;
+    dev->dma = MCD_DEFAULT_DMA;
 
-    io_sethandler(0x310, 2,
+    io_sethandler(MCD_DEFAULT_IOPORT, 3,
                   mitsumi_cdrom_in, NULL, NULL, mitsumi_cdrom_out, NULL, NULL, dev);
 
     mitsumi_cdrom_reset(dev);

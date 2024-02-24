@@ -87,9 +87,9 @@ SettingsInput::onCurrentMachineChanged(int machineId)
     mouseModel->removeRows(0, removeRows);
     ui->comboBoxMouse->setCurrentIndex(selectedRow);
 
-    int   i             = 0;
-    char *joyName       = joystick_get_name(i);
-    auto *joystickModel = ui->comboBoxJoystick->model();
+    int         i             = 0;
+    const char *joyName       = joystick_get_name(i);
+    auto       *joystickModel = ui->comboBoxJoystick->model();
     removeRows          = joystickModel->rowCount();
     selectedRow         = 0;
     while (joyName) {
@@ -116,7 +116,7 @@ void
 SettingsInput::on_comboBoxJoystick_currentIndexChanged(int index)
 {
     int joystickId = ui->comboBoxJoystick->currentData().toInt();
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < MAX_JOYSTICKS; ++i) {
         auto *btn = findChild<QPushButton *>(QString("pushButtonJoystick%1").arg(i + 1));
         if (btn == nullptr) {
             continue;
@@ -137,22 +137,16 @@ get_axis(JoystickConfiguration &jc, int axis, int joystick_nr)
 {
     int axis_sel = jc.selectedAxis(axis);
     int nr_axes  = plat_joystick_state[joystick_state[joystick_nr].plat_joystick_nr - 1].nr_axes;
-    int nr_povs  = plat_joystick_state[joystick_state[joystick_nr].plat_joystick_nr - 1].nr_povs;
 
     if (axis_sel < nr_axes) {
         return axis_sel;
     }
 
     axis_sel -= nr_axes;
-    if (axis_sel < nr_povs * 2) {
-        if (axis_sel & 1)
-            return POV_Y | (axis_sel >> 1);
-        else
-            return POV_X | (axis_sel >> 1);
-    }
-    axis_sel -= nr_povs;
-
-    return SLIDER | (axis_sel >> 1);
+    if (axis_sel & 1)
+        return POV_Y | (axis_sel >> 1);
+    else
+        return POV_X | (axis_sel >> 1);
 }
 
 static int
@@ -190,9 +184,9 @@ updateJoystickConfig(int type, int joystick_nr, QWidget *parent)
         for (int c = 0; c < joystick_get_button_count(type); c++) {
             joystick_state[joystick_nr].button_mapping[c] = jc.selectedButton(c);
         }
-        for (int c = 0; c < joystick_get_button_count(type); c++) {
+        for (int c = 0; c < joystick_get_pov_count(type) * 2; c += 2) {
             joystick_state[joystick_nr].pov_mapping[c][0] = get_pov(jc, c, joystick_nr);
-            joystick_state[joystick_nr].pov_mapping[c][1] = get_pov(jc, c, joystick_nr);
+            joystick_state[joystick_nr].pov_mapping[c][1] = get_pov(jc, c + 1, joystick_nr);
         }
     }
 }

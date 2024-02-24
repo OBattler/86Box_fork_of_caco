@@ -35,12 +35,14 @@
 #include <86box/nmi.h>
 #include <86box/pic.h>
 #include <86box/pci.h>
+#include <86box/plat_unused.h>
 #include <86box/port_92.h>
 #include <86box/smram.h>
 
 #include <86box/chipset.h>
 
-#define DEFINE_SHADOW_PROCEDURE (((dev->regs[0x14] & 0x10) ? MEM_READ_INTERNAL : MEM_READ_EXTANY) | ((dev->regs[0x14] & 0x20) ? MEM_WRITE_INTERNAL : MEM_WRITE_EXTANY))
+#define DEFINE_SHADOW_PROCEDURE (((dev->regs[0x14] & 0x10) ? MEM_READ_INTERNAL : MEM_READ_EXTANY) | \
+                                ((dev->regs[0x14] & 0x20) ? MEM_WRITE_INTERNAL : MEM_WRITE_EXTANY))
 #define DISABLED_SHADOW         (MEM_READ_EXTANY | MEM_WRITE_EXTANY)
 
 #ifdef ENABLE_ALI1489_LOG
@@ -61,28 +63,26 @@ ali1489_log(const char *fmt, ...)
 #    define ali1489_log(fmt, ...)
 #endif
 
-typedef struct
-{
-    uint8_t index, ide_index, ide_chip_id, pci_slot,
-        regs[256], pci_conf[256], ide_regs[256];
+typedef struct ali1489_t {
+    uint8_t index;
+    uint8_t pci_slot;
+    uint8_t regs[256];
+    uint8_t pci_conf[256];
 
     port_92_t *port_92;
     smram_t   *smram;
 } ali1489_t;
 
-static void ali1489_ide_handler(ali1489_t *dev);
-
 static void
 ali1489_shadow_recalc(ali1489_t *dev)
 {
-    uint32_t i;
-
     shadowbios = shadowbios_write = 0;
 
-    for (i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < 8; i++) {
         if (dev->regs[0x13] & (1 << i)) {
             ali1489_log("%06Xh-%06Xh region shadow enabled: read = %i, write = %i\n",
-                        0xc0000 + (i << 14), 0xc3fff + (i << 14), !!(dev->regs[0x14] & 0x10), !!(dev->regs[0x14] & 0x20));
+                        0xc0000 + (i << 14), 0xc3fff + (i << 14),
+                        !!(dev->regs[0x14] & 0x10), !!(dev->regs[0x14] & 0x20));
             mem_set_mem_state_both(0xc0000 + (i << 14), 0x4000, DEFINE_SHADOW_PROCEDURE);
         } else {
             ali1489_log("%06Xh-%06Xh region shadow disabled\n", 0xc0000 + (i << 14), 0xc3fff + (i << 14));
@@ -90,10 +90,11 @@ ali1489_shadow_recalc(ali1489_t *dev)
         }
     }
 
-    for (i = 0; i < 4; i++) {
+    for (uint8_t i = 0; i < 4; i++) {
         if (dev->regs[0x14] & (1 << i)) {
             ali1489_log("%06Xh-%06Xh region shadow enabled: read = %i, write = %i\n",
-                        0xe0000 + (i << 15), 0xe7fff + (i << 15), !!(dev->regs[0x14] & 0x10), !!(dev->regs[0x14] & 0x20));
+                        0xe0000 + (i << 15), 0xe7fff + (i << 15),
+                        !!(dev->regs[0x14] & 0x10), !!(dev->regs[0x14] & 0x20));
             mem_set_mem_state_both(0xe0000 + (i << 15), 0x8000, DEFINE_SHADOW_PROCEDURE);
             shadowbios |= !!(dev->regs[0x14] & 0x10);
             shadowbios_write |= !!(dev->regs[0x14] & 0x20);
@@ -126,6 +127,8 @@ ali1489_smram_recalc(ali1489_t *dev)
             else
                 smram_enable(dev->smram, 0x38000, 0xa8000, 0x08000, (dev->regs[0x19] & 0x08), 1);
             break;
+        default:
+            break;
     }
 
     if ((dev->regs[0x19] & 0x31) == 0x11) {
@@ -137,24 +140,8 @@ ali1489_smram_recalc(ali1489_t *dev)
 static void
 ali1489_defaults(ali1489_t *dev)
 {
-    memset(dev->ide_regs, 0x00, 256);
     memset(dev->pci_conf, 0x00, 256);
     memset(dev->regs, 0x00, 256);
-
-    ide_pri_disable();
-    ide_sec_disable();
-
-    /* IDE registers */
-    dev->ide_regs[0x00] = 0x57;
-    dev->ide_regs[0x01] = 0x02;
-    dev->ide_regs[0x08] = 0xff;
-    dev->ide_regs[0x09] = 0x41;
-    dev->ide_regs[0x0c] = 0x02;
-    dev->ide_regs[0x0e] = 0x02;
-    dev->ide_regs[0x10] = 0x02;
-    dev->ide_regs[0x12] = 0x02;
-    dev->ide_regs[0x34] = 0xff;
-    dev->ide_regs[0x35] = 0x01;
 
     /* PCI registers */
     dev->pci_conf[0x00] = 0xb9;
@@ -198,8 +185,6 @@ ali1489_defaults(ali1489_t *dev)
     pci_set_irq_routing(PCI_INTB, PCI_IRQ_DISABLED);
     pci_set_irq_routing(PCI_INTC, PCI_IRQ_DISABLED);
     pci_set_irq_routing(PCI_INTD, PCI_IRQ_DISABLED);
-
-    ali1489_ide_handler(dev);
 }
 
 static void
@@ -208,7 +193,7 @@ ali1489_write(uint16_t addr, uint8_t val, void *priv)
     ali1489_t    *dev = (ali1489_t *) priv;
     uint8_t       old;
     uint8_t       irq;
-    const uint8_t irq_array[16] = { 0, 3, 4, 7, 0, 0, 0, 0, 9, 10, 5, 6, 11, 12, 14, 15 };
+    const uint8_t irq_array[16] = { 0, 9, 3, 10, 4, 5, 7, 6, 0, 11, 0, 12, 0, 14, 0, 15 };
 
     switch (addr) {
         case 0x22:
@@ -320,6 +305,8 @@ ali1489_write(uint16_t addr, uint8_t val, void *priv)
                                 case 0x30:
                                     picint(1 << 10);
                                     break;
+                                default:
+                                    break;
                             }
                             dev->regs[0x35] |= 0x0e;
                         } else if (!(val & 0x10))
@@ -378,8 +365,11 @@ ali1489_write(uint16_t addr, uint8_t val, void *priv)
                         break;
 
                     case 0x44: /* PCI INTx Sensitivity Register */
-                        /* TODO: When doing the IRQ and PCI IRQ rewrite, bits 0 to 3 toggle edge/level output. */
+                        /* TODO: When doing the IRQ and PCI IRQ rewrite,
+                                 bits 0 to 3 toggle edge/level output. */
                         dev->regs[dev->index] = val;
+                        break;
+                    default:
                         break;
                 }
 
@@ -390,14 +380,17 @@ ali1489_write(uint16_t addr, uint8_t val, void *priv)
                 dev->regs[dev->index] = val;
 
             break;
+
+        default:
+            break;
     }
 }
 
 static uint8_t
 ali1489_read(uint16_t addr, void *priv)
 {
-    uint8_t    ret = 0xff;
-    ali1489_t *dev = (ali1489_t *) priv;
+    uint8_t          ret = 0xff;
+    const ali1489_t *dev = (ali1489_t *) priv;
 
     switch (addr) {
         case 0x23:
@@ -409,6 +402,8 @@ ali1489_read(uint16_t addr, void *priv)
             else
                 ret = dev->regs[dev->index];
             break;
+        default:
+            break;
     }
 
     ali1489_log("M1489: dev->regs[%02x] (%02x)\n", dev->index, ret);
@@ -417,7 +412,7 @@ ali1489_read(uint16_t addr, void *priv)
 }
 
 static void
-ali1489_pci_write(int func, int addr, uint8_t val, void *priv)
+ali1489_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
 {
     ali1489_t *dev = (ali1489_t *) priv;
 
@@ -433,123 +428,20 @@ ali1489_pci_write(int func, int addr, uint8_t val, void *priv)
         case 0x07:
             dev->pci_conf[0x07] &= ~(val & 0xb8);
             break;
+
+        default:
+            break;
     }
 }
 
 static uint8_t
-ali1489_pci_read(int func, int addr, void *priv)
+ali1489_pci_read(UNUSED(int func), int addr, void *priv)
 {
-    ali1489_t *dev = (ali1489_t *) priv;
-    uint8_t    ret = 0xff;
+    const ali1489_t *dev = (ali1489_t *) priv;
+    uint8_t          ret = 0xff;
 
     ret = dev->pci_conf[addr];
     ali1489_log("M1489-PCI: dev->pci_conf[%02x] (%02x)\n", addr, ret);
-    return ret;
-}
-
-static void
-ali1489_ide_handler(ali1489_t *dev)
-{
-    ide_pri_disable();
-    ide_sec_disable();
-    if (dev->ide_regs[0x01] & 0x01) {
-        ide_pri_enable();
-        if (!(dev->ide_regs[0x35] & 0x40))
-            ide_sec_enable();
-    }
-}
-
-static void
-ali1489_ide_write(uint16_t addr, uint8_t val, void *priv)
-{
-    ali1489_t *dev = (ali1489_t *) priv;
-
-    switch (addr) {
-        case 0xf4: /* Usually it writes 30h here */
-            dev->ide_chip_id = val;
-            break;
-
-        case 0xf8:
-            dev->ide_index = val;
-            break;
-
-        case 0xfc:
-            if (dev->ide_chip_id != 0x30)
-                break;
-
-            switch (dev->ide_index) {
-                case 0x01: /* IDE Configuration Register */
-                    dev->ide_regs[dev->ide_index] = val & 0x8f;
-                    ali1489_ide_handler(dev);
-                    break;
-                case 0x02: /* DBA Data Byte Cative Count for IDE-1 */
-                case 0x03: /* D0RA Disk 0 Read Active Count for IDE-1 */
-                case 0x04: /* D0WA Disk 0 Write Active Count for IDE-1 */
-                case 0x05: /* D1RA Disk 1 Read Active Count for IDE-1 */
-                case 0x06: /* D1WA Disk 1 Write Active Count for IDE-1 */
-                case 0x25: /* DBR Data Byte Recovery Count for IDE-1 */
-                case 0x26: /* D0RR Disk 0 Read Byte Recovery Count for IDE-1 */
-                case 0x27: /* D0WR Disk 0 Write Byte Recovery Count for IDE-1 */
-                case 0x28: /* D1RR Disk 1 Read Byte Recovery Count for IDE-1 */
-                case 0x29: /* D1WR Disk 1 Write Byte Recovery Count for IDE-1 */
-                case 0x2a: /* DBA Data Byte Cative Count for IDE-2 */
-                case 0x2b: /* D0RA Disk 0 Read Active Count for IDE-2 */
-                case 0x2c: /* D0WA Disk 0 Write Active Count for IDE-2 */
-                case 0x2d: /* D1RA Disk 1 Read Active Count for IDE-2 */
-                case 0x2e: /* D1WA Disk 1 Write Active Count for IDE-2 */
-                case 0x2f: /* DBR Data Byte Recovery Count for IDE-2 */
-                case 0x30: /* D0RR Disk 0 Read Byte Recovery Count for IDE-2 */
-                case 0x31: /* D0WR Disk 0 Write Byte Recovery Count for IDE-2 */
-                case 0x32: /* D1RR Disk 1 Read Byte Recovery Count for IDE-2 */
-                case 0x33: /* D1WR Disk 1 Write Byte Recovery Count for IDE-2 */
-                    dev->ide_regs[dev->ide_index] = val & 0x1f;
-                    break;
-                case 0x07: /* Buffer Mode Register 1 */
-                    dev->ide_regs[dev->ide_index] = val;
-                    break;
-                case 0x09: /* IDEPE1 IDE Port Enable Register 1 */
-                    dev->ide_regs[dev->ide_index] = val & 0xc3;
-                    break;
-                case 0x0a: /* Buffer Mode Register 2 */
-                    dev->ide_regs[dev->ide_index] = val & 0x4f;
-                    break;
-                case 0x0b: /* IDE Channel 1 Disk 0 Sector Byte Count Register 1 */
-                case 0x0d: /* IDE Channel 1 Disk 1 Sector Byte Count Register 1 */
-                case 0x0f: /* IDE Channel 2 Disk 0 Sector Byte Count Register 1 */
-                case 0x11: /* IDE Channel 2 Disk 1 Sector Byte Count Register 1 */
-                    dev->ide_regs[dev->ide_index] = val & 0x03;
-                    break;
-                case 0x0c: /* IDE Channel 1 Disk 0 Sector Byte Count Register 2 */
-                case 0x0e: /* IDE Channel 1 Disk 1 Sector Byte Count Register 2 */
-                case 0x10: /* IDE Channel 2 Disk 1 Sector Byte Count Register 2 */
-                case 0x12: /* IDE Channel 2 Disk 1 Sector Byte Count Register 2 */
-                    dev->ide_regs[dev->ide_index] = val & 0x1f;
-                    break;
-                case 0x35: /* IDEPE3 IDE Port Enable Register 3 */
-                    dev->ide_regs[dev->ide_index] = val;
-                    ali1489_ide_handler(dev);
-                    break;
-            }
-            break;
-    }
-}
-
-static uint8_t
-ali1489_ide_read(uint16_t addr, void *priv)
-{
-    ali1489_t *dev = (ali1489_t *) priv;
-    uint8_t    ret = 0xff;
-
-    switch (addr) {
-        case 0xf4:
-            ret = dev->ide_chip_id;
-            break;
-        case 0xfc:
-            ret = dev->ide_regs[dev->ide_index];
-            ali1489_log("M1489-IDE: dev->regs[%02x] (%02x)\n", dev->ide_index, ret);
-            break;
-    }
-
     return ret;
 }
 
@@ -576,7 +468,7 @@ ali1489_close(void *priv)
 }
 
 static void *
-ali1489_init(const device_t *info)
+ali1489_init(UNUSED(const device_t *info))
 {
     ali1489_t *dev = (ali1489_t *) malloc(sizeof(ali1489_t));
     memset(dev, 0, sizeof(ali1489_t));
@@ -586,19 +478,10 @@ ali1489_init(const device_t *info)
        23h Data Port */
     io_sethandler(0x0022, 0x0002, ali1489_read, NULL, NULL, ali1489_write, NULL, NULL, dev);
 
-    /* M1489 IDE controller
-       F4h Chip ID we write always 30h onto it
-       F8h Index Port
-       FCh Data Port
-    */
-    io_sethandler(0x0f4, 0x0001, ali1489_ide_read, NULL, NULL, ali1489_ide_write, NULL, NULL, dev);
-    io_sethandler(0x0f8, 0x0001, ali1489_ide_read, NULL, NULL, ali1489_ide_write, NULL, NULL, dev);
-    io_sethandler(0x0fc, 0x0001, ali1489_ide_read, NULL, NULL, ali1489_ide_write, NULL, NULL, dev);
-
     /* Dummy M1489 PCI device */
-    dev->pci_slot = pci_add_card(PCI_ADD_NORTHBRIDGE, ali1489_pci_read, ali1489_pci_write, dev);
+    pci_add_card(PCI_ADD_NORTHBRIDGE, ali1489_pci_read, ali1489_pci_write, dev, &dev->pci_slot);
 
-    device_add(&ide_pci_2ch_device);
+    device_add(&ide_ali1489_device);
 
     dev->port_92 = device_add(&port_92_pci_device);
     dev->smram   = smram_add();

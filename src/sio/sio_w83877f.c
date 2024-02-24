@@ -56,13 +56,16 @@
 #define PRTIQS     (dev->regs[0x27] & 0x0f)
 #define ECPIRQ     ((dev->regs[0x27] >> 5) & 0x07)
 
-typedef struct {
-    uint8_t  tries, regs[42];
-    uint16_t reg_init;
-    int      locked, rw_locked,
-        cur_reg,
-        base_address, key,
-        key_times;
+typedef struct w83877f_t {
+    uint8_t   tries;
+    uint8_t   regs[42];
+    uint16_t  reg_init;
+    int       locked;
+    int       rw_locked;
+    int       cur_reg;
+    int       base_address;
+    int       key;
+    int       key_times;
     fdc_t    *fdc;
     serial_t *uart[2];
 } w83877f_t;
@@ -75,12 +78,12 @@ w83877f_remap(w83877f_t *dev)
 {
     uint8_t hefras = HEFRAS;
 
-    io_removehandler(0x250, 0x0002,
+    io_removehandler(0x250, 0x0003,
                      w83877f_read, NULL, NULL, w83877f_write, NULL, NULL, dev);
     io_removehandler(FDC_PRIMARY_ADDR, 0x0002,
                      w83877f_read, NULL, NULL, w83877f_write, NULL, NULL, dev);
     dev->base_address = (hefras ? FDC_PRIMARY_ADDR : 0x250);
-    io_sethandler(dev->base_address, 0x0002,
+    io_sethandler(dev->base_address, hefras ? 0x0002 : 0x0003,
                   w83877f_read, NULL, NULL, w83877f_write, NULL, NULL, dev);
     dev->key_times = hefras + 1;
     dev->key       = (hefras ? 0x86 : 0x88) | HEFERE;
@@ -140,6 +143,9 @@ make_port(w83877f_t *dev, uint8_t reg)
             if ((p < 0x100) || (p > 0x3F8))
                 p = COM2_ADDR;
             break;
+
+        default:
+            break;
     }
 
     return p;
@@ -149,8 +155,9 @@ static void
 w83877f_fdc_handler(w83877f_t *dev)
 {
     fdc_remove(dev->fdc);
-    if (!(dev->regs[6] & 0x08) && (dev->regs[0x20] & 0xc0))
-        fdc_set_base(dev->fdc, FDC_PRIMARY_ADDR);
+    if (dev->regs[0x20] & 0xc0)
+        fdc_set_base(dev->fdc, make_port(dev, 0x20));
+    fdc_set_power_down(dev->fdc, !!(dev->regs[6] & 0x08));
 }
 
 static void
@@ -246,7 +253,7 @@ w83877f_write(uint16_t port, uint8_t val, void *priv)
             if (dev->cur_reg == 0x29)
                 return;
             if (dev->cur_reg == 6)
-                val &= 0xF3;
+                val &= 0xFB;
             valxor                  = val ^ dev->regs[dev->cur_reg];
             dev->regs[dev->cur_reg] = val;
         } else
@@ -357,6 +364,9 @@ w83877f_write(uint16_t port, uint8_t val, void *priv)
                     dev->regs[0x28] |= 0x40;
                 w83877f_serial_handler(dev, 0);
             }
+            break;
+
+        default:
             break;
     }
 }

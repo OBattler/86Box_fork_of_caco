@@ -10,13 +10,12 @@
  *
  *
  *
- * Authors: Sarah Walker, <https://pcem-emulator.co.uk/>
- *          Miran Grca, <mgrca8@gmail.com>
- *          Melissa Goad, <mszoopers@protonmail.com>
+ * Authors: Miran Grca, <mgrca8@gmail.com>
+ *          RichardG, <richardg867@gmail.com>
  *          Tiseno100,
  *
  *          Copyright 2020 Miran Grca.
- *          Copyright 2020 Melissa Goad.
+ *          Copyright 2020 RichardG.
  *          Copyright 2020 Tiseno100.
  */
 #include <stdio.h>
@@ -45,9 +44,14 @@
 #define VIA_8601 0x86010500
 
 typedef struct via_apollo_t {
-    uint32_t id;
     uint8_t  drb_unit;
+    uint8_t  pci_slot;
+    uint8_t  pad;
+    uint8_t  pad0;
+
     uint8_t  pci_conf[256];
+
+    uint32_t id;
 
     smram_t   *smram;
     agpgart_t *agpgart;
@@ -68,6 +72,8 @@ apollo_map(uint32_t addr, uint32_t size, int state)
             break;
         case 3:
             mem_set_mem_state_both(addr, size, MEM_READ_INTERNAL | MEM_WRITE_INTERNAL);
+            break;
+        default:
             break;
     }
 
@@ -392,8 +398,8 @@ via_apollo_host_bridge_write(int func, int addr, uint8_t val, void *priv)
             smram_disable_all();
             if (dev->id >= VIA_691)
                 switch (val & 0x03) {
-                    case 0x00:
                     default:
+                    case 0x00:
                         apollo_smram_map(dev, 1, 0x000a0000, 0x00020000, 1); /* SMM: Code DRAM, Data DRAM */
                         apollo_smram_map(dev, 0, 0x000a0000, 0x00020000, 0); /* Non-SMM: Code PCI, Data PCI */
                         break;
@@ -412,8 +418,8 @@ via_apollo_host_bridge_write(int func, int addr, uint8_t val, void *priv)
                 }
             else if (dev->id >= VIA_597)
                 switch (val & 0x03) {
-                    case 0x00:
                     default:
+                    case 0x00:
                         /* Disable SMI Address Redirection (default) */
                         apollo_smram_map(dev, 1, 0x000a0000, 0x00020000, 0);
                         apollo_smram_map(dev, 0, 0x000a0000, 0x00020000, 0);
@@ -457,6 +463,9 @@ via_apollo_host_bridge_write(int func, int addr, uint8_t val, void *priv)
                         apollo_smram_map(dev, 0, 0x000a0000, 0x00020000, 1);
                         apollo_smram_map(dev, 1, 0x000a0000, 0x00020000, 3);
                         apollo_smram_map(dev, 0, 0x000a0000, 0x00020000, 3);
+                        break;
+
+                    default:
                         break;
                 }
             break;
@@ -666,12 +675,14 @@ via_apollo_host_bridge_write(int func, int addr, uint8_t val, void *priv)
 static uint8_t
 via_apollo_read(int func, int addr, void *priv)
 {
-    via_apollo_t *dev = (via_apollo_t *) priv;
-    uint8_t       ret = 0xff;
+    const via_apollo_t *dev = (via_apollo_t *) priv;
+    uint8_t             ret = 0xff;
 
     switch (func) {
         case 0:
             ret = dev->pci_conf[addr];
+            break;
+        default:
             break;
     }
 
@@ -684,6 +695,8 @@ via_apollo_write(int func, int addr, uint8_t val, void *priv)
     switch (func) {
         case 0:
             via_apollo_host_bridge_write(func, addr, val, priv);
+            break;
+        default:
             break;
     }
 }
@@ -706,7 +719,7 @@ via_apollo_init(const device_t *info)
     if (dev->id != VIA_8601)
         apollo_smram_map(dev, 1, 0x000a0000, 0x00020000, 1); /* SMM: Code DRAM, Data DRAM */
 
-    pci_add_card(PCI_ADD_NORTHBRIDGE, via_apollo_read, via_apollo_write, dev);
+    pci_add_card(PCI_ADD_NORTHBRIDGE, via_apollo_read, via_apollo_write, dev, &dev->pci_slot);
 
     dev->id = info->local;
 
@@ -727,6 +740,9 @@ via_apollo_init(const device_t *info)
         case VIA_693A:
         case VIA_694:
             device_add(&via_mvp3_agp_device);
+            break;
+
+        default:
             break;
     }
 

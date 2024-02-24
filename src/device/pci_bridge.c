@@ -41,20 +41,22 @@
 #define AGP_BRIDGE_VIA_598     0x11068598
 #define AGP_BRIDGE_VIA_691     0x11068691
 #define AGP_BRIDGE_VIA_8601    0x11068601
+#define AGP_BRIDGE_SIS_5XXX    0x10390001
 
 #define AGP_BRIDGE_ALI(x)      (((x) >> 16) == 0x10b9)
 #define AGP_BRIDGE_INTEL(x)    (((x) >> 16) == 0x8086)
 #define AGP_BRIDGE_VIA(x)      (((x) >> 16) == 0x1106)
-#define AGP_BRIDGE(x)          ((x) >= AGP_BRIDGE_ALI_M5243)
+#define AGP_BRIDGE_SIS(x)      (((x) >> 16) == 0x1039)
+#define AGP_BRIDGE(x)          ((x) >= AGP_BRIDGE_SIS_5XXX)
 
-typedef struct
-{
+typedef struct pci_bridge_t {
     uint32_t local;
-    uint8_t  type, ctl;
+    uint8_t  type;
+    uint8_t  ctl;
 
     uint8_t regs[256];
     uint8_t bus_index;
-    int     slot;
+    uint8_t slot;
 } pci_bridge_t;
 
 #ifdef ENABLE_PCI_BRIDGE_LOG
@@ -134,6 +136,8 @@ pci_bridge_write(int func, int addr, uint8_t val, void *priv)
                 val |= 0x02;
             else if (dev->local == AGP_BRIDGE_ALI_M5247)
                 val &= 0xc3;
+            else if (AGP_BRIDGE_SIS(dev->local))
+                val &= 0x27;
             else
                 val &= 0x67;
             break;
@@ -194,7 +198,8 @@ pci_bridge_write(int func, int addr, uint8_t val, void *priv)
         case 0x22:
         case 0x24:
         case 0x26:
-            val &= 0xf0;
+            val &= 0xf0;    /* SiS datasheets say 0Fh for 1Ch but that's clearly an erratum since the
+                               definition of the bits is identical to the other vendors' AGP bridges. */
             break;
 
         case 0x3c:
@@ -205,6 +210,8 @@ pci_bridge_write(int func, int addr, uint8_t val, void *priv)
         case 0x3e:
             if (AGP_BRIDGE_VIA(dev->local))
                 val &= 0x0c;
+            else if (AGP_BRIDGE_SIS(dev->local))
+                val &= 0x0e;
             else if (dev->local == AGP_BRIDGE_ALI_M5247)
                 val &= 0x0f;
             else if (dev->local == AGP_BRIDGE_ALI_M5243)
@@ -352,6 +359,9 @@ pci_bridge_write(int func, int addr, uint8_t val, void *priv)
                     return;
             }
             break;
+
+        default:
+            break;
     }
 
     dev->regs[addr] = val;
@@ -360,8 +370,8 @@ pci_bridge_write(int func, int addr, uint8_t val, void *priv)
 static uint8_t
 pci_bridge_read(int func, int addr, void *priv)
 {
-    pci_bridge_t *dev = (pci_bridge_t *) priv;
-    uint8_t       ret;
+    const pci_bridge_t *dev = (pci_bridge_t *) priv;
+    uint8_t             ret;
 
     if (func > 0)
         ret = 0xff;
@@ -434,6 +444,9 @@ pci_bridge_reset(void *priv)
             dev->regs[0x06] = 0x20;
             dev->regs[0x07] = 0x02;
             break;
+
+        default:
+            break;
     }
 
     /* class */
@@ -477,7 +490,6 @@ pci_bridge_init(const device_t *info)
     uint8_t interrupt_count;
     uint8_t interrupt_mask;
     uint8_t slot_count;
-    uint8_t i;
 
     pci_bridge_t *dev = (pci_bridge_t *) malloc(sizeof(pci_bridge_t));
     memset(dev, 0, sizeof(pci_bridge_t));
@@ -488,24 +500,29 @@ pci_bridge_init(const device_t *info)
 
     pci_bridge_reset(dev);
 
-    dev->slot = pci_add_card(AGP_BRIDGE(dev->local) ? PCI_ADD_AGPBRIDGE : PCI_ADD_BRIDGE, pci_bridge_read, pci_bridge_write, dev);
+    pci_add_bridge(AGP_BRIDGE(dev->local), pci_bridge_read, pci_bridge_write, dev, &dev->slot);
 
     interrupt_count = sizeof(interrupts);
     interrupt_mask  = interrupt_count - 1;
     if (dev->slot < 32) {
-        for (i = 0; i < interrupt_count; i++)
+        for (uint8_t i = 0; i < interrupt_count; i++)
             interrupts[i] = pci_get_int(dev->slot, PCI_INTA + i);
     }
-    pci_bridge_log("PCI Bridge %d: upstream bus %02X slot %02X interrupts %02X %02X %02X %02X\n", dev->bus_index, (dev->slot >> 5) & 0xff, dev->slot & 31, interrupts[0], interrupts[1], interrupts[2], interrupts[3]);
+    pci_bridge_log("PCI Bridge %d: upstream bus %02X slot %02X interrupts %02X %02X %02X %02X\n",
+                   dev->bus_index, (dev->slot >> 5) & 0xff, dev->slot & 31, interrupts[0],
+                   interrupts[1], interrupts[2], interrupts[3]);
 
     if (info->local == PCI_BRIDGE_DEC_21150)
         slot_count = 9; /* 9 bus masters */
     else
         slot_count = 1; /* AGP bridges always have 1 slot */
 
-    for (i = 0; i < slot_count; i++) {
+    for (uint8_t i = 0; i < slot_count; i++) {
         /* Interrupts for bridge slots are assigned in round-robin: ABCD, BCDA, CDAB and so on. */
-        pci_bridge_log("PCI Bridge %d: downstream slot %02X interrupts %02X %02X %02X %02X\n", dev->bus_index, i, interrupts[i & interrupt_mask], interrupts[(i + 1) & interrupt_mask], interrupts[(i + 2) & interrupt_mask], interrupts[(i + 3) & interrupt_mask]);
+        pci_bridge_log("PCI Bridge %d: downstream slot %02X interrupts %02X %02X %02X %02X\n",
+                       dev->bus_index, i, interrupts[i & interrupt_mask],
+                       interrupts[(i + 1) & interrupt_mask], interrupts[(i + 2) & interrupt_mask],
+                       interrupts[(i + 3) & interrupt_mask]);
         pci_register_bus_slot(dev->bus_index, i, AGP_BRIDGE(dev->local) ? PCI_CARD_AGP : PCI_CARD_NORMAL,
                               interrupts[i & interrupt_mask],
                               interrupts[(i + 1) & interrupt_mask],
@@ -650,6 +667,20 @@ const device_t via_vt8601_agp_device = {
     .internal_name = "via_vt8601_agp",
     .flags         = DEVICE_PCI,
     .local         = AGP_BRIDGE_VIA_8601,
+    .init          = pci_bridge_init,
+    .close         = NULL,
+    .reset         = pci_bridge_reset,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = NULL
+};
+
+const device_t sis_5xxx_agp_device = {
+    .name          = "SiS 5591/(5)600 AGP Bridge",
+    .internal_name = "via_5xxx_agp",
+    .flags         = DEVICE_PCI,
+    .local         = AGP_BRIDGE_SIS_5XXX,
     .init          = pci_bridge_init,
     .close         = NULL,
     .reset         = pci_bridge_reset,

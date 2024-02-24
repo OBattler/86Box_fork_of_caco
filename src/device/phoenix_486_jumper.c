@@ -6,15 +6,16 @@
  *
  *          This file is part of the 86Box distribution.
  *
- *          Implementation of the Phoenix 486 Jumper Readout
+ *          Implementation of the Phoenix 486 Jumper Readout.
  *
  *
  *
- * Authors: Tiseno100
+ * Authors: Miran Grca, <mgrca8@gmail.com>
+ *          Tiseno100,
  *
- *          Copyright 2020 Tiseno100
+ *          Copyright 2020-2023 Miran Grca.
+ *          Copyright 2020-2023 Tiseno100.
  */
-
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,6 +29,7 @@
 #include <86box/io.h>
 #include <86box/device.h>
 #include <86box/chipset.h>
+#include <86box/plat_unused.h>
 
 /*
     Bit 7 = Super I/O chip: 1 = enabled, 0 = disabled;
@@ -40,9 +42,9 @@
     Bit 0 = ????.
 */
 
-typedef struct
-{
-    uint8_t type, jumper;
+typedef struct phoenix_486_jumper_t {
+    uint8_t type;
+    uint8_t jumper;
 } phoenix_486_jumper_t;
 
 #ifdef ENABLE_PHOENIX_486_JUMPER_LOG
@@ -64,7 +66,7 @@ phoenix_486_jumper_log(const char *fmt, ...)
 #endif
 
 static void
-phoenix_486_jumper_write(uint16_t addr, uint8_t val, void *priv)
+phoenix_486_jumper_write(UNUSED(uint16_t addr), uint8_t val, void *priv)
 {
     phoenix_486_jumper_t *dev = (phoenix_486_jumper_t *) priv;
     phoenix_486_jumper_log("Phoenix 486 Jumper: Write %02x\n", val);
@@ -75,9 +77,10 @@ phoenix_486_jumper_write(uint16_t addr, uint8_t val, void *priv)
 }
 
 static uint8_t
-phoenix_486_jumper_read(uint16_t addr, void *priv)
+phoenix_486_jumper_read(UNUSED(uint16_t addr), void *priv)
 {
-    phoenix_486_jumper_t *dev = (phoenix_486_jumper_t *) priv;
+    const phoenix_486_jumper_t *dev = (phoenix_486_jumper_t *) priv;
+
     phoenix_486_jumper_log("Phoenix 486 Jumper: Read %02x\n", dev->jumper);
     return dev->jumper;
 }
