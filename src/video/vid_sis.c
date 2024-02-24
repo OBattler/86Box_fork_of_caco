@@ -130,6 +130,7 @@ typedef struct sis_t {
     int cpu_pixel_count;
 
     rom_t bios_rom;
+    uint8_t slot;
 } sis_t;
 
 #define FIFO_EMPTY(sis)   (sis->accel_fifo_write_idx == sis->accel_fifo_read_idx)
@@ -182,7 +183,7 @@ sis_render_24bpp_highres(svga_t *svga)
 void
 sis_recalctimings(svga_t *svga)
 {
-    sis_t *sis = (sis_t *) svga->p;
+    sis_t *sis = (sis_t *) svga->priv;
 
     svga->ma_latch |= (svga->seqregs[0x27] & 0xF) << 16;
     svga->vblankstart |= !!(svga->seqregs[0x0A] & 0x4) << 10;
@@ -1538,7 +1539,7 @@ void
 sis_writeb_linear(uint32_t addr, uint8_t val, void *p)
 {
     svga_t *svga = (svga_t *) p;
-    sis_t  *sis  = (sis_t *) svga->p;
+    sis_t  *sis  = (sis_t *) svga->priv;
 
     if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
         sis_cpu_bitblt(sis, addr, val);
@@ -1550,7 +1551,7 @@ void
 sis_writew_linear(uint32_t addr, uint16_t val, void *p)
 {
     svga_t *svga = (svga_t *) p;
-    sis_t  *sis  = (sis_t *) svga->p;
+    sis_t  *sis  = (sis_t *) svga->priv;
 
     if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
         if (sis->svga.bpp == 8) {
@@ -1567,7 +1568,7 @@ void
 sis_writel_linear(uint32_t addr, uint32_t val, void *p)
 {
     svga_t *svga = (svga_t *) p;
-    sis_t  *sis  = (sis_t *) svga->p;
+    sis_t  *sis  = (sis_t *) svga->priv;
 
     if (sis->engine_active && (sis->svga.seqregs[0xb] & 0x1)) {
         if (sis->svga.bpp == 8) {
@@ -1601,7 +1602,7 @@ sis_init(const device_t *info)
 
     io_sethandler(0x03c0, 0x0020, sis_in, NULL, NULL, sis_out, NULL, NULL, sis);
 
-    pci_add_card(PCI_ADD_VIDEO, sis_pci_read, sis_pci_write, sis);
+    pci_add_card(PCI_ADD_VIDEO, sis_pci_read, sis_pci_write, sis, &sis->slot);
 
     sis->svga.bpp              = 8;
     sis->svga.miscout          = 1;
