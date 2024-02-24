@@ -85,7 +85,7 @@ typedef struct sis_accel_line_t {
     uint32_t cmd_status;
     uint8_t  pattern[64];
 } sis_accel_line_t;
-#pragma(pack, pop)
+#pragma pack(pop)
 
 typedef struct sis_cpu_bitblt_fifo_t {
     uint32_t dst;
