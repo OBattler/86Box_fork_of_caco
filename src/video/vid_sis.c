@@ -717,7 +717,7 @@ sis_expand_color_font(sis_t *sis)
                         /* TODO: Check this later. */
                         break;
                     }
-                case 8:
+                case 8:{
                     uint8_t dst         = svga_readb_linear(dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx), &sis->svga);
                     uint8_t *src_pattern = ((sis->accel_cur.cmd_status >> 24) & 0x20) ? (uint8_t *) &sis->svga.vram[src_addr_pattern_vram + (dy * sis->accel_cur.src_pitch) + (dx)] : sis->accel_cur.pattern;
                     uint8_t  src         = 0;
@@ -762,7 +762,7 @@ sis_expand_color_font(sis_t *sis)
                         //sis_do_rop_8bpp_patterned(&dst, (((sis->accel_cur.cmd_status >> 16) & 0x3) == 0x0) ? (sis->accel_cur.fg_color_rop & 0xFF) : (sis->accel_cur.bg_color_rop & 0xFF), src, pat >> 24);
                     }
                     svga_writeb_linear(dest_addr + (dy * sis->accel_cur.dst_pitch) + (dx), dst, &sis->svga);
-                    break;
+                    break;}
             }
             dx += xdir;
             width--;
@@ -884,7 +884,7 @@ sis_bitblt(sis_t *sis)
         dx    = 0;
         while (width) {
             switch (sis->svga.bpp) {
-                case 8:
+                case 8:{
                     uint8_t  src            = 0;
                     uint8_t  srcrop         = 0;
                     uint8_t  pat            = 0;
@@ -928,7 +928,7 @@ sis_bitblt(sis_t *sis)
                     svga_writeb_linear(real_dest_addr, dst_dat, &sis->svga);
                     // if (srcrop ==)
                     // if (src)
-                    break;
+                    break;}
             }
             width--;
             dx += xdir;
