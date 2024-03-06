@@ -110,6 +110,7 @@ static const struct {
     { &ide_vlb_device              },
     { &ide_vlb_2ch_device          },
     { &mcide_device                },
+    { &siig_enhanced_ide_device    },
     { NULL                         }
     // clang-format on
 };

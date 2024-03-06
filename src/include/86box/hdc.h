@@ -93,6 +93,8 @@ extern const device_t ide_ter_pnp_device;
 extern const device_t ide_qua_device;
 extern const device_t ide_qua_pnp_device;
 
+extern const device_t siig_enhanced_ide_device;
+
 extern const device_t mcide_device;
 
 extern const device_t xta_wdxt150_device; /* xta_wdxt150 */
