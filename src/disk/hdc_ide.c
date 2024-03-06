@@ -145,6 +145,10 @@ typedef struct mcide_t {
     rom_t bios_rom;
 } mcide_t;
 
+typedef struct siig_enhancer_t {
+    rom_t bios_rom;
+} siig_enhancer_t;
+
 ide_board_t *ide_boards[IDE_BUS_MAX];
 
 static uint8_t ide_ter_pnp_rom[] = {
@@ -3320,6 +3324,49 @@ mcide_close(void *priv)
     free(dev);
 }
 
+static void*
+siig_enhanced_ide_init(const device_t* info)
+{
+    siig_enhancer_t* siig_enhancer = (siig_enhancer_t*)calloc(1, sizeof(siig_enhancer_t));
+
+    ide_board_init(0, 14, 0x1f0, 0x3f6, info->local, info->flags);
+    ide_board_init(1, 15, 0x170, 0x376, info->local, info->flags);
+    ide_board_init(2, HDC_TERTIARY_IRQ, HDC_TERTIARY_BASE, HDC_TERTIARY_SIDE, 0, 0);
+    ide_board_init(3, HDC_QUATERNARY_IRQ, HDC_QUATERNARY_BASE, HDC_QUATERNARY_SIDE, 0, 0);
+
+    rom_init(&siig_enhancer->bios_rom, "roms/hdd/misc/siig_sc-je4012_eprom_nmc27c256q.bin", device_get_config_hex20("bios_addr"), 0x8000, 0x7fff, 0, MEM_MAPPING_EXTERNAL);
+    return siig_enhancer;
+}
+
+static void
+siig_enhanced_ide_reset(void *priv)
+{
+    for (uint8_t i = 0; i < 4; i++) {
+        if (ide_boards[i] != NULL)
+            ide_board_reset(i);
+    }
+}
+
+static void
+siig_enhanced_ide_close(void *priv)
+{
+    siig_enhancer_t* siig_enhancer = (void*)priv;
+
+    ide_board_close(0);
+    ide_board_close(1);
+    ide_board_close(2);
+    ide_board_close(3);
+
+    free(siig_enhancer->bios_rom.rom);
+    free(priv);
+}
+
+static int
+siig_enhanced_ide_available(void)
+{
+    return rom_present("roms/hdd/misc/siig_sc-je4012_eprom_nmc27c256q.bin");
+}
+
 const device_t ide_isa_device = {
     .name          = "ISA PC/AT IDE Controller",
     .internal_name = "ide_isa",
@@ -3471,6 +3518,27 @@ static const device_config_t ide_qua_config[] = {
     },
     { .name = "", .description = "", .type = CONFIG_END }
 };
+
+static const device_config_t siig_enhanced_ide_config[] = {
+    {
+        .name = "bios_addr",
+        .description = "BIOS Address",
+        .type = CONFIG_HEX20,
+        .default_string = "",
+        .default_int = 0xd0000,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            { .description = "D000H",    .value = 0xd0000 },
+            { .description = "D400H",    .value = 0xd4000 },
+            { .description = "D800H",    .value = 0xd8000 },
+            { .description = "DC00H",    .value = 0xdc000 },
+            { .description = ""                           }
+        },
+    },
+    { .name = "", .description = "", .type = CONFIG_END }
+};
+
 // clang-format on
 
 const device_t ide_ter_device = {
@@ -3527,4 +3595,18 @@ const device_t ide_qua_pnp_device = {
     .speed_changed = NULL,
     .force_redraw  = NULL,
     .config        = ide_qua_config
+};
+
+const device_t siig_enhanced_ide_device = {
+    .name          = "SIIG EIDE Master ISA",
+    .internal_name = "ide_siig",
+    .flags         = DEVICE_AT | DEVICE_ISA,
+    .local         = 0,
+    .init          = siig_enhanced_ide_init,
+    .close         = siig_enhanced_ide_close,
+    .reset         = siig_enhanced_ide_reset,
+    { .available = siig_enhanced_ide_available },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = siig_enhanced_ide_config
 };
