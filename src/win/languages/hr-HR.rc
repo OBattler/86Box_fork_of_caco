@@ -283,7 +283,7 @@ END
 #define STR_VIDEO         "Video:"
 #define STR_VIDEO_2       "Video 2:"
 #define STR_VOODOO        "Voodoo grafika"
-#define STR_IBM8514       "IBM 8514/a grafika"
+#define STR_IBM8514       "IBM 8514/A grafika"
 #define STR_XGA           "XGA grafika"
 
 #define STR_MOUSE         "Miš:"
@@ -464,7 +464,6 @@ BEGIN
     IDS_2108    "%u MB (CHS: %i, %i, %i)"
     IDS_2109    "Disketa %i (%s): %ls"
     IDS_2110    "Sve slike (*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF)\0*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF\0Napredne sektorske slike (*.IMD;*.JSON;*.TD0)\0*.IMD;*.JSON;*.TD0\0Osnovne sektorske slike (*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?)\0*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?\0Flux slike (*.FDI)\0*.FDI\0Površinske slike (*.86F;*.MFM)\0*.86F;*.MFM\0Sve datoteke (*.*)\0*.*\0"
-    IDS_2112    "Nije moguće inicijalizirati SDL, SDL2.dll je potrebno"
     IDS_2113    "Jeste li sigurni da želite hard resetirati emulirani sistem?"
     IDS_2114    "Jeste li sigurni da želite zatvoriti 86Box?"
     IDS_2115    "Nije moguće inicijalizirati GhostScript"
@@ -480,7 +479,7 @@ BEGIN
     IDS_2125    "O programu 86Box"
     IDS_2126    "86Box verzija " EMU_VERSION
 
-    IDS_2127    "Emulator starih računala\n\nAutori: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, i drugi.\n\nPreveo: dob205\n\nObjavljeno pod licencom GNU General Public License, verzija 2 ili novije. Za više informacija pogledajte datoteku LICENCE."
+    IDS_2127    "Emulator starih računala\n\nAutori: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, i drugi.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, i drugi.\n\nPreveo: dob205\n\nObjavljeno pod licencom GNU General Public License, verzija 2 ili novije. Za više informacija pogledajte datoteku LICENCE."
     IDS_2128    "U redu"
     IDS_2129    "Hardver nije dostupan"
 #ifdef _WIN32

@@ -51,10 +51,11 @@ enum {
 
 class YMFMChipBase {
 public:
-    YMFMChipBase(uint32_t clock, fm_type type, UNUSED(uint32_t samplerate))
+    YMFMChipBase(UNUSED(uint32_t clock), fm_type type, uint32_t samplerate)
         : m_buf_pos(0)
         , m_flags(0)
         , m_type(type)
+        , m_samplerate(samplerate)
     {
         memset(m_buffer, 0, sizeof(m_buffer));
     }
@@ -79,10 +80,11 @@ public:
     virtual void     set_clock(uint32_t clock)                               = 0;
 
 protected:
-    int32_t m_buffer[SOUNDBUFLEN * 2];
-    int     m_buf_pos;
-    int8_t  m_flags;
-    fm_type m_type;
+    int32_t  m_buffer[MUSICBUFLEN * 2];
+    int      m_buf_pos;
+    int8_t   m_flags;
+    fm_type  m_type;
+    uint32_t m_samplerate;
 };
 
 template <typename ChipType>
@@ -98,7 +100,7 @@ public:
         memset(m_samples, 0, sizeof(m_samples));
         memset(m_oldsamples, 0, sizeof(m_oldsamples));
         m_rateratio   = (samplerate << RSM_FRAC) / m_chip.sample_rate(m_clock);
-        m_clock_us    = 1000000 / (double) m_clock;
+        m_clock_us    = 1000000.0 / (double) m_clock;
         m_subtract[0] = 80.0;
         m_subtract[1] = 320.0;
         m_type        = type;
@@ -139,7 +141,7 @@ public:
     virtual void set_clock(uint32_t clock) override
     {
         m_clock     = clock;
-        m_clock_us  = 1000000 / (double) m_clock;
+        m_clock_us  = 1000000.0 / (double) m_clock;
         m_rateratio = (m_samplerate << RSM_FRAC) / m_chip.sample_rate(m_clock);
 
         ymfm_set_timer(0, m_duration_in_clocks[0]);
@@ -150,29 +152,50 @@ public:
     {
         for (uint32_t i = 0; i < num_samples; i++) {
             m_chip.generate(&m_output);
-            if (ChipType::OUTPUTS == 1) {
-                *data++ = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
-                *data++ = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
+            if ((m_type == FM_YMF278B) && (sizeof(m_output.data) > (4 * sizeof(int32_t)))) {
+                if (ChipType::OUTPUTS == 1) {
+                    *data++ = m_output.data[4];
+                    *data++ = m_output.data[4];
+                } else {
+                    *data++ = m_output.data[4];
+                    *data++ = m_output.data[5];
+                }
+            } else if (ChipType::OUTPUTS == 1) {
+                *data++ = m_output.data[0];
+                *data++ = m_output.data[0];
             } else {
-                *data++ = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
-                *data++ = m_output.data[(m_type == FM_YMF278B) ? 5 : (1 % ChipType::OUTPUTS)];
+                *data++ = m_output.data[0];
+                *data++ = m_output.data[1 % ChipType::OUTPUTS];
             }
         }
     }
 
     virtual void generate_resampled(int32_t *data, uint32_t num_samples) override
     {
+        if (m_samplerate == FREQ_49716) {
+            generate(data, num_samples);
+            return;
+        }
+
         for (uint32_t i = 0; i < num_samples; i++) {
             while (m_samplecnt >= m_rateratio) {
                 m_oldsamples[0] = m_samples[0];
                 m_oldsamples[1] = m_samples[1];
                 m_chip.generate(&m_output);
-                if (ChipType::OUTPUTS == 1) {
-                    m_samples[0] = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
-                    m_samples[1] = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
+                if ((m_type == FM_YMF278B) && (sizeof(m_output.data) > (4 * sizeof(int32_t)))) {
+                    if (ChipType::OUTPUTS == 1) {
+                        m_samples[0] = m_output.data[4];
+                        m_samples[1] = m_output.data[4];
+                    } else {
+                        m_samples[0] = m_output.data[4];
+                        m_samples[1] = m_output.data[5];
+                    }
+                } else if (ChipType::OUTPUTS == 1) {
+                    m_samples[0] = m_output.data[0];
+                    m_samples[1] = m_output.data[0];
                 } else {
-                    m_samples[0] = m_output.data[(m_type == FM_YMF278B) ? 4 : 0];
-                    m_samples[1] = m_output.data[(m_type == FM_YMF278B) ? 5 : (1 % ChipType::OUTPUTS)];
+                    m_samples[0] = m_output.data[0];
+                    m_samples[1] = m_output.data[1 % ChipType::OUTPUTS];
                 }
                 m_samplecnt -= m_rateratio;
             }
@@ -190,14 +213,26 @@ public:
 
     virtual int32_t *update() override
     {
-        if (m_buf_pos >= sound_pos_global)
-            return m_buffer;
+        if (m_samplerate == FREQ_49716) {
+            if (m_buf_pos >= music_pos_global)
+                return m_buffer;
 
-        generate_resampled(&m_buffer[m_buf_pos * 2], sound_pos_global - m_buf_pos);
+            generate(&m_buffer[m_buf_pos * 2], music_pos_global - m_buf_pos);
 
-        for (; m_buf_pos < sound_pos_global; m_buf_pos++) {
-            m_buffer[m_buf_pos * 2] /= 2;
-            m_buffer[(m_buf_pos * 2) + 1] /= 2;
+            for (; m_buf_pos < music_pos_global; m_buf_pos++) {
+                m_buffer[m_buf_pos * 2] /= 2;
+                m_buffer[(m_buf_pos * 2) + 1] /= 2;
+            }
+        } else {
+            if (m_buf_pos >= sound_pos_global)
+                return m_buffer;
+
+            generate_resampled(&m_buffer[m_buf_pos * 2], sound_pos_global - m_buf_pos);
+
+            for (; m_buf_pos < sound_pos_global; m_buf_pos++) {
+                m_buffer[m_buf_pos * 2] /= 2;
+                m_buffer[(m_buf_pos * 2) + 1] /= 2;
+            }
         }
 
         return m_buffer;
@@ -298,19 +333,21 @@ ymfm_drv_init(const device_t *info)
     switch (info->local) {
         default:
         case FM_YM3812:
-            fm = (YMFMChipBase *) new YMFMChip<ymfm::ym3812>(3579545, FM_YM3812, OPL_FREQ);
+            fm = (YMFMChipBase *) new YMFMChip<ymfm::ym3812>(3579545, FM_YM3812, FREQ_49716);
             break;
 
         case FM_YMF262:
-            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf262>(14318181, FM_YMF262, OPL_FREQ);
+            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf262>(14318181, FM_YMF262, FREQ_49716);
             break;
 
         case FM_YMF289B:
-            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf289b>(33868800, FM_YMF289B, OPL_FREQ);
+            /* According to the datasheet, we should be using 33868800, but YMFM appears
+               to cheat and does it using the same values as the YMF262. */
+            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf289b>(14318181, FM_YMF289B, OPL_FREQ);
             break;
 
         case FM_YMF278B:
-            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf278b>(33868800, FM_YMF278B, 48000);
+            fm = (YMFMChipBase *) new YMFMChip<ymfm::ymf278b>(33868800, FM_YMF278B, OPL_FREQ);
             break;
     }
 
@@ -381,6 +418,13 @@ ymfm_drv_set_do_cycles(void *priv, int8_t do_cycles)
     drv->set_do_cycles(do_cycles);
 }
 
+static void
+ymfm_drv_generate(void *priv, int32_t *data, uint32_t num_samples)
+{
+    YMFMChipBase *drv = (YMFMChipBase *) priv;
+    drv->generate_resampled(data, num_samples);
+}
+
 const device_t ym3812_ymfm_device = {
     .name          = "Yamaha YM3812 OPL2 (YMFM)",
     .internal_name = "ym3812_ymfm",
@@ -425,7 +469,7 @@ const device_t ymf289b_ymfm_device = {
 
 const device_t ymf278b_ymfm_device = {
     .name          = "Yamaha YMF278B OPL4 (YMFM)",
-    .internal_name = "ymf289b_ymfm",
+    .internal_name = "ymf278b_ymfm",
     .flags         = 0,
     .local         = FM_YMF278B,
     .init          = ymfm_drv_init,
@@ -444,6 +488,7 @@ const fm_drv_t ymfm_drv {
     &ymfm_drv_reset_buffer,
     &ymfm_drv_set_do_cycles,
     NULL,
+    ymfm_drv_generate,
 };
 
 #ifdef __clang__

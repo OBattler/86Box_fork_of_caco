@@ -124,6 +124,9 @@ msgstr "&Zachovat poměr stran"
 msgid "&Integer scale"
 msgstr "&Celočíselné škálování"
 
+msgid "4:&3 Integer scale"
+msgstr "4:&3 Celočíselné škálování"
+
 msgid "E&GA/(S)VGA settings"
 msgstr "Nastavení pro E&GA a (S)VGA"
 
@@ -349,6 +352,9 @@ msgstr "Procesor:"
 msgid "Speed:"
 msgstr "Rychlost:"
 
+msgid "Frequency:"
+msgstr "Frekvence:"
+
 msgid "FPU:"
 msgstr "Koprocesor:"
 
@@ -382,8 +388,8 @@ msgstr "Grafika:"
 msgid "Voodoo Graphics"
 msgstr "Použít grafický akcelerátor Voodoo"
 
-msgid "IBM 8514/a Graphics"
-msgstr "Grafika IBM 8514/a"
+msgid "IBM 8514/A Graphics"
+msgstr "Grafika IBM 8514/A"
 
 msgid "XGA Graphics"
 msgstr "Grafika XGA"
@@ -406,16 +412,16 @@ msgstr "Joystick 3..."
 msgid "Joystick 4..."
 msgstr "Joystick 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "Zvuková karta 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "Zvuková karta 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "Zvuková karta 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "Zvuková karta 4:"
 
 msgid "MIDI Out Device:"
@@ -656,7 +662,7 @@ msgid "(empty)"
 msgstr "(prázdné)"
 
 msgid "All files"
-msgstr "All files"
+msgstr "Všechny soubory"
 
 msgid "Turbo"
 msgstr "Turbo"
@@ -808,9 +814,6 @@ msgstr "Rozšířené sektorové obrazy"
 msgid "Flux images"
 msgstr "Obrazy magnetického toku"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "Nastala chyba při inicializaci knihovny SDL, je potřeba SDL2.dll"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "Opravdu chcete resetovat emulovaný počítač?"
 
@@ -853,8 +856,8 @@ msgstr "O programu 86Box"
 msgid "86Box v"
 msgstr "86Box v"
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "Emulátor starých počítačů\n\nAutoři: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nZveřejněno pod licencí GNU General Public License verze 2 nebo novější. Viz soubor LICENSE pro více informací."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "Emulátor starých počítačů\n\nAutoři: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nZveřejněno pod licencí GNU General Public License verze 2 nebo novější. Viz soubor LICENSE pro více informací."
 
 msgid "Hardware not available"
 msgstr "Hardware není dostupný"
@@ -932,10 +935,10 @@ msgid "Cartridge images"
 msgstr "Obrazy cartridge"
 
 msgid "Error initializing renderer"
-msgstr "Error initializing renderer"
+msgstr "Chyba při inicializaci vykreslovače"
 
 msgid "OpenGL (3.0 Core) renderer could not be initialized. Use another renderer."
-msgstr "OpenGL (3.0 Core) renderer could not be initialized. Use another renderer."
+msgstr "Vykreslovač OpenGL (3.0 Core) se nepodařilo inicializovat. Použijte jiný renderer."
 
 msgid "Resume execution"
 msgstr "Obnovit"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(Výchozí nastavení systému)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "Nepodařilo se inicializovat síťový ovladač"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "Konfigurace sítě bude přepnuta na nulový ovladač"
 
+msgid "Mouse sensitivity:"
+msgstr "Citlivost myší:"
+
+msgid "Select media images from program working directory"
+msgstr "Výběr mediálních obrazů z pracovního adresáře programu"
+
+msgid "PIT mode:"
+msgstr "Režim PIT:"
+
+msgid "Auto"
+msgstr "Automatický"
+
+msgid "Slow"
+msgstr "Pomalý"
+
+msgid "Fast"
+msgstr "Rychlý"
+
+msgid "&Auto-pause on focus loss"
+msgstr "&Automatická pauza při ztrátě zaměření okna"
+
+msgid "WinBox is no longer supported"
+msgstr "WinBox již není podporován"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "Vývoj správce WinBox byl zastaven v roce 2022 z důvodu nedostatku správců. Vzhledem k tomu, že naše úsilí směřujeme k tomu, abychom 86Box ještě vylepšili, rozhodli jsme se WinBox jako správce již nepodporovat.\n\nProstřednictvím WinBoxu nebudou poskytovány žádné další aktualizace a pokud jej budete nadále používat s novějšími verzemi 86Boxu, můžete se setkat s nesprávným chováním. Veškerá hlášení o chybách souvisejících s chováním WinBoxu budou uzavřena jako neplatná.\n\nSeznam dalších správců, které můžete používat, najdete na webu 86box.net."

@@ -11,7 +11,10 @@
 #include <86box/pic.h>
 #include <86box/sound.h>
 #include <86box/prt_devs.h>
-#include <86box/net_plip.h>
+#include <86box/thread.h>
+#include <86box/timer.h>
+#include <86box/device.h>
+#include <86box/network.h>
 
 lpt_port_t lpt_ports[PARALLEL_MAX];
 
@@ -45,22 +48,22 @@ static const struct {
   // clang-format on
 };
 
-char *
+const char *
 lpt_device_get_name(int id)
 {
-    if (strlen((char *) lpt_devices[id].internal_name) == 0)
+    if (strlen(lpt_devices[id].internal_name) == 0)
         return NULL;
     if (!lpt_devices[id].device)
         return "None";
-    return (char *) lpt_devices[id].device->name;
+    return lpt_devices[id].device->name;
 }
 
-char *
+const char *
 lpt_device_get_internal_name(int id)
 {
-    if (strlen((char *) lpt_devices[id].internal_name) == 0)
+    if (strlen(lpt_devices[id].internal_name) == 0)
         return NULL;
-    return (char *) lpt_devices[id].internal_name;
+    return lpt_devices[id].internal_name;
 }
 
 int
@@ -68,7 +71,7 @@ lpt_device_get_from_internal_name(char *s)
 {
     int c = 0;
 
-    while (strlen((char *) lpt_devices[c].internal_name) != 0) {
+    while (strlen(lpt_devices[c].internal_name) != 0) {
         if (strcmp(lpt_devices[c].internal_name, s) == 0)
             return c;
         c++;
@@ -161,6 +164,29 @@ lpt_read(uint16_t port, void *priv)
         default:
             break;
     }
+
+    return ret;
+}
+
+uint8_t
+lpt_read_port(int port, uint16_t reg)
+{
+    lpt_port_t *dev = &(lpt_ports[port]);
+    uint8_t ret = lpt_read(reg, dev);
+
+    return ret;
+}
+
+uint8_t
+lpt_read_status(int port)
+{
+    lpt_port_t *dev = &(lpt_ports[port]);
+    uint8_t ret = 0xff;
+
+    if (dev->dt && dev->dt->read_status && dev->priv)
+        ret = dev->dt->read_status(dev->priv) | 0x07;
+    else
+        ret = 0xdf;
 
     return ret;
 }

@@ -124,6 +124,9 @@ msgstr "pixels &Carrés(Keep ratio)"
 msgid "&Integer scale"
 msgstr "Echelle &Entière"
 
+msgid "4:&3 Integer scale"
+msgstr "Echelle Entière 4:&3"
+
 msgid "E&GA/(S)VGA settings"
 msgstr "Réglages E&GA/(S)VGA"
 
@@ -349,6 +352,9 @@ msgstr "Type du processeur:"
 msgid "Speed:"
 msgstr "Vitesse:"
 
+msgid "Frequency:"
+msgstr "Fréquence:"
+
 msgid "FPU:"
 msgstr "FPU:"
 
@@ -382,8 +388,8 @@ msgstr "Vidéo:"
 msgid "Voodoo Graphics"
 msgstr "Graphique Voodoo"
 
-msgid "IBM 8514/a Graphics"
-msgstr "Graphique IBM 8514/a"
+msgid "IBM 8514/A Graphics"
+msgstr "Graphique IBM 8514/A"
 
 msgid "XGA Graphics"
 msgstr "Graphique XGA"
@@ -406,16 +412,16 @@ msgstr "Manette 3..."
 msgid "Joystick 4..."
 msgstr "Manette 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "Carte son 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "Carte son 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "Carte son 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "Carte son 4:"
 
 msgid "MIDI Out Device:"
@@ -808,9 +814,6 @@ msgstr "Images du secteur avancés"
 msgid "Flux images"
 msgstr "Images du flux"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "Impossible d'initialiser SDL, SDL2.dll est nécessaire"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "Etes-vous sûr de vouloir réinitialiser la machine émulée ?"
 
@@ -853,8 +856,8 @@ msgstr "À propos de 86Box"
 msgid "86Box v"
 msgstr "86Box v"
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "Un émulateur de vieux ordinateurs\n\nAuteurs: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nLibéré sous la licence GNU General Public License version 2 ou ultérieure. Pour plus d'informations, voir le fichier LICENSE."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "Un émulateur de vieux ordinateurs\n\nAuteurs: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nLibéré sous la licence GNU General Public License version 2 ou ultérieure. Pour plus d'informations, voir le fichier LICENSE."
 
 msgid "Hardware not available"
 msgstr "Matériel non disponible"
@@ -932,28 +935,28 @@ msgid "Cartridge images"
 msgstr "Images cartouche"
 
 msgid "Error initializing renderer"
-msgstr "Error initializing renderer"
+msgstr "Erreur d'initialisation du moteur de rendu"
 
 msgid "OpenGL (3.0 Core) renderer could not be initialized. Use another renderer."
-msgstr "OpenGL (3.0 Core) renderer could not be initialized. Use another renderer."
+msgstr "Le moteur de rendu OpenGL (3.0 Core) n'a pas pu être initialisé. Utilisez un autre moteur de rendu."
 
 msgid "Resume execution"
-msgstr "Resume execution"
+msgstr "Reprendre l'exécution"
 
 msgid "Pause execution"
-msgstr "Pause execution"
+msgstr "Pause de l'exécution"
 
 msgid "Press Ctrl+Alt+Del"
-msgstr "Press Ctrl+Alt+Del"
+msgstr "Appuyer sur Ctrl+Alt+Suppr."
 
 msgid "Press Ctrl+Alt+Esc"
-msgstr "Press Ctrl+Alt+Esc"
+msgstr "Appuyer sur Ctrl+Alt+Esc"
 
 msgid "Hard reset"
 msgstr "Hard reset"
 
 msgid "ACPI shutdown"
-msgstr "ACPI shutdown"
+msgstr "Arrêt ACPI"
 
 msgid "Hard disk (%s)"
 msgstr "Disque dur (%s)"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(Défaut du système)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "Échec de l'initialisation du pilote réseau"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "La configuration du réseau passera au pilote nul"
 
+msgid "Mouse sensitivity:"
+msgstr "Sensibilité de la souris:"
+
+msgid "Select media images from program working directory"
+msgstr "Sélectionner des images dans le répertoire de travail du programme"
+
+msgid "PIT mode:"
+msgstr "Mode PIT:"
+
+msgid "Auto"
+msgstr "Auto"
+
+msgid "Slow"
+msgstr "Lent"
+
+msgid "Fast"
+msgstr "Rapide"
+
+msgid "&Auto-pause on focus loss"
+msgstr "&Pause automatique à perte de mise au point"
+
+msgid "WinBox is no longer supported"
+msgstr "WinBox n'est plus pris en charge"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "Le développement du gestionnaire WinBox s'est arrêté en 2022 en raison d'un manque de mainteneurs. Comme nous concentrons nos efforts sur l'amélioration de 86Box, nous avons pris la décision de ne plus supporter WinBox en tant que gestionnaire.\n\nAucune mise à jour ne sera fournie par WinBox, et vous pourriez rencontrer des comportements incorrects si vous continuez à l'utiliser avec des versions plus récentes de 86Box. Tous les rapports de bogues relatifs au comportement de WinBox seront classés comme non valides.\n\nAllez sur 86box.net pour une liste d'autres gestionnaires que vous pouvez utiliser."

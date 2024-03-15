@@ -234,6 +234,7 @@ typedef struct ncr53c8xx_t {
     int waiting;
 
     uint8_t current_lun;
+    uint8_t irq_state;
 
     uint8_t istat;
     uint8_t dcmd;
@@ -279,6 +280,7 @@ typedef struct ncr53c8xx_t {
     uint8_t swide;
     uint8_t gpcntl;
     uint8_t last_command;
+    uint8_t sodl;
 
     int                command_complete;
     ncr53c8xx_request *current;
@@ -498,10 +500,10 @@ static void
 do_irq(ncr53c8xx_t *dev, int level)
 {
     if (level) {
-        pci_set_irq(dev->pci_slot, PCI_INTA);
+        pci_set_irq(dev->pci_slot, PCI_INTA, &dev->irq_state);
         ncr53c8xx_log("Raising IRQ...\n");
     } else {
-        pci_clear_irq(dev->pci_slot, PCI_INTA);
+        pci_clear_irq(dev->pci_slot, PCI_INTA, &dev->irq_state);
         ncr53c8xx_log("Lowering IRQ...\n");
     }
 }
@@ -534,12 +536,16 @@ ncr53c8xx_update_irq(ncr53c8xx_t *dev)
         level = 1;
     }
 
+#ifdef STATE_KEEPING
     if (level != dev->last_level) {
+#endif
         ncr53c8xx_log("Update IRQ level %d dstat %02x sist %02x%02x\n",
                       level, dev->dstat, dev->sist1, dev->sist0);
         dev->last_level = level;
         do_irq(dev, level); /* Only do something with the IRQ if the new level differs from the previous one. */
+#ifdef STATE_KEEPING
     }
+#endif
 }
 
 /* Stop SCRIPTS execution and raise a SCSI interrupt.  */
@@ -1440,15 +1446,15 @@ ncr53c8xx_callback(void *priv)
 static void
 ncr53c8xx_eeprom(ncr53c8xx_t *dev, uint8_t save)
 {
-    FILE *f;
+    FILE *fp;
 
-    f = nvr_fopen(dev->nvr_path, save ? "wb" : "rb");
-    if (f) {
+    fp = nvr_fopen(dev->nvr_path, save ? "wb" : "rb");
+    if (fp) {
         if (save)
-            fwrite(&dev->nvram, sizeof(dev->nvram), 1, f);
+            fwrite(&dev->nvram, sizeof(dev->nvram), 1, fp);
         else
-            (void) !fread(&dev->nvram, sizeof(dev->nvram), 1, f);
-        fclose(f);
+            (void) !fread(&dev->nvram, sizeof(dev->nvram), 1, fp);
+        fclose(fp);
     }
 }
 
@@ -1699,6 +1705,8 @@ ncr53c8xx_reg_writeb(ncr53c8xx_t *dev, uint32_t offset, uint8_t val)
             dev->stest3 = val;
             break;
         case 0x54:
+            dev->sodl = val;
+            break;
         case 0x55:
             break;
             CASE_SET_REG32(scratchb, 0x5c)
@@ -1984,6 +1992,9 @@ ncr53c8xx_reg_readb(ncr53c8xx_t *dev, uint32_t offset)
             if ((dev->sstat1 & PHASE_MASK) == PHASE_MI) {
                 ncr53c8xx_log("NCR 810: Read SBDL %02X\n", dev->msg[0]);
                 return dev->msg[0];
+            } else if (dev->stest2 & 0x80) {
+                ncr53c8xx_log("NCR 810: Read SBDL %02X\n", dev->sodl);
+                return dev->sodl;
             }
             ncr53c8xx_log("NCR 810: Read SBDL 00\n");
             return 0;
@@ -2552,9 +2563,9 @@ ncr53c8xx_init(const device_t *info)
         dev->has_bios = 0;
 
     if (info->local & 0x8000)
-        dev->pci_slot = pci_add_card(PCI_ADD_SCSI, ncr53c8xx_pci_read, ncr53c8xx_pci_write, dev);
+        pci_add_card(PCI_ADD_SCSI, ncr53c8xx_pci_read, ncr53c8xx_pci_write, dev, &dev->pci_slot);
     else
-        dev->pci_slot = pci_add_card(PCI_ADD_NORMAL, ncr53c8xx_pci_read, ncr53c8xx_pci_write, dev);
+        pci_add_card(PCI_ADD_NORMAL, ncr53c8xx_pci_read, ncr53c8xx_pci_write, dev, &dev->pci_slot);
 
     if (dev->chip == CHIP_875) {
         dev->chip_rev = 0x04;
@@ -2617,6 +2628,8 @@ ncr53c8xx_init(const device_t *info)
     ncr53c8xx_soft_reset(dev);
 
     timer_add(&dev->timer, ncr53c8xx_callback, dev, 0);
+
+    scsi_bus_set_speed(dev->bus, 10000000.0);
 
     return dev;
 }

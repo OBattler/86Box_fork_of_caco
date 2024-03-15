@@ -50,6 +50,7 @@
 #include <86box/rom.h>
 #include <86box/video.h>
 #include <86box/vid_cga.h>
+#include <86box/hdc.h>
 #include <86box/plat_fallthrough.h>
 #include <86box/plat_unused.h>
 
@@ -124,9 +125,7 @@ elt_vid_out(uint16_t addr, uint8_t val, void *priv)
         case 0x3d1:
             if (cga->crtcreg >= 32)
                 return;
-#ifdef FALLTHROUGH_ANNOTATION
-            [[fallthrough]];
-#endif
+            fallthrough;
 
         default:
             cga->crtcreg &= 31;

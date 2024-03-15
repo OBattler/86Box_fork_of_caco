@@ -28,6 +28,8 @@
 #include <QLibraryInfo>
 #include <QString>
 #include <QFont>
+#include <QDialog>
+#include <QMessageBox>
 
 #ifdef QT_STATIC
 /* Static builds need plugin imports */
@@ -56,6 +58,7 @@ extern "C" {
 #   include <86box/discord.h>
 #endif
 #include <86box/gdbstub.h>
+#include <86box/version.h>
 }
 
 #include <thread>
@@ -92,6 +95,7 @@ main_thread_fn()
     int      frames;
 
     QThread::currentThread()->setPriority(QThread::HighestPriority);
+    plat_set_thread_name(NULL, "main_thread_fn");
     framecountx = 0;
     // title_update = 1;
     old_time = elapsed_timer.elapsed();
@@ -135,6 +139,8 @@ main_thread_fn()
             }
         } else {
             /* Just so we dont overload the host OS. */
+            if (dopause)
+                ack_pause();
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
@@ -190,10 +196,49 @@ main(int argc, char *argv[])
     QApplication::setFont(QFont(font_name, font_size.toInt()));
     SetCurrentProcessExplicitAppUserModelID(L"86Box.86Box");
 #endif
+
+#ifndef Q_OS_MACOS
+#    ifdef RELEASE_BUILD
+    app.setWindowIcon(QIcon(":/settings/win/icons/86Box-green.ico"));
+#    elif defined ALPHA_BUILD
+    app.setWindowIcon(QIcon(":/settings/win/icons/86Box-red.ico"));
+#    elif defined BETA_BUILD
+    app.setWindowIcon(QIcon(":/settings/win/icons/86Box-yellow.ico"));
+#    else
+    app.setWindowIcon(QIcon(":/settings/win/icons/86Box-gray.ico"));
+#    endif
+
+#    ifdef Q_OS_UNIX
+    app.setDesktopFileName("net.86box.86Box");
+#    endif
+#endif
+
     if (!pc_init_modules()) {
         ui_msgbox_header(MBX_FATAL, (void *) IDS_2121, (void *) IDS_2056);
         return 6;
     }
+
+#ifdef Q_OS_WINDOWS
+#    if !defined(EMU_BUILD_NUM) || (EMU_BUILD_NUM != 5624)
+    HWND winbox = FindWindow("TWinBoxMain", NULL);
+    if (winbox &&
+        FindWindowEx(winbox, NULL, "TToolBar", NULL) &&
+        FindWindowEx(winbox, NULL, "TListBox", NULL) &&
+        FindWindowEx(winbox, NULL, "TStatusBar", NULL) &&
+        (winbox = FindWindowEx(winbox, NULL, "TPageControl", NULL)) && /* holds a TTabSheet even on VM pages */
+        FindWindowEx(winbox, NULL, "TTabSheet", NULL))
+#    endif
+    {
+        QMessageBox warningbox(QMessageBox::Icon::Warning, QObject::tr("WinBox is no longer supported"),
+                               QObject::tr("Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."),
+                               QMessageBox::NoButton);
+        warningbox.addButton(QObject::tr("Continue"), QMessageBox::AcceptRole);
+        warningbox.addButton(QObject::tr("Exit"), QMessageBox::RejectRole);
+        warningbox.exec();
+        if (warningbox.result() == QDialog::Accepted)
+              return 0;
+    }
+#endif
 
     if (settings_only) {
         Settings settings;
@@ -202,6 +247,18 @@ main(int argc, char *argv[])
             config_save();
         }
         return 0;
+    }
+
+    /* Warn the user about unsupported configs */
+    if (cpu_override) {
+        QMessageBox warningbox(QMessageBox::Icon::Warning, QObject::tr("You are loading an unsupported configuration"),
+                               QObject::tr("CPU type filtering based on selected machine is disabled for this emulated machine.\n\nThis makes it possible to choose a CPU that is otherwise incompatible with the selected machine. However, you may run into incompatibilities with the machine BIOS or other software.\n\nEnabling this setting is not officially supported and any bug reports filed may be closed as invalid."),
+                               QMessageBox::NoButton);
+        warningbox.addButton(QObject::tr("Continue"), QMessageBox::AcceptRole);
+        warningbox.addButton(QObject::tr("Exit"), QMessageBox::RejectRole);
+        warningbox.exec();
+        if (warningbox.result() == QDialog::Accepted)
+              return 0;
     }
 
 #ifdef DISCORD
@@ -256,7 +313,6 @@ main(int argc, char *argv[])
     auto rawInputFilter = WindowsRawInputFilter::Register(main_window);
     if (rawInputFilter) {
         app.installNativeEventFilter(rawInputFilter.get());
-        QObject::connect(main_window, &MainWindow::pollMouse, (WindowsRawInputFilter *) rawInputFilter.get(), &WindowsRawInputFilter::mousePoll, Qt::DirectConnection);
         main_window->setSendKeyboardInput(false);
     }
 #endif
@@ -275,10 +331,9 @@ main(int argc, char *argv[])
         main_window->installEventFilter(&socket);
         socket.connectToServer(qgetenv("86BOX_MANAGER_SOCKET"));
     }
+
     // pc_reset_hard_init();
 
-    /* Set the PAUSE mode depending on the renderer. */
-    // plat_pause(0);
     QTimer onesec;
     QObject::connect(&onesec, &QTimer::timeout, &app, [] {
         pc_onesec();
@@ -307,6 +362,14 @@ main(int argc, char *argv[])
     QTimer::singleShot(0, &app, [] {
         pc_reset_hard_init();
         main_thread = new std::thread(main_thread_fn);
+
+        /* Set the PAUSE mode depending on the renderer. */
+#ifdef USE_VNC
+        if (vnc_enabled && vid_api != 5)
+            plat_pause(1);
+        else
+#endif
+            plat_pause(0);
     });
 
     auto ret       = app.exec();

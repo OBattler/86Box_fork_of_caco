@@ -82,51 +82,47 @@
 #define PCI_DEVID   0x8029 /* RTL8029AS */
 #define PCI_REGSIZE 256    /* size of PCI space */
 
-static uint8_t rtl8019as_pnp_rom[] = {
-    0x4a, 0x8c, 0x80, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,                                                                                                                                        /* RTL8019, dummy checksum (filled in by isapnp_add_card) */
-    0x0a, 0x10, 0x10,                                                                                                                                                                            /* PnP version 1.0, vendor version 1.0 */
-    0x82, 0x22, 0x00, 'R', 'E', 'A', 'L', 'T', 'E', 'K', ' ', 'P', 'L', 'U', 'G', ' ', '&', ' ', 'P', 'L', 'A', 'Y', ' ', 'E', 'T', 'H', 'E', 'R', 'N', 'E', 'T', ' ', 'C', 'A', 'R', 'D', 0x00, /* ANSI identifier */
-
-    0x16, 0x4a, 0x8c, 0x80, 0x19, 0x02, 0x00,       /* logical device RTL8019 */
-    0x1c, 0x41, 0xd0, 0x80, 0xd6,                   /* compatible device PNP80D6 */
-    0x47, 0x00, 0x20, 0x02, 0x80, 0x03, 0x20, 0x20, /* I/O 0x220-0x380, decodes 10-bit, 32-byte alignment, 32 addresses */
-    0x23, 0x38, 0x9e, 0x01,                         /* IRQ 3/4/5/9/10/11/12/15, high true edge sensitive */
-
-    0x79, 0x00 /* end tag, dummy checksum (filled in by isapnp_add_card) */
-};
-
 typedef struct nic_t {
     dp8390_t   *dp8390;
+
     const char *name;
+
+    uint8_t     pnp_csnsav;
+    uint8_t     pci_slot;
+    uint8_t     irq_state;
+    uint8_t     pad;
+
+    /* RTL8019AS/RTL8029AS registers */
+    uint8_t     config0;
+    uint8_t     config2;
+    uint8_t     config3;
+    uint8_t     _9346cr;
+
+    uint8_t     pci_regs[PCI_REGSIZE];
+    uint8_t     eeprom[128]; /* for RTL8029AS */
+
+    uint8_t     maclocal[6]; /* configured MAC (local) address */
+
+    /* POS registers, MCA boards only */
+    uint8_t     pos_regs[8];
+
     int         board;
     int         is_pci;
     int         is_mca;
     int         is_8bit;
-    uint32_t    base_address;
     int         base_irq;
+    int         has_bios;
+
+    uint32_t    base_address;
     uint32_t    bios_addr;
     uint32_t    bios_size;
     uint32_t    bios_mask;
-    int         card; /* PCI card slot */
-    int         has_bios;
-    int         pad;
+
     bar_t       pci_bar[2];
-    uint8_t     pci_regs[PCI_REGSIZE];
-    uint8_t     eeprom[128]; /* for RTL8029AS */
+
     rom_t       bios_rom;
+
     void       *pnp_card;
-    uint8_t     pnp_csnsav;
-    uint8_t     maclocal[6]; /* configured MAC (local) address */
-
-    /* RTL8019AS/RTL8029AS registers */
-    uint8_t  config0;
-    uint8_t  config2;
-    uint8_t  config3;
-    uint8_t  _9346cr;
-    uint32_t pad0;
-
-    /* POS registers, MCA boards only */
-    uint8_t pos_regs[8];
 } nic_t;
 
 #ifdef ENABLE_NE2K_LOG
@@ -150,13 +146,13 @@ nelog(int lvl, const char *fmt, ...)
 static void
 nic_interrupt(void *priv, int set)
 {
-    const nic_t *dev = (nic_t *) priv;
+    nic_t *dev = (nic_t *) priv;
 
     if (dev->is_pci) {
         if (set)
-            pci_set_irq(dev->card, PCI_INTA);
+            pci_set_irq(dev->pci_slot, PCI_INTA, &dev->irq_state);
         else
-            pci_clear_irq(dev->card, PCI_INTA);
+            pci_clear_irq(dev->pci_slot, PCI_INTA, &dev->irq_state);
     } else {
         if (set)
             picint(1 << dev->base_irq);
@@ -750,9 +746,7 @@ nic_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
         case 0x10:       /* PCI_BAR */
             val &= 0xe0; /* 0xe0 acc to RTL DS */
             val |= 0x01; /* re-enable IOIN bit */
-#ifdef FALLTHROUGH_ANNOTATION
-            [[fallthrough]];
-#endif
+            fallthrough;
 
         case 0x11: /* PCI_BAR */
         case 0x12: /* PCI_BAR */
@@ -805,7 +799,7 @@ static void
 nic_rom_init(nic_t *dev, char *s)
 {
     uint32_t temp;
-    FILE    *f;
+    FILE    *fp;
 
     if (s == NULL)
         return;
@@ -813,10 +807,10 @@ nic_rom_init(nic_t *dev, char *s)
     if (dev->bios_addr == 0)
         return;
 
-    if ((f = rom_fopen(s, "rb")) != NULL) {
-        fseek(f, 0L, SEEK_END);
-        temp = ftell(f);
-        fclose(f);
+    if ((fp = rom_fopen(s, "rb")) != NULL) {
+        fseek(fp, 0L, SEEK_END);
+        temp = ftell(fp);
+        fclose(fp);
         dev->bios_size = 0x10000;
         if (temp <= 0x8000)
             dev->bios_size = 0x8000;
@@ -940,7 +934,7 @@ nic_init(const device_t *info)
         if (dev->board != NE2K_ETHERNEXT_MC) {
             dev->base_address = device_get_config_hex16("base");
             dev->base_irq     = device_get_config_int("irq");
-            if (dev->board == NE2K_NE2000) {
+            if ((dev->board == NE2K_NE2000) || (dev->board == NE2K_NE2000_COMPAT)) {
                 dev->bios_addr = device_get_config_hex20("bios_addr");
                 dev->has_bios  = !!dev->bios_addr;
             } else {
@@ -986,10 +980,29 @@ nic_init(const device_t *info)
             dp8390_mem_alloc(dev->dp8390, 0x2000, 0x2000);
             break;
 
+        case NE2K_NE1000_COMPAT:
+            dev->maclocal[0] = 0x00; /* 00:86:B0 (86Box OID) */
+            dev->maclocal[1] = 0x86;
+            dev->maclocal[2] = 0xB0;
+            dev->is_8bit     = 1;
+            rom              = NULL;
+            dp8390_set_defaults(dev->dp8390, DP8390_FLAG_CHECK_CR | DP8390_FLAG_CLEAR_IRQ);
+            dp8390_mem_alloc(dev->dp8390, 0x2000, 0x2000);
+            break;
+
         case NE2K_NE2000:
             dev->maclocal[0] = 0x00; /* 00:00:D8 (Novell OID) */
             dev->maclocal[1] = 0x00;
             dev->maclocal[2] = 0xD8;
+            rom              = ROM_PATH_NE2000;
+            dp8390_set_defaults(dev->dp8390, DP8390_FLAG_EVEN_MAC | DP8390_FLAG_CHECK_CR | DP8390_FLAG_CLEAR_IRQ);
+            dp8390_mem_alloc(dev->dp8390, 0x4000, 0x4000);
+            break;
+
+        case NE2K_NE2000_COMPAT:
+            dev->maclocal[0] = 0x00; /* 00:86:B0 (86Box OID) */
+            dev->maclocal[1] = 0x86;
+            dev->maclocal[2] = 0xB0;
             rom              = ROM_PATH_NE2000;
             dp8390_set_defaults(dev->dp8390, DP8390_FLAG_EVEN_MAC | DP8390_FLAG_CHECK_CR | DP8390_FLAG_CLEAR_IRQ);
             dp8390_mem_alloc(dev->dp8390, 0x4000, 0x4000);
@@ -1004,6 +1017,16 @@ nic_init(const device_t *info)
             rom              = NULL;
             dp8390_set_defaults(dev->dp8390, DP8390_FLAG_EVEN_MAC | DP8390_FLAG_CHECK_CR | DP8390_FLAG_CLEAR_IRQ);
             dp8390_mem_alloc(dev->dp8390, 0x4000, 0x4000);
+            break;
+
+        case NE2K_DE220P:
+            dev->maclocal[0] = 0x00; /* 00:80:C8 (D-Link OID) */
+            dev->maclocal[1] = 0x80;
+            dev->maclocal[2] = 0xC8;
+            rom              = NULL;
+            dp8390_set_defaults(dev->dp8390, DP8390_FLAG_EVEN_MAC | DP8390_FLAG_CLEAR_IRQ);
+            dp8390_set_id(dev->dp8390, 0x50, 0x70);
+            dp8390_mem_alloc(dev->dp8390, 0x4000, 0x8000);
             break;
 
         case NE2K_RTL8019AS:
@@ -1036,7 +1059,7 @@ nic_init(const device_t *info)
      * Make this device known to the I/O system.
      * PnP and PCI devices start with address spaces inactive.
      */
-    if (dev->board < NE2K_RTL8019AS && dev->board != NE2K_ETHERNEXT_MC)
+    if ((dev->board < NE2K_RTL8019AS) && (dev->board != NE2K_ETHERNEXT_MC))
         nic_ioset(dev, dev->base_address);
 
     /* Set up our BIOS ROM space, if any. */
@@ -1087,8 +1110,7 @@ nic_init(const device_t *info)
             mem_mapping_disable(&dev->bios_rom.mapping);
 
             /* Add device to the PCI bus, keep its slot number. */
-            dev->card = pci_add_card(PCI_ADD_NORMAL,
-                                     nic_pci_read, nic_pci_write, dev);
+            pci_add_card(PCI_ADD_NORMAL, nic_pci_read, nic_pci_write, dev, &dev->pci_slot);
         }
 
         /* Initialize the RTL8029 EEPROM. */
@@ -1102,9 +1124,44 @@ nic_init(const device_t *info)
             dev->eeprom[0x78] = dev->eeprom[0x7C] = (PCI_VENDID & 0xff);
             dev->eeprom[0x79] = dev->eeprom[0x7D] = (PCI_VENDID >> 8);
         } else {
-            memcpy(&dev->eeprom[0x12], rtl8019as_pnp_rom, sizeof(rtl8019as_pnp_rom));
+            const char *pnp_rom_file = NULL;
+            int pnp_rom_len = 0x4a;
+            switch (dev->board) {
+                case NE2K_RTL8019AS:
+                    pnp_rom_file = "roms/network/rtl8019as/RTL8019A.BIN";
+                    break;
 
-            dev->pnp_card = isapnp_add_card(&dev->eeprom[0x12], sizeof(rtl8019as_pnp_rom), nic_pnp_config_changed, nic_pnp_csn_changed, nic_pnp_read_vendor_reg, nic_pnp_write_vendor_reg, dev);
+                case NE2K_DE220P:
+                    pnp_rom_file = "roms/network/de220p/dlk2201a.bin";
+                    pnp_rom_len = 0x43;
+                    break;
+
+                default:
+                    break;
+            }
+
+            uint8_t *pnp_rom = NULL;
+            if (pnp_rom_file) {
+                FILE *fp = rom_fopen(pnp_rom_file, "rb");
+                if (fp) {
+                    if (fread(&dev->eeprom[0x12], 1, pnp_rom_len, fp) == pnp_rom_len)
+                        pnp_rom = &dev->eeprom[0x12];
+                    fclose(fp);
+                }
+            }
+
+            switch (info->local) {
+                case NE2K_RTL8019AS:
+                case NE2K_DE220P:
+                    dev->pnp_card = isapnp_add_card(pnp_rom, pnp_rom_len,
+                                                    nic_pnp_config_changed, nic_pnp_csn_changed,
+                                                    nic_pnp_read_vendor_reg, nic_pnp_write_vendor_reg,
+                                                    dev);
+                    break;
+
+                default:
+                    break;
+            }
         }
     }
 
@@ -1131,6 +1188,18 @@ nic_close(void *priv)
     free(dev);
 }
 
+static int
+rtl8019as_available(void)
+{
+    return rom_present("roms/network/rtl8019as/RTL8019A.BIN");
+}
+
+static int
+de220p_available(void)
+{
+    return rom_present("roms/network/de220p/dlk2201a.bin");
+}
+
 // clang-format off
 static const device_config_t ne1000_config[] = {
     {
@@ -1142,12 +1211,11 @@ static const device_config_t ne1000_config[] = {
         .file_filter = "",
         .spinner = { 0 },
         .selection = {
-            { .description = "0x280", .value = 0x280 },
+            /* Source: Windows 95 .INF file. */
             { .description = "0x300", .value = 0x300 },
             { .description = "0x320", .value = 0x320 },
             { .description = "0x340", .value = 0x340 },
             { .description = "0x360", .value = 0x360 },
-            { .description = "0x380", .value = 0x380 },
             { .description = ""                      }
         },
     },
@@ -1160,12 +1228,71 @@ static const device_config_t ne1000_config[] = {
         .file_filter = "",
         .spinner = { 0 },
         .selection = {
+            /* Source: Windows 95 .INF file. */
             { .description = "IRQ 2",  .value =  2 },
             { .description = "IRQ 3",  .value =  3 },
+            { .description = "IRQ 4",  .value =  4 },
+            { .description = "IRQ 5",  .value =  5 },
+            { .description = "IRQ 9",  .value =  9 },
+            { .description = ""                    }
+        },
+    },
+    {
+        .name = "mac",
+        .description = "MAC Address",
+        .type = CONFIG_MAC,
+        .default_string = "",
+        .default_int = -1
+    },
+    { .name = "", .description = "", .type = CONFIG_END }
+};
+
+static const device_config_t ne1000_compat_config[] = {
+    {
+        .name = "base",
+        .description = "Address",
+        .type = CONFIG_HEX16,
+        .default_string = "",
+        .default_int = 0x300,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            /* Source: Windows 95 .INF file. */
+            { .description = "0x200", .value = 0x200 },
+            { .description = "0x220", .value = 0x220 },
+            { .description = "0x240", .value = 0x240 },
+            { .description = "0x260", .value = 0x260 },
+            { .description = "0x280", .value = 0x280 },
+            { .description = "0x2a0", .value = 0x2a0 },
+            { .description = "0x2c0", .value = 0x2c0 },
+            { .description = "0x2e0", .value = 0x2e0 },
+            { .description = "0x300", .value = 0x300 },
+            { .description = "0x320", .value = 0x320 },
+            { .description = "0x340", .value = 0x340 },
+            { .description = "0x360", .value = 0x360 },
+            { .description = "0x380", .value = 0x380 },
+            { .description = "0x3a0", .value = 0x3a0 },
+            { .description = "0x3c0", .value = 0x3c0 },
+            { .description = "0x3e0", .value = 0x3e0 },
+            { .description = ""                      }
+        },
+    },
+    {
+        .name = "irq",
+        .description = "IRQ",
+        .type = CONFIG_SELECTION,
+        .default_string = "",
+        .default_int = 3,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            /* Source: Windows 95 .INF file. */
+            { .description = "IRQ 2",  .value =  2 },
+            { .description = "IRQ 3",  .value =  3 },
+            { .description = "IRQ 4",  .value =  4 },
             { .description = "IRQ 5",  .value =  5 },
             { .description = "IRQ 7",  .value =  7 },
-            { .description = "IRQ 10", .value = 10 },
-            { .description = "IRQ 11", .value = 11 },
+            { .description = "IRQ 9",  .value =  9 },
             { .description = ""                    }
         },
     },
@@ -1189,12 +1316,11 @@ static const device_config_t ne2000_config[] = {
         .file_filter = "",
         .spinner = { 0 },
         .selection = {
-            { .description = "0x280", .value = 0x280 },
+            /* Source: Windows 95 .INF file. */
             { .description = "0x300", .value = 0x300 },
             { .description = "0x320", .value = 0x320 },
             { .description = "0x340", .value = 0x340 },
             { .description = "0x360", .value = 0x360 },
-            { .description = "0x380", .value = 0x380 },
             { .description = ""                      }
         },
     },
@@ -1207,12 +1333,92 @@ static const device_config_t ne2000_config[] = {
         .file_filter = "",
         .spinner = { 0 },
         .selection = {
+            /* Source: Windows 95 .INF file. */
             { .description = "IRQ 2",  .value =  2 },
             { .description = "IRQ 3",  .value =  3 },
+            { .description = "IRQ 4",  .value =  4 },
+            { .description = "IRQ 5",  .value =  5 },
+            { .description = "IRQ 9",  .value =  9 },
+            { .description = ""                    }
+        },
+    },
+    {
+        .name = "mac",
+        .description = "MAC Address",
+        .type = CONFIG_MAC,
+        .default_string = "",
+        .default_int = -1
+    },
+    {
+        .name = "bios_addr",
+        .description = "BIOS address",
+        .type = CONFIG_HEX20,
+        .default_string = "",
+        .default_int = 0,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            { .description = "Disabled", .value = 0x00000 },
+            { .description = "D000",     .value = 0xD0000 },
+            { .description = "D800",     .value = 0xD8000 },
+            { .description = "C800",     .value = 0xC8000 },
+            { .description = ""                           }
+        },
+    },
+    { .name = "", .description = "", .type = CONFIG_END }
+};
+
+static const device_config_t ne2000_compat_config[] = {
+    {
+        .name = "base",
+        .description = "Address",
+        .type = CONFIG_HEX16,
+        .default_string = "",
+        .default_int = 0x300,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            /* Source: Windows 95 .INF file. */
+            { .description = "0x200", .value = 0x200 },
+            { .description = "0x220", .value = 0x220 },
+            { .description = "0x240", .value = 0x240 },
+            { .description = "0x260", .value = 0x260 },
+            { .description = "0x280", .value = 0x280 },
+            { .description = "0x2a0", .value = 0x2a0 },
+            { .description = "0x2c0", .value = 0x2c0 },
+            { .description = "0x2e0", .value = 0x2e0 },
+            { .description = "0x300", .value = 0x300 },
+            { .description = "0x320", .value = 0x320 },
+            { .description = "0x340", .value = 0x340 },
+            { .description = "0x360", .value = 0x360 },
+            { .description = "0x380", .value = 0x380 },
+            { .description = "0x3a0", .value = 0x3a0 },
+            { .description = "0x3c0", .value = 0x3c0 },
+            { .description = "0x3e0", .value = 0x3e0 },
+            { .description = ""                      }
+        },
+    },
+    {
+        .name = "irq",
+        .description = "IRQ",
+        .type = CONFIG_SELECTION,
+        .default_string = "",
+        .default_int = 10,
+        .file_filter = "",
+        .spinner = { 0 },
+        .selection = {
+            /* Source: Windows 95 .INF file - not giving impossible IRQ's
+                       such as 6, 8, or 13. */
+            { .description = "IRQ 3",  .value =  3 },
+            { .description = "IRQ 4",  .value =  4 },
             { .description = "IRQ 5",  .value =  5 },
             { .description = "IRQ 7",  .value =  7 },
+            { .description = "IRQ 9",  .value =  9 },
             { .description = "IRQ 10", .value = 10 },
             { .description = "IRQ 11", .value = 11 },
+            { .description = "IRQ 12", .value = 12 },
+            { .description = "IRQ 14", .value = 14 },
+            { .description = "IRQ 15", .value = 15 },
             { .description = ""                    }
         },
     },
@@ -1285,7 +1491,7 @@ static const device_config_t mca_mac_config[] = {
 
 const device_t ne1000_device = {
     .name          = "Novell NE1000",
-    .internal_name = "ne1k",
+    .internal_name = "novell_ne1k",
     .flags         = DEVICE_ISA,
     .local         = NE2K_NE1000,
     .init          = nic_init,
@@ -1297,9 +1503,23 @@ const device_t ne1000_device = {
     .config        = ne1000_config
 };
 
+const device_t ne1000_compat_device = {
+    .name          = "NE1000 Compatible",
+    .internal_name = "ne1k",
+    .flags         = DEVICE_ISA,
+    .local         = NE2K_NE1000_COMPAT,
+    .init          = nic_init,
+    .close         = nic_close,
+    .reset         = NULL,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = ne1000_compat_config
+};
+
 const device_t ne2000_device = {
     .name          = "Novell NE2000",
-    .internal_name = "ne2k",
+    .internal_name = "novell_ne2k",
     .flags         = DEVICE_ISA | DEVICE_AT,
     .local         = NE2K_NE2000,
     .init          = nic_init,
@@ -1309,6 +1529,20 @@ const device_t ne2000_device = {
     .speed_changed = NULL,
     .force_redraw  = NULL,
     .config        = ne2000_config
+};
+
+const device_t ne2000_compat_device = {
+    .name          = "NE2000 Compatible",
+    .internal_name = "ne2k",
+    .flags         = DEVICE_ISA | DEVICE_AT,
+    .local         = NE2K_NE2000_COMPAT,
+    .init          = nic_init,
+    .close         = nic_close,
+    .reset         = NULL,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = ne2000_compat_config
 };
 
 const device_t ethernext_mc_device = {
@@ -1333,7 +1567,21 @@ const device_t rtl8019as_device = {
     .init          = nic_init,
     .close         = nic_close,
     .reset         = NULL,
-    { .available = NULL },
+    { .available = rtl8019as_available },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = rtl8019as_config
+};
+
+const device_t de220p_device = {
+    .name          = "D-Link DE-220P",
+    .internal_name = "de220p",
+    .flags         = DEVICE_ISA | DEVICE_AT,
+    .local         = NE2K_DE220P,
+    .init          = nic_init,
+    .close         = nic_close,
+    .reset         = NULL,
+    { .available = de220p_available },
     .speed_changed = NULL,
     .force_redraw  = NULL,
     .config        = rtl8019as_config

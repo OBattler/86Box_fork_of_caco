@@ -286,7 +286,7 @@ END
 #define STR_VIDEO         "Vídeo:"
 #define STR_VIDEO_2       "Vídeo 2:"
 #define STR_VOODOO        "3DFX Voodoo"
-#define STR_IBM8514       "Gráficos IBM 8514/a"
+#define STR_IBM8514       "Gráficos IBM 8514/A"
 #define STR_XGA           "Gráficos XGA"
 
 #define STR_MOUSE         "Mouse:"
@@ -467,7 +467,6 @@ BEGIN
     IDS_2108    "%u MB (CHS: %i, %i, %i)"
     IDS_2109    "Disquete %i (%s): %ls"
     IDS_2110    "Todas as imagens (*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF)\0*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF\0Imagens de setor avançado (*.IMD;*.JSON;*.TD0)\0*.IMD;*.JSON;*.TD0\0Imagens de setor básico (*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?)\0*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?\0Imagens de fluxo (*.FDI)\0*.FDI\0Imagens de superfície (*.86F;*.MFM)\0*.86F;*.MFM\0Todos os arquivos (*.*)\0*.*\0"
-    IDS_2112    "Não é possível inicializar o SDL, é necessário o SDL2.dll"
     IDS_2113    "Tem certeza de que deseja reiniciar completamente a máquina emulada?"
     IDS_2114    "Tem certeza de que deseja sair do 86Box?"
     IDS_2115    "Não é possível inicializar o Ghostscript"
@@ -483,7 +482,7 @@ BEGIN
     IDS_2125    "Sobre o 86Box"
     IDS_2126    "86Box versão" EMU_VERSION
 
-    IDS_2127    "Um emulador de computadores antigos\n\nAutores: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, e outros.\n\nTraduzido por: Altieres Lima da Silva\n\nLançado sob a Licença Pública Geral GNU versão 2 ou posterior. Veja o arquivo LICENSE para mais informações."
+    IDS_2127    "Um emulador de computadores antigos\n\nAutores: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, e outros.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, e outros.\n\nTraduzido por: Altieres Lima da Silva\n\nLançado sob a Licença Pública Geral GNU versão 2 ou posterior. Veja o arquivo LICENSE para mais informações."
     IDS_2128    "OK"
     IDS_2129    "Hardware não disponível"
 #ifdef _WIN32

@@ -179,10 +179,16 @@ opLAR(w_a16, fetch_ea_16, 0, 0)
 
                                 static int op0F00_common(uint32_t fetchdat, int ea32)
 {
-    int      dpl, valid, granularity;
-    uint32_t addr, base, limit;
-    uint16_t desc, sel;
-    uint8_t  access, ar_high;
+    int      dpl;
+    int      valid;
+    int      granularity;
+    uint32_t addr;
+    uint32_t base;
+    uint32_t limit;
+    uint16_t desc;
+    uint16_t sel;
+    uint8_t  access;
+    uint8_t  ar_high;
 
     switch (rmdat & 0x38) {
         case 0x00: /*SLDT*/
@@ -356,9 +362,12 @@ static int
 op0F01_common(uint32_t fetchdat, int is32, int is286, int ea32)
 {
     uint32_t base;
-    uint16_t limit, tempw;
+    uint16_t limit;
+    uint16_t tempw;
+
     switch (rmdat & 0x38) {
         case 0x00: /*SGDT*/
+            ILLEGAL_ON(cpu_mod == 3);
             if (cpu_mod != 3)
                 SEG_CHECK_WRITE(cpu_state.ea_seg);
             seteaw(gdt.limit);
@@ -381,6 +390,7 @@ op0F01_common(uint32_t fetchdat, int is32, int is286, int ea32)
             PREFETCH_RUN(7, 2, rmdat, 0, 0, 1, 1, ea32);
             break;
         case 0x10: /*LGDT*/
+            ILLEGAL_ON(cpu_mod == 3);
             if ((CPL || cpu_state.eflags & VM_FLAG) && (cr0 & 1)) {
                 x86gpf(NULL, 0);
                 break;

@@ -67,11 +67,8 @@
 #include <86box/ui.h>
 #include <86box/timer.h>
 #include <86box/network.h>
-#include <86box/net_3c501.h>
-#include <86box/net_3c503.h>
 #include <86box/net_ne2000.h>
 #include <86box/net_pcnet.h>
-#include <86box/net_plip.h>
 #include <86box/net_wd8003.h>
 
 #ifdef _WIN32
@@ -95,13 +92,30 @@ static const device_t net_none_device = {
 };
 
 extern const device_t eepro100_device;
+static const device_t net_internal_device = {
+    .name          = "Internal",
+    .internal_name = "internal",
+    .flags         = 0,
+    .local         = NET_TYPE_NONE,
+    .init          = NULL,
+    .close         = NULL,
+    .reset         = NULL,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = NULL
+};
 
 static const device_t *net_cards[] = {
     &net_none_device,
+    &net_internal_device,
     &threec501_device,
     &threec503_device,
     &pcnet_am79c960_device,
     &pcnet_am79c961_device,
+    &de220p_device,
+    &ne1000_compat_device,
+    &ne2000_compat_device,
     &ne1000_device,
     &ne2000_device,
     &pcnet_am79c960_eb_device,
@@ -116,9 +130,15 @@ static const device_t *net_cards[] = {
     &wd8013epa_device,
     &pcnet_am79c973_device,
     &pcnet_am79c970a_device,
+    &dec_tulip_device,
     &rtl8029as_device,
+    &rtl8139c_plus_device,
+    &dec_tulip_21140_device,
+    &dec_tulip_21140_vpc_device,
+    &dec_tulip_21040_device,
     &pcnet_am79c960_vlb_device,
     &eepro100_device,
+    &modem_device,
     NULL
 };
 
@@ -436,6 +456,7 @@ netcard_t *
 network_attach(void *card_drv, uint8_t *mac, NETRXCB rx, NETSETLINKSTATE set_link_state)
 {
     netcard_t *card       = calloc(1, sizeof(netcard_t));
+    int net_type          = net_cards_conf[net_card_current].net_type;
     card->queued_pkt.data = calloc(1, NET_MAX_FRAME);
     card->card_drv        = card_drv;
     card->rx              = rx;
@@ -452,7 +473,12 @@ network_attach(void *card_drv, uint8_t *mac, NETRXCB rx, NETSETLINKSTATE set_lin
         network_queue_init(&card->queues[i]);
     }
 
-    switch (net_cards_conf[net_card_current].net_type) {
+    if (!strcmp(network_card_get_internal_name(net_cards_conf[net_card_current].device_num), "modem") && net_type >= NET_TYPE_PCAP) {
+        /* Force SLiRP here. Modem only operates on non-Ethernet frames. */
+        net_type = NET_TYPE_SLIRP;
+    }
+
+    switch (net_type) {
         case NET_TYPE_SLIRP:
             card->host_drv      = net_slirp_drv;
             card->host_drv.priv = card->host_drv.init(card, mac, NULL, net_drv_error);
@@ -567,7 +593,8 @@ network_reset(void)
         }
 
         net_card_current = i;
-        device_add_inst(net_cards[net_cards_conf[i].device_num], i + 1);
+        if (net_cards_conf[i].device_num > NET_INTERNAL)
+            device_add_inst(net_cards[net_cards_conf[i].device_num], i + 1);
     }
 }
 
@@ -672,7 +699,8 @@ network_dev_available(int id)
 {
     int available = (net_cards_conf[id].device_num > 0);
 
-    if (net_cards_conf[id].net_type == NET_TYPE_PCAP && (network_dev_to_id(net_cards_conf[id].host_dev_name) <= 0))
+    if ((net_cards_conf[id].net_type == NET_TYPE_PCAP) &&
+        (network_dev_to_id(net_cards_conf[id].host_dev_name) <= 0))
         available = 0;
 
     // TODO: Handle VDE device
@@ -720,7 +748,7 @@ network_card_has_config(int card)
 }
 
 /* UI */
-char *
+const char *
 network_card_get_internal_name(int card)
 {
     return device_get_internal_name(net_cards[card]);
@@ -733,7 +761,7 @@ network_card_get_from_internal_name(char *s)
     int c = 0;
 
     while (net_cards[c] != NULL) {
-        if (!strcmp((char *) net_cards[c]->internal_name, s))
+        if (!strcmp(net_cards[c]->internal_name, s))
             return c;
         c++;
     }

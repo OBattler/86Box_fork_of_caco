@@ -59,7 +59,6 @@ public:
         OpenGLES,
         OpenGL3,
         Vulkan,
-        Direct3D9,
         None = -1
     };
     void switchRenderer(Renderer renderer);
@@ -71,32 +70,20 @@ public:
     /* Returns options dialog for current renderer */
     QDialog *getOptions(QWidget *parent) { return rendererWindow ? rendererWindow->getOptions(parent) : nullptr; }
 
-    void setFocusRenderer()
-    {
-        if (current)
-            current->setFocus();
-    }
-    void onResize(int width, int height)
-    {
-        if (rendererWindow)
-            rendererWindow->onResize(width, height);
-    }
+    void setFocusRenderer();
+    void onResize(int width, int height);
 
-    void (*mouse_poll_func)()                   = nullptr;
     void (*mouse_capture_func)(QWindow *window) = nullptr;
     void (*mouse_uncapture_func)()              = nullptr;
+
     void (*mouse_exit_func)()                   = nullptr;
 
 signals:
     void blitToRenderer(int buf_idx, int x, int y, int w, int h);
-    void blit(int x, int y, int w, int h);
     void rendererChanged();
 
 public slots:
-    void blitCommon(int x, int y, int w, int h);
-    void blitRenderer(int x, int y, int w, int h);
-    void blitDummy(int x, int y, int w, int h);
-    void mousePoll();
+    void blit(int x, int y, int w, int h);
 
 private:
     void createRenderer(Renderer renderer);
@@ -116,13 +103,10 @@ private:
     int isMouseDown     = 0;
     int m_monitor_index = 0;
 
-    Renderer current_vid_api = Renderer::None;
-
     std::vector<std::tuple<uint8_t *, std::atomic_flag *>> imagebufs;
 
     RendererCommon          *rendererWindow { nullptr };
     std::unique_ptr<QWidget> current;
-    std::atomic<bool>        directBlitting { false };
 };
 
 #endif // QT_RENDERERCONTAINER_HPP

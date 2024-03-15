@@ -124,6 +124,9 @@ msgstr "&Kvadratni pikseli (zadrži omjer)"
 msgid "&Integer scale"
 msgstr "&Cijelobrojno skaliranje"
 
+msgid "4:&3 Integer scale"
+msgstr "4:&3 Cijelobrojno skaliranje"
+
 msgid "E&GA/(S)VGA settings"
 msgstr "E&GA/(S)VGA postavke"
 
@@ -349,6 +352,9 @@ msgstr "Tip procesora:"
 msgid "Speed:"
 msgstr "Brzina:"
 
+msgid "Frequency:"
+msgstr "Frekvencija:"
+
 msgid "FPU:"
 msgstr "FPU uređaj:"
 
@@ -382,8 +388,8 @@ msgstr "Video:"
 msgid "Voodoo Graphics"
 msgstr "Voodoo grafika"
 
-msgid "IBM 8514/a Graphics"
-msgstr "IBM 8514/a grafika"
+msgid "IBM 8514/A Graphics"
+msgstr "IBM 8514/A grafika"
 
 msgid "XGA Graphics"
 msgstr "XGA grafika"
@@ -406,16 +412,16 @@ msgstr "Palica za igru 3..."
 msgid "Joystick 4..."
 msgstr "Palica za igru 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "Zvučna kartica 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "Zvučna kartica 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "Zvučna kartica 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "Zvučna kartica 4:"
 
 msgid "MIDI Out Device:"
@@ -808,9 +814,6 @@ msgstr "Napredne sektorske slike"
 msgid "Flux images"
 msgstr "Flux slike"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "Nije moguće inicijalizirati SDL, SDL2.dll je potrebno"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "Jeste li sigurni da želite hard resetirati emulirani sistem?"
 
@@ -853,8 +856,8 @@ msgstr "O programu 86Box"
 msgid "86Box v"
 msgstr "86Box verzija "
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "Emulator starih računala\n\nAutori: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, i drugi.\n\nPreveo: dob205\n\nObjavljeno pod licencom GNU General Public License, verzija 2 ili novije. Za više informacija pogledajte datoteku LICENCE."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "Emulator starih računala\n\nAutori: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, i drugi.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, i drugi.\n\nPreveo: dob205\n\nObjavljeno pod licencom GNU General Public License, verzija 2 ili novije. Za više informacija pogledajte datoteku LICENCE."
 
 msgid "Hardware not available"
 msgstr "Hardver nije dostupan"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(Zadana postavka operativnog sustava)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "Neuspješno pokretanje mrežnog upravljačkog programa"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "Konfiguracija mreže bit će prebačena na nulti upravljački program"
 
+msgid "Mouse sensitivity:"
+msgstr "Osjetljivost miša:"
+
+msgid "Select media images from program working directory"
+msgstr "Medijske slike su odabrane iz radnog direktorija programa"
+
+msgid "PIT mode:"
+msgstr "PIT način:"
+
+msgid "Auto"
+msgstr "Auto"
+
+msgid "Slow"
+msgstr "Spori"
+
+msgid "Fast"
+msgstr "Brzi"
+
+msgid "&Auto-pause on focus loss"
+msgstr "&Automatska pauza pri gubitku fokusa"
+
+msgid "WinBox is no longer supported"
+msgstr "WinBox is no longer supported"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."

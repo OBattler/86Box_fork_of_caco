@@ -124,6 +124,9 @@ msgstr "&Kwadratowe piksele (Zachowaj proporcje)"
 msgid "&Integer scale"
 msgstr "&Skalowanie całkowite"
 
+msgid "4:&3 Integer scale"
+msgstr "Skalowanie całkowite 4:&3"
+
 msgid "E&GA/(S)VGA settings"
 msgstr "Ustawienia E&GA/(S)VGA"
 
@@ -349,6 +352,9 @@ msgstr "Rodzaj procesora:"
 msgid "Speed:"
 msgstr "Szybkość:"
 
+msgid "Frequency:"
+msgstr "Częstotliwość:"
+
 msgid "FPU:"
 msgstr "Jednostka FPU:"
 
@@ -382,8 +388,8 @@ msgstr "Wideo:"
 msgid "Voodoo Graphics"
 msgstr "Grafika Voodoo"
 
-msgid "IBM 8514/a Graphics"
-msgstr "Grafika IBM 8514/a"
+msgid "IBM 8514/A Graphics"
+msgstr "Grafika IBM 8514/A"
 
 msgid "XGA Graphics"
 msgstr "Grafika XGA"
@@ -406,16 +412,16 @@ msgstr "Joystick 3..."
 msgid "Joystick 4..."
 msgstr "Joystick 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "Karta dźwiękowa 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "Karta dźwiękowa 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "Karta dźwiękowa 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "Karta dźwiękowa 4:"
 
 msgid "MIDI Out Device:"
@@ -808,9 +814,6 @@ msgstr "Zaawansowane obrazy sektorów"
 msgid "Flux images"
 msgstr "Flux images"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "Nie można zainicjować SDL, wymagany SDL2.dll"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "Jesteś pewien że chcesz wykonać twardy reset emulowanej maszyny?"
 
@@ -853,8 +856,8 @@ msgstr "O 86Box"
 msgid "86Box v"
 msgstr "86Box v"
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "Emulator starych komputerów\n\nAutorzy: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, i inni.\n\nPrzetłumaczony przez: Fanta-Shokata\n\nWydany na licencji GNU General Public License w wersji 2 lub nowszej. Zobacz LICENSE aby uzyskać więcej informacji."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "Emulator starych komputerów\n\nAutorzy: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, i inni.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, i inni.\n\nPrzetłumaczony przez: Fanta-Shokata\n\nWydany na licencji GNU General Public License w wersji 2 lub nowszej. Zobacz LICENSE aby uzyskać więcej informacji."
 
 msgid "Hardware not available"
 msgstr "Sprzęt niedostępny"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(Domyślne ustawienie systemowe)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "Nie udało się zainicjować sterownika sieciowego"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "Konfiguracja sieci zostanie przełączona na sterownik null"
 
+msgid "Mouse sensitivity:"
+msgstr "Wrażliwość myszy:"
+
+msgid "Select media images from program working directory"
+msgstr "Wybór obrazów multimedialnych z katalogu roboczego programu"
+
+msgid "PIT mode:"
+msgstr "Tryb PIT:"
+
+msgid "Auto"
+msgstr "Automatyczny"
+
+msgid "Slow"
+msgstr "Powolny"
+
+msgid "Fast"
+msgstr "Szybki"
+
+msgid "&Auto-pause on focus loss"
+msgstr "&Automatyczna pauza po utracie fokusu"
+
+msgid "WinBox is no longer supported"
+msgstr "WinBox nie jest już wspierany"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "Rozwój menedżera WinBox został zatrzymany w 2022 roku z powodu braku opiekunów. Ponieważ kierujemy nasze wysiłki na uczynienie 86Box jeszcze lepszym, podjęliśmy decyzję o zaprzestaniu wspierania WinBox jako menedżera.\n\nŻadne dalsze aktualizacje nie będą dostarczane za pośrednictwem WinBox i możesz napotkać nieprawidłowe zachowanie, jeśli będziesz go nadal używać z nowszymi wersjami 86Box. Wszelkie zgłoszenia błędów związane z działaniem WinBox zostaną zamknięte jako nieważne.\n\nLista innych menedżerów, z których można korzystać, znajduje się na stronie 86box.net."

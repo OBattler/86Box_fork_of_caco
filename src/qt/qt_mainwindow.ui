@@ -68,16 +68,18 @@
      <addaction name="actionPen"/>
      <addaction name="actionCursor_Puck"/>
     </widget>
+    <addaction name="actionAuto_pause"/>
+    <addaction name="separator"/>
     <addaction name="actionKeyboard_requires_capture"/>
     <addaction name="actionRight_CTRL_is_left_ALT"/>
     <addaction name="menuTablet_tool"/>
+    <addaction name="separator"/>
+    <addaction name="actionPause"/>
     <addaction name="separator"/>
     <addaction name="actionHard_Reset"/>
     <addaction name="actionCtrl_Alt_Del"/>
     <addaction name="separator"/>
     <addaction name="actionCtrl_Alt_Esc"/>
-    <addaction name="separator"/>
-    <addaction name="actionPause"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -115,7 +117,6 @@
      <addaction name="actionHardware_Renderer_OpenGL_ES"/>
      <addaction name="actionOpenGL_3_0_Core"/>
      <addaction name="actionVulkan"/>
-     <addaction name="actionDirect3D_9"/>
      <addaction name="actionVNC"/>
     </widget>
     <widget class="QMenu" name="menuWindow_scale_factor">
@@ -148,6 +149,7 @@
      <addaction name="actionFullScreen_43"/>
      <addaction name="actionFullScreen_keepRatio"/>
      <addaction name="actionFullScreen_int"/>
+     <addaction name="actionFullScreen_int43"/>
     </widget>
     <widget class="QMenu" name="menuEGA_S_VGA_settings">
      <property name="title">
@@ -255,6 +257,7 @@
    </attribute>
    <addaction name="actionPause"/>
    <addaction name="actionHard_Reset"/>
+   <addaction name="separator"/>
    <addaction name="actionACPI_Shutdown"/>
    <addaction name="separator"/>
    <addaction name="actionCtrl_Alt_Del"/>
@@ -262,6 +265,14 @@
    <addaction name="separator"/>
    <addaction name="actionSettings"/>
   </widget>
+  <action name="actionAuto_pause">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Auto-pause on focus loss</string>
+   </property>
+  </action>
   <action name="actionKeyboard_requires_capture">
    <property name="checkable">
     <bool>true</bool>
@@ -585,6 +596,14 @@
     <string>&amp;Integer scale</string>
    </property>
   </action>
+  <action name="actionFullScreen_int43">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>4:&amp;3 Integer scale</string>
+   </property>
+  </action>
   <action name="actionInverted_VGA_monitor">
    <property name="checkable">
     <bool>true</bool>
@@ -752,10 +771,10 @@
      <normaloff>:/menuicons/win/icons/acpi_shutdown.ico</normaloff>:/menuicons/win/icons/acpi_shutdown.ico</iconset>
    </property>
    <property name="text">
-    <string>ACPI Shutdown</string>
+    <string>ACPI shutdown</string>
    </property>
    <property name="toolTip">
-    <string>ACPI Shutdown</string>
+    <string>ACPI shutdown</string>
    </property>
    <property name="visible">
     <bool>true</bool>
@@ -810,17 +829,6 @@
     <string>MCA devices...</string>
    </property>
   </action>
-  <action name="actionDirect3D_9">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Direct3D 9</string>
-   </property>
-   <property name="vid_api" stdset="0">
-    <number>5</number>
-   </property>
-  </action>
   <action name="actionShow_non_primary_monitors">
    <property name="checkable">
     <bool>true</bool>
@@ -837,7 +845,7 @@
     <string>VNC</string>
    </property>
    <property name="vid_api" stdset="0">
-    <number>6</number>
+    <number>5</number>
    </property>
   </action>
   <action name="actionOpen_screenshots_folder">

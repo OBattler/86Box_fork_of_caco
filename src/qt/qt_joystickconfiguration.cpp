@@ -106,6 +106,7 @@ JoystickConfiguration::on_comboBoxDevice_currentIndexChanged(int index)
         auto label = new QLabel(joystick_get_axis_name(type, c), this);
         auto cbox  = new QComboBox(this);
         cbox->setObjectName(QString("cboxAxis%1").arg(QString::number(c)));
+        cbox->setMaxVisibleItems(30);
         auto model = cbox->model();
 
         for (int d = 0; d < plat_joystick_state[joystick].nr_axes; d++) {
@@ -117,19 +118,12 @@ JoystickConfiguration::on_comboBoxDevice_currentIndexChanged(int index)
             Models::AddEntry(model, QString("%1 (Y axis)").arg(plat_joystick_state[joystick].pov[d].name), 0);
         }
 
-        for (int d = 0; d < plat_joystick_state[joystick].nr_sliders; d++) {
-            Models::AddEntry(model, plat_joystick_state[joystick].slider[d].name, 0);
-        }
-
         int nr_axes = plat_joystick_state[joystick].nr_axes;
-        int nr_povs = plat_joystick_state[joystick].nr_povs;
         int mapping = joystick_state[joystick_nr].axis_mapping[c];
         if (mapping & POV_X)
             cbox->setCurrentIndex(nr_axes + (mapping & 3) * 2);
         else if (mapping & POV_Y)
             cbox->setCurrentIndex(nr_axes + (mapping & 3) * 2 + 1);
-        else if (mapping & SLIDER)
-            cbox->setCurrentIndex(nr_axes + nr_povs * 2 + (mapping & 3));
         else
             cbox->setCurrentIndex(mapping);
 
@@ -146,6 +140,7 @@ JoystickConfiguration::on_comboBoxDevice_currentIndexChanged(int index)
         auto label = new QLabel(joystick_get_button_name(type, c), this);
         auto cbox  = new QComboBox(this);
         cbox->setObjectName(QString("cboxButton%1").arg(QString::number(c)));
+        cbox->setMaxVisibleItems(30);
         auto model = cbox->model();
 
         for (int d = 0; d < plat_joystick_state[joystick].nr_buttons; d++) {
@@ -172,6 +167,7 @@ JoystickConfiguration::on_comboBoxDevice_currentIndexChanged(int index)
         }
         auto cbox = new QComboBox(this);
         cbox->setObjectName(QString("cboxPov%1").arg(QString::number(c)));
+        cbox->setMaxVisibleItems(30);
         auto model = cbox->model();
 
         for (int d = 0; d < plat_joystick_state[joystick].nr_povs; d++) {
@@ -183,16 +179,8 @@ JoystickConfiguration::on_comboBoxDevice_currentIndexChanged(int index)
             Models::AddEntry(model, plat_joystick_state[joystick].axis[d].name, 0);
         }
 
-        int mapping = joystick_state[joystick_nr].pov_mapping[c][0];
+        int mapping = joystick_state[joystick_nr].pov_mapping[c / 2][c & 1];
         int nr_povs = plat_joystick_state[joystick].nr_povs;
-        if (mapping & POV_X)
-            cbox->setCurrentIndex((mapping & 3) * 2);
-        else if (mapping & POV_Y)
-            cbox->setCurrentIndex((mapping & 3) * 2 + 1);
-        else
-            cbox->setCurrentIndex(mapping + nr_povs * 2);
-
-        mapping = joystick_state[joystick_nr].pov_mapping[c][1];
         if (mapping & POV_X)
             cbox->setCurrentIndex((mapping & 3) * 2);
         else if (mapping & POV_Y)

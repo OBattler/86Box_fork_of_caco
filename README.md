@@ -2,6 +2,7 @@
 =====
 
 [![Build Status](https://ci.86box.net/job/86Box/badge/icon)](https://ci.86box.net/job/86Box/)
+[![License](https://img.shields.io/github/license/86Box/86Box)](COPYING) [![Latest release](https://img.shields.io/github/release/86Box/86Box.svg)](https://github.com/86Box/86Box/releases) [![Downloads](https://img.shields.io/github/downloads/86Box/86Box/total.svg)](https://github.com/86Box/86Box/releases)
 
 **86Box** is a low level x86 emulator that runs older operating systems and software designed for IBM PC systems and compatibles from 1981 through fairly recent system designs based on the PCI bus.
 
@@ -30,9 +31,9 @@ Performance may vary depending on both host and guest configuration. Most emulat
 It is also recommended to use a manager application with 86Box for easier handling of multiple virtual machines.
 
 * [86Box Manager](https://github.com/86Box/86BoxManager) by [Overdoze](https://github.com/daviunic) (Windows only)
-* [86Box Manager Lite](https://github.com/insanemal/86box_manager_py) by [Insanemal](https://github.com/insanemal)
-* [WinBox for 86Box](https://github.com/86Box/WinBox-for-86Box) by Laci bá' (Windows only)
-* [Linbox-qt5](https://github.com/Dungeonseeker/linbox-qt5) by Dungeonseeker (Linux focused, should work on Windows though untested)
+* [86Box Manager X](https://github.com/RetBox/86BoxManagerX) by [xafero](https://github.com/xafero) (Cross platform Port of 86Box Manager using Avalonia)
+* [sl86](https://github.com/DDXofficial/sl86) by [DDX](https://github.com/DDXofficial) (Command-line 86Box machine manager written in Python)
+* [Linbox-qt5](https://github.com/Dungeonseeker/linbox-qt5) by [Dungeonseeker](https://github.com/Dungeonseeker/) (Linux focused, should work on Windows though untested)
 * [MacBox for 86Box](https://github.com/Moonif/MacBox) by [Moonif](https://github.com/Moonif) (MacOS only)
 
 It is also possible to use 86Box on its own with the `--vmpath`/`-P` command line option.
@@ -67,7 +68,7 @@ Donations
 ---------
 
 We do not charge you for the emulator but donations are still welcome:
-https://paypal.me/86Box.
+<https://paypal.me/86Box>.
 
 You can also support the project on Patreon:
-https://www.patreon.com/86box.
+<https://www.patreon.com/86box>.

@@ -50,7 +50,7 @@ msgid "SDL (&OpenGL)"
 msgstr "SDL (OpenGL)(&O)"
 
 msgid "Open&GL (3.0 Core)"
-msgstr "OpenGL (3.0 코어)(&G)"
+msgstr "OpenGL (3.0 Core)(&G)"
 
 msgid "&VNC"
 msgstr "VNC(&V)"
@@ -123,6 +123,9 @@ msgstr "정사각형 픽셀 (비율 유지)(&S)"
 
 msgid "&Integer scale"
 msgstr "정수배 확대(&I)"
+
+msgid "4:&3 Integer scale"
+msgstr "4:3 정수배 확대(&3)"
 
 msgid "E&GA/(S)VGA settings"
 msgstr "E&GA/(S)VGA 설정"
@@ -349,6 +352,9 @@ msgstr "CPU 종류:"
 msgid "Speed:"
 msgstr "속도:"
 
+msgid "Frequency:"
+msgstr "빈도:"
+
 msgid "FPU:"
 msgstr "FPU:"
 
@@ -382,8 +388,8 @@ msgstr "비디오 카드:"
 msgid "Voodoo Graphics"
 msgstr "Voodoo 그래픽"
 
-msgid "IBM 8514/a Graphics"
-msgstr "IBM 8514/a 그래픽"
+msgid "IBM 8514/A Graphics"
+msgstr "IBM 8514/A 그래픽"
 
 msgid "XGA Graphics"
 msgstr "XGA 그래픽"
@@ -406,16 +412,16 @@ msgstr "조이스틱 3..."
 msgid "Joystick 4..."
 msgstr "조이스틱 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "사운드 카드 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "사운드 카드 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "사운드 카드 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "사운드 카드 4:"
 
 msgid "MIDI Out Device:"
@@ -808,9 +814,6 @@ msgstr "어드밴스드 섹터 이미지"
 msgid "Flux images"
 msgstr "플럭스 이미지"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "SDL을 초기화할 수 없습니다. SDL2.dll이 필요합니다"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "실행중인 머신을 재시작하시겠습니까?"
 
@@ -853,8 +856,8 @@ msgstr "86Box에 대해"
 msgid "86Box v"
 msgstr "86Box v"
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "고전 컴퓨터 에뮬레이터\n\n저자: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nGNU General Public 라이선스 (버전 2 이상)에 의해 배포되었습니다. 자세한 내용은 LICENSE 파일을 읽어 주세요."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "고전 컴퓨터 에뮬레이터\n\n저자: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nGNU General Public 라이선스 (버전 2 이상)에 의해 배포되었습니다. 자세한 내용은 LICENSE 파일을 읽어 주세요."
 
 msgid "Hardware not available"
 msgstr "하드웨어를 이용할 수 없습니다"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(시스템 기본값)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "네트워크 드라이버를 초기화하지 못했습니다"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "네트워크 구성이 널 드라이버로 전환됩니다"
 
+msgid "Mouse sensitivity:"
+msgstr "마우스 감도:"
+
+msgid "Select media images from program working directory"
+msgstr "프로그램 작업 디렉토리에서 미디어 이미지 선택"
+
+msgid "PIT mode:"
+msgstr "PIT 모드:"
+
+msgid "Auto"
+msgstr "자동"
+
+msgid "Slow"
+msgstr "느린"
+
+msgid "Fast"
+msgstr "빠른"
+
+msgid "&Auto-pause on focus loss"
+msgstr "집중력 저하 시 자동 일시 중지(&A)"
+
+msgid "WinBox is no longer supported"
+msgstr "WinBox는 더 이상 지원되지 않습니다"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "WinBox 매니저의 개발은 유지 관리자의 부족으로 인해 2022년에 중단되었습니다. 86Box를 더욱 개선하기 위한 노력의 일환으로 WinBox 매니저를 더 이상 지원하지 않기로 결정했습니다.\n\nWinBox를 통해 더 이상의 업데이트는 제공되지 않으며, 최신 버전의 86Box를 계속 사용할 경우 잘못된 동작이 발생할 수 있습니다. WinBox 동작과 관련된 모든 버그 보고는 유효하지 않은 것으로 종료됩니다.\n\n사용할 수 있는 다른 관리자 목록을 보려면 86box.net으로 이동하세요."

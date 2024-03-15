@@ -43,7 +43,7 @@ BEGIN
             MENUITEM "SDL (소프트웨어)(&S)", IDM_VID_SDL_SW
             MENUITEM "SDL (하드웨어)(&H)", IDM_VID_SDL_HW
             MENUITEM "SDL (OpenGL)(&O)", IDM_VID_SDL_OPENGL
-            MENUITEM "OpenGL (3.0 코어)(&G)", IDM_VID_OPENGL_CORE
+            MENUITEM "OpenGL (3.0 Core)(&G)", IDM_VID_OPENGL_CORE
 #ifdef USE_VNC
             MENUITEM "VNC(&V)", IDM_VID_VNC
 #endif
@@ -283,7 +283,7 @@ END
 #define STR_VIDEO         "비디오 카드:"
 #define STR_VIDEO_2       "비디오 카드 2:"
 #define STR_VOODOO        "Voodoo 그래픽"
-#define STR_IBM8514       "IBM 8514/a 그래픽"
+#define STR_IBM8514       "IBM 8514/A 그래픽"
 #define STR_XGA           "XGA 그래픽"
 
 #define STR_MOUSE         "마우스:"
@@ -464,7 +464,6 @@ BEGIN
     IDS_2108    "%u MB (CHS: %i, %i, %i)"
     IDS_2109    "플로피 %i (%s): %ls"
     IDS_2110    "모든 이미지 (*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF)\0*.0??;*.1??;*.??0;*.86F;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.JSON;*.TD0;*.*FD?;*.MFM;*.XDF\0어드밴스드 섹터 이미지 (*.IMD;*.JSON;*.TD0)\0*.IMD;*.JSON;*.TD0\0기본 섹터 이미지 (*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?)\0*.0??;*.1??;*.??0;*.BIN;*.CQ?;*.D??;*.FLP;*.HDM;*.IM?;*.XDF;*.*FD?\0플럭스 이미지 (*.FDI)\0*.FDI\0표면 이미지 (*.86F;*.MFM)\0*.86F;*.MFM\0모든 파일 (*.*)\0*.*\0"
-    IDS_2112    "SDL을 초기화할 수 없습니다. SDL2.dll이 필요합니다"
     IDS_2113    "실행중인 머신을 재시작하시겠습니까?"
     IDS_2114    "86Box를 끝내시겠습니까?"
     IDS_2115    "Ghostscript를 초기화할 수 없습니다"
@@ -480,7 +479,7 @@ BEGIN
     IDS_2125    "86Box에 대해"
     IDS_2126    "86Box v" EMU_VERSION
 
-    IDS_2127    "고전 컴퓨터 에뮬레이터\n\n저자: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nGNU General Public 라이선스 (버전 2 이상)에 의해 배포되었습니다. 자세한 내용은 LICENSE 파일을 읽어 주세요."
+    IDS_2127    "고전 컴퓨터 에뮬레이터\n\n저자: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nGNU General Public 라이선스 (버전 2 이상)에 의해 배포되었습니다. 자세한 내용은 LICENSE 파일을 읽어 주세요."
     IDS_2128    "확인"
     IDS_2129    "하드웨어를 이용할 수 없습니다"
 #ifdef _WIN32

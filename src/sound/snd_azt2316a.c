@@ -968,7 +968,7 @@ azt2316a_get_buffer(int32_t *buffer, int len, void *priv)
 static void *
 azt_init(const device_t *info)
 {
-    FILE       *f;
+    FILE       *fp;
     char       *fn = NULL;
     int         i;
     int         loaded_from_eeprom = 0;
@@ -986,20 +986,20 @@ azt_init(const device_t *info)
     }
 
     /* config */
-    f = nvr_fopen(fn, "rb");
-    if (f) {
+    fp = nvr_fopen(fn, "rb");
+    if (fp) {
         uint8_t checksum = 0x7f;
         uint8_t saved_checksum;
         size_t  res;
 
-        res = fread(read_eeprom, AZTECH_EEPROM_SIZE, 1, f);
+        res = fread(read_eeprom, AZTECH_EEPROM_SIZE, 1, fp);
         for (i = 0; i < AZTECH_EEPROM_SIZE; i++)
             checksum += read_eeprom[i];
 
-        res = fread(&saved_checksum, sizeof(saved_checksum), 1, f);
+        res = fread(&saved_checksum, sizeof(saved_checksum), 1, fp);
         (void) res;
 
-        fclose(f);
+        fclose(fp);
 
         if (checksum == saved_checksum)
             loaded_from_eeprom = 1;
@@ -1237,6 +1237,7 @@ azt_init(const device_t *info)
     if (azt2316a->sb->opl_enabled)
         fm_driver_get(FM_YMF262, &azt2316a->sb->opl);
 
+    sb_dsp_set_real_opl(&azt2316a->sb->dsp, 1);
     sb_dsp_init(&azt2316a->sb->dsp, SBPRO2, azt2316a->type, azt2316a);
     sb_dsp_setaddr(&azt2316a->sb->dsp, azt2316a->cur_addr);
     sb_dsp_setirq(&azt2316a->sb->dsp, azt2316a->cur_irq);
@@ -1253,6 +1254,8 @@ azt_init(const device_t *info)
 
     azt2316a_create_config_word(azt2316a);
     sound_add_handler(azt2316a_get_buffer, azt2316a);
+    if (azt2316a->sb->opl_enabled)
+        music_add_handler(sb_get_music_buffer_sbpro, azt2316a->sb);
     sound_set_cd_audio_filter(sbpro_filter_cd_audio, azt2316a->sb);
 
     if (azt2316a->cur_mpu401_enabled) {
@@ -1273,7 +1276,7 @@ azt_close(void *priv)
 {
     azt2316a_t *azt2316a = (azt2316a_t *) priv;
     char       *fn       = NULL;
-    FILE       *f;
+    FILE       *fp;
     uint8_t     checksum = 0x7f;
 
     if (azt2316a->type == SB_SUBTYPE_CLONE_AZT1605_0X0C) {
@@ -1283,18 +1286,18 @@ azt_close(void *priv)
     }
 
     /* always save to eeprom (recover from bad values) */
-    f = nvr_fopen(fn, "wb");
-    if (f) {
+    fp = nvr_fopen(fn, "wb");
+    if (fp) {
         for (uint8_t i = 0; i < AZTECH_EEPROM_SIZE; i++)
             checksum += azt2316a->sb->dsp.azt_eeprom[i];
-        fwrite(azt2316a->sb->dsp.azt_eeprom, AZTECH_EEPROM_SIZE, 1, f);
+        fwrite(azt2316a->sb->dsp.azt_eeprom, AZTECH_EEPROM_SIZE, 1, fp);
 
         // TODO: confirm any models saving mixer settings to EEPROM and implement reading back
         // TODO: should remember to save wss duplex setting if 86Box has voice recording implemented in the future? Also, default azt2316a->wss_config
         // TODO: azt2316a->cur_mode is not saved to EEPROM?
-        fwrite(&checksum, sizeof(checksum), 1, f);
+        fwrite(&checksum, sizeof(checksum), 1, fp);
 
-        fclose(f);
+        fclose(fp);
     }
 
     sb_close(azt2316a->sb);

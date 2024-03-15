@@ -69,6 +69,9 @@ vga_out(uint16_t addr, uint8_t val, void *priv)
                 }
             }
             break;
+
+        default:
+            break;
     }
     svga_out(addr, val, svga);
 }
@@ -183,7 +186,7 @@ vga_force_redraw(void *priv)
 }
 
 const device_t vga_device = {
-    .name          = "VGA",
+    .name          = "IBM VGA",
     .internal_name = "vga",
     .flags         = DEVICE_ISA,
     .local         = 0,
@@ -197,7 +200,7 @@ const device_t vga_device = {
 };
 
 const device_t ps1vga_device = {
-    .name          = "PS/1 VGA",
+    .name          = "IBM PS/1 VGA",
     .internal_name = "ps1vga",
     .flags         = DEVICE_ISA,
     .local         = 0,
@@ -211,7 +214,7 @@ const device_t ps1vga_device = {
 };
 
 const device_t ps1vga_mca_device = {
-    .name          = "PS/1 VGA",
+    .name          = "IBM PS/1 VGA",
     .internal_name = "ps1vga_mca",
     .flags         = DEVICE_MCA,
     .local         = 0,

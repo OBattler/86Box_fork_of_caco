@@ -70,6 +70,11 @@ uint16_t aha_ports[] = {
 
 static uint8_t *aha1542cp_pnp_rom = NULL;
 
+// static char    *aha1542cp_rev     = "F001";
+static char     aha1542cp_rev[16] = { 0 };
+
+static uint16_t fw_chksum         = 0x0000;
+
 #pragma pack(push, 1)
 typedef struct aha_setup_t {
     uint8_t  CustomerSignature[20];
@@ -152,13 +157,13 @@ aha154x_shram(x54x_t *dev, uint8_t cmd)
 static void
 aha_eeprom_save(x54x_t *dev)
 {
-    FILE *f;
+    FILE *fp;
 
-    f = nvr_fopen(dev->nvr_path, "wb");
-    if (f) {
-        fwrite(dev->nvr, 1, NVR_SIZE, f);
-        fclose(f);
-        f = NULL;
+    fp = nvr_fopen(dev->nvr_path, "wb");
+    if (fp) {
+        fwrite(dev->nvr, 1, NVR_SIZE, fp);
+        fclose(fp);
+        fp = NULL;
     }
 }
 
@@ -282,15 +287,12 @@ aha_param_len(void *priv)
         case CMD_BIOS_MBINIT:
             /* Same as 0x01 for AHA. */
             return sizeof(MailboxInit_t);
-            break;
 
         case CMD_SHADOW_RAM:
             return 1;
-            break;
 
         case CMD_WRITE_EEPROM:
             return 35;
-            break;
 
         case CMD_READ_EEPROM:
             return 3;
@@ -469,8 +471,10 @@ aha_setup_data(void *priv)
     ReplyISI->fParityCheckingEnabled        = dev->parity & 1;
 
     U32_TO_ADDR(aha_setup->BIOSMailboxAddress, dev->BIOSMailboxOutAddr);
-    aha_setup->uChecksum = 0xA3;
-    aha_setup->uUnknown  = 0xC2;
+    // aha_setup->uChecksum = 0xA3;
+    // aha_setup->uUnknown  = 0xC2;
+    aha_setup->uChecksum = fw_chksum >> 8;
+    aha_setup->uUnknown  = fw_chksum & 0xff;
 }
 
 static void
@@ -716,7 +720,7 @@ aha_setbios(x54x_t *dev)
     uint32_t size;
     uint32_t mask;
     uint32_t temp;
-    FILE    *f;
+    FILE    *fp;
     int      i;
 
     /* Only if this device has a BIOS ROM. */
@@ -725,7 +729,7 @@ aha_setbios(x54x_t *dev)
 
     /* Open the BIOS image file and make sure it exists. */
     aha_log("%s: loading BIOS from '%s'\n", dev->name, dev->bios_path);
-    if ((f = rom_fopen(dev->bios_path, "rb")) == NULL) {
+    if ((fp = rom_fopen(dev->bios_path, "rb")) == NULL) {
         aha_log("%s: BIOS ROM not found!\n", dev->name);
         return;
     }
@@ -737,17 +741,17 @@ aha_setbios(x54x_t *dev)
      * this special case, we can't: we may need WRITE access to the
      * memory later on.
      */
-    (void) fseek(f, 0L, SEEK_END);
-    temp = ftell(f);
-    (void) fseek(f, 0L, SEEK_SET);
+    (void) fseek(fp, 0L, SEEK_END);
+    temp = ftell(fp);
+    (void) fseek(fp, 0L, SEEK_SET);
 
     /* Load first chunk of BIOS (which is the main BIOS, aka ROM1.) */
     dev->rom1 = malloc(ROM_SIZE);
-    (void) !fread(dev->rom1, ROM_SIZE, 1, f);
+    (void) !fread(dev->rom1, ROM_SIZE, 1, fp);
     temp -= ROM_SIZE;
     if (temp > 0) {
         dev->rom2 = malloc(ROM_SIZE);
-        (void) !fread(dev->rom2, ROM_SIZE, 1, f);
+        (void) !fread(dev->rom2, ROM_SIZE, 1, fp);
         temp -= ROM_SIZE;
     } else {
         dev->rom2 = NULL;
@@ -757,13 +761,13 @@ aha_setbios(x54x_t *dev)
         free(dev->rom1);
         if (dev->rom2 != NULL)
             free(dev->rom2);
-        (void) fclose(f);
+        (void) fclose(fp);
         return;
     }
-    temp = ftell(f);
+    temp = ftell(fp);
     if (temp > ROM_SIZE)
         temp = ROM_SIZE;
-    (void) fclose(f);
+    (void) fclose(fp);
 
     /* Adjust BIOS size in chunks of 2K, as per BIOS spec. */
     size = 0x10000;
@@ -824,7 +828,8 @@ static void
 aha_setmcode(x54x_t *dev)
 {
     uint32_t temp;
-    FILE    *f;
+    FILE    *fp;
+    uint16_t tempb = 0x00;
 
     /* Only if this device has a BIOS ROM. */
     if (dev->mcode_path == NULL)
@@ -832,7 +837,7 @@ aha_setmcode(x54x_t *dev)
 
     /* Open the microcode image file and make sure it exists. */
     aha_log("%s: loading microcode from '%ls'\n", dev->name, dev->bios_path);
-    if ((f = rom_fopen(dev->mcode_path, "rb")) == NULL) {
+    if ((fp = rom_fopen(dev->mcode_path, "rb")) == NULL) {
         aha_log("%s: microcode ROM not found!\n", dev->name);
         return;
     }
@@ -844,15 +849,18 @@ aha_setmcode(x54x_t *dev)
      * this special case, we can't: we may need WRITE access to the
      * memory later on.
      */
-    (void) fseek(f, 0L, SEEK_END);
-    temp = ftell(f);
-    (void) fseek(f, 0L, SEEK_SET);
+    (void) fseek(fp, 0L, SEEK_END);
+    temp = ftell(fp);
+    (void) fseek(fp, 0L, SEEK_SET);
 
     if (temp < (dev->cmd_33_offset + dev->cmd_33_len - 1)) {
         aha_log("%s: microcode ROM size invalid!\n", dev->name);
-        (void) fclose(f);
+        (void) fclose(fp);
         return;
     }
+
+    fseek(fp, 0x3136, SEEK_SET);
+    (void) !fread(dev->fw_rev, 4, 1, fp);
 
     /* Allocate the buffer and then read the real PnP ROM into it. */
     if (aha1542cp_pnp_rom != NULL) {
@@ -860,11 +868,11 @@ aha_setmcode(x54x_t *dev)
         aha1542cp_pnp_rom = NULL;
     }
     aha1542cp_pnp_rom = (uint8_t *) malloc(dev->pnp_len + 7);
-    fseek(f, dev->pnp_offset, SEEK_SET);
-    (void) !fread(aha1542cp_pnp_rom, dev->pnp_len, 1, f);
+    fseek(fp, dev->pnp_offset, SEEK_SET);
+    (void) !fread(aha1542cp_pnp_rom, dev->pnp_len, 1, fp);
     memset(&(aha1542cp_pnp_rom[4]), 0x00, 5);
-    fseek(f, dev->pnp_offset + 4, SEEK_SET);
-    (void) !fread(&(aha1542cp_pnp_rom[9]), dev->pnp_len - 4, 1, f);
+    fseek(fp, dev->pnp_offset + 4, SEEK_SET);
+    (void) !fread(&(aha1542cp_pnp_rom[9]), dev->pnp_len - 4, 1, fp);
     /* Even the real AHA-1542CP microcode seem to be flipping bit
        4 to not erroneously indicate there is a range length. */
     aha1542cp_pnp_rom[0x87] |= 0x04;
@@ -874,10 +882,18 @@ aha_setmcode(x54x_t *dev)
     aha1542cp_pnp_rom[dev->pnp_len + 6] = 0x00;
 
     /* Load the SCSISelect decompression code. */
-    fseek(f, dev->cmd_33_offset, SEEK_SET);
-    (void) !fread(dev->cmd_33_buf, dev->cmd_33_len, 1, f);
+    fseek(fp, dev->cmd_33_offset, SEEK_SET);
+    (void) !fread(dev->cmd_33_buf, dev->cmd_33_len, 1, fp);
 
-    (void) fclose(f);
+    fw_chksum = 0x0000;
+
+    for (uint16_t i = 0; i < 32768; i++) {
+        (void) fseek(fp, i, SEEK_SET);
+        (void) !fread(&tempb, 1, 1, fp);
+        fw_chksum += tempb;
+    }
+
+    (void) fclose(fp);
 }
 
 static void
@@ -895,14 +911,14 @@ aha_initnvr(x54x_t *dev)
                    EE2_EXT1G | EE2_RMVOK); /* Imm return on seek */
     dev->nvr[3] = SPEED_50;                /* speed 5.0 MB/s */
     dev->nvr[6] = (EE6_TERM |              /* host term enable */
-                   EE6_RSTBUS);            /* reset SCSI bus on boot*/
+                   EE6_RSTBUS);            /* reset SCSI bus on boot */
 }
 
 /* Initialize the board's EEPROM (NVR.) */
 static void
 aha_setnvr(x54x_t *dev)
 {
-    FILE *f;
+    FILE *fp;
 
     /* Only if this device has an EEPROM. */
     if (dev->nvr_path == NULL)
@@ -912,12 +928,12 @@ aha_setnvr(x54x_t *dev)
     dev->nvr = (uint8_t *) malloc(NVR_SIZE);
     memset(dev->nvr, 0x00, NVR_SIZE);
 
-    f = nvr_fopen(dev->nvr_path, "rb");
-    if (f) {
-        if (fread(dev->nvr, 1, NVR_SIZE, f) != NVR_SIZE)
+    fp = nvr_fopen(dev->nvr_path, "rb");
+    if (fp) {
+        if (fread(dev->nvr, 1, NVR_SIZE, fp) != NVR_SIZE)
             fatal("aha_setnvr(): Error reading data\n");
-        fclose(f);
-        f = NULL;
+        fclose(fp);
+        fp = NULL;
     } else
         aha_initnvr(dev);
 
@@ -945,6 +961,7 @@ static void *
 aha_init(const device_t *info)
 {
     x54x_t *dev;
+    const char *bios_rev = NULL;
 
     /* Call common initializer. */
     dev      = x54x_init(info);
@@ -984,13 +1001,16 @@ aha_init(const device_t *info)
 
     strcpy(dev->vendor, "Adaptec");
 
+    fw_chksum          = 0xa3c2;
+
     /* Perform per-board initialization. */
     switch (dev->type) {
         case AHA_154xA:
             strcpy(dev->name, "AHA-154xA");
             dev->fw_rev    = "A003";                              /* The 3.07 microcode says A006. */
             dev->bios_path = "roms/scsi/adaptec/aha1540a307.bin"; /*Only for port 0x330*/
-            /* This is configurable from the configuration for the 154xB, the rest of the controllers read it from the EEPROM. */
+            /* This is configurable from the configuration for the 154xB, the rest of the controllers read
+               it from the EEPROM. */
             dev->HostID      = device_get_config_int("hostid");
             dev->rom_shram   = 0x3F80;    /* shadow RAM address base */
             dev->rom_shramsz = 128;       /* size of shadow RAM */
@@ -1012,7 +1032,8 @@ aha_init(const device_t *info)
                     break;
             }
             dev->fw_rev = "A005"; /* The 3.2 microcode says A012. */
-            /* This is configurable from the configuration for the 154xB, the rest of the controllers read it from the EEPROM. */
+            /* This is configurable from the configuration for the 154xB, the rest of the controllers read
+               it from the EEPROM. */
             dev->HostID      = device_get_config_int("hostid");
             dev->rom_shram   = 0x3F80;    /* shadow RAM address base */
             dev->rom_shramsz = 128;       /* size of shadow RAM */
@@ -1028,6 +1049,7 @@ aha_init(const device_t *info)
             dev->rom_shramsz     = 128;             /* size of shadow RAM */
             dev->rom_ioaddr      = 0x3F7E;          /* [2:0] idx into addr table */
             dev->rom_fwhigh      = 0x0022;          /* firmware version (hi/lo) */
+            dev->flags |= X54X_HAS_SIGNATURE;
             dev->ven_get_host_id = aha_get_host_id; /* function to return host ID from EEPROM */
             dev->ven_get_irq     = aha_get_irq;     /* function to return IRQ from EEPROM */
             dev->ven_get_dma     = aha_get_dma;     /* function to return DMA channel from EEPROM */
@@ -1044,6 +1066,7 @@ aha_init(const device_t *info)
             dev->rom_ioaddr  = 0x3F7E; /* [2:0] idx into addr table */
             dev->rom_fwhigh  = 0x0022; /* firmware version (hi/lo) */
             dev->flags |= X54X_CDROM_BOOT;
+            dev->flags |= X54X_HAS_SIGNATURE;
             dev->ven_get_host_id = aha_get_host_id; /* function to return host ID from EEPROM */
             dev->ven_get_irq     = aha_get_irq;     /* function to return IRQ from EEPROM */
             dev->ven_get_dma     = aha_get_dma;     /* function to return DMA channel from EEPROM */
@@ -1054,26 +1077,31 @@ aha_init(const device_t *info)
 
         case AHA_154xCP:
             strcpy(dev->name, "AHA-154xCP");
-            dev->bios_path   = "roms/scsi/adaptec/aha1542cp102.bin";
-            dev->mcode_path  = "roms/scsi/adaptec/908301-00_f_mcode_17c9.u12";
+            bios_rev         = (char *) device_get_config_bios("bios_rev");
+            dev->bios_path   = (char *) device_get_bios_file(info, bios_rev, 0);
+            dev->mcode_path  = (char *) device_get_bios_file(info, bios_rev, 1);
             dev->nvr_path    = "aha1542cp.nvr";
-            dev->fw_rev      = "F001";
+            dev->fw_rev      = aha1542cp_rev;
             dev->rom_shram   = 0x3F80; /* shadow RAM address base */
             dev->rom_shramsz = 128;    /* size of shadow RAM */
             dev->rom_ioaddr  = 0x3F7E; /* [2:0] idx into addr table */
             dev->rom_fwhigh  = 0x0055; /* firmware version (hi/lo) */
             dev->flags |= X54X_CDROM_BOOT;
             dev->flags |= X54X_ISAPNP;
+            dev->flags |= X54X_HAS_SIGNATURE;
             dev->ven_get_host_id = aha_get_host_id; /* function to return host ID from EEPROM */
             dev->ven_get_irq     = aha_get_irq;     /* function to return IRQ from EEPROM */
             dev->ven_get_dma     = aha_get_dma;     /* function to return DMA channel from EEPROM */
             dev->ha_bps          = 10000000.0;      /* fast SCSI */
             dev->pnp_len         = 0x00be;          /* length of the PnP ROM */
-            dev->pnp_offset      = 0x533d;          /* offset of the PnP ROM in the microcode ROM */
-            dev->cmd_33_len      = 0x06dc;          /* length of the SCSISelect code expansion routine returned by
-                                                       SCSI controller command 0x33 */
-            dev->cmd_33_offset = 0x7000;            /* offset of the SCSISelect code expansion routine in the
-                                                       microcode ROM */
+            if (!strcmp(bios_rev, "v1_02_en"))
+                dev->pnp_offset      = 0x533d;          /* offset of the PnP ROM in the microcode ROM */
+            else
+                dev->pnp_offset      = 0x5345;          /* offset of the PnP ROM in the microcode ROM */
+            dev->cmd_33_len      = 0x06dc;          /* length of the SCSISelect code expansion routine
+                                                       returned by SCSI controller command 0x33 */
+            dev->cmd_33_offset   = 0x7000;          /* offset of the SCSISelect code expansion routine
+                                                       in the microcode ROM */
             aha_setmcode(dev);
             if (aha1542cp_pnp_rom)
                 isapnp_add_card(aha1542cp_pnp_rom, dev->pnp_len + 7, aha_pnp_config_changed, NULL, NULL, NULL, dev);
@@ -1088,6 +1116,7 @@ aha_init(const device_t *info)
             dev->fw_rev    = "BB01";
 
             dev->flags |= X54X_LBA_BIOS;
+            dev->flags |= X54X_HAS_SIGNATURE; /*To be confirmed*/
 
             /* Enable MCA. */
             dev->pos_regs[0] = 0x1F; /* MCA board ID */
@@ -1099,6 +1128,8 @@ aha_init(const device_t *info)
         default:
             break;
     }
+
+    scsi_bus_set_speed(dev->bus, dev->ha_bps);
 
     /* Initialize ROM BIOS if needed. */
     aha_setbios(dev);
@@ -1381,6 +1412,31 @@ static const device_config_t aha_154xcf_config[] = {
     },
     { .name = "", .description = "", .type = CONFIG_END }
 };
+
+static const device_config_t aha_154xcp_config[] = {
+    {
+        .name = "bios_rev",
+        .description = "BIOS Revision",
+        .type = CONFIG_BIOS,
+        .default_string = "v1_02_en",
+        .default_int = 0,
+        .file_filter = "",
+        .spinner = { 0 }, /*W1*/
+        .bios = {
+            { .name = "Version 1.02 (English)", .internal_name = "v1_02_en", .bios_type = BIOS_NORMAL,
+              .files_no = 2, .local = 0, .size = 32768, .files = { "roms/scsi/adaptec/aha1542cp102.bin",
+              "roms/scsi/adaptec/908301-00_f_mcode_17c9.u12", "" } },
+            { .name = "Version 1.02 (German)", .internal_name = "v1_02_de", .bios_type = BIOS_NORMAL,
+              .files_no = 2, .local = 0, .size = 32768, .files = { "roms/scsi/adaptec/buff_1-0_bios.bin",
+              "roms/scsi/adaptec/buff_1-0_mcode.bin", "" } },
+            { .name = "Version 1.03 (English)", .internal_name = "v1_03_en", .bios_type = BIOS_NORMAL,
+              .files_no = 2, .local = 0, .size = 32768, .files = { "roms/scsi/adaptec/aha1542cp103.bin",
+              "roms/scsi/adaptec/908301-00_g_mcode_144c.u12.bin", "" } },
+            { .files_no = 0 }
+        },
+    },
+    { .name = "", .description = "", .type = CONFIG_END }
+};
 // clang-format on
 
 const device_t aha154xa_device = {
@@ -1450,7 +1506,7 @@ const device_t aha154xcp_device = {
     { .available = NULL },
     .speed_changed = NULL,
     .force_redraw  = NULL,
-    .config        = NULL
+    .config        = aha_154xcp_config
 };
 
 const device_t aha1640_device = {

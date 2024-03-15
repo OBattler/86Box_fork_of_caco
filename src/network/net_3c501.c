@@ -56,7 +56,6 @@
 #include <86box/thread.h>
 #include <86box/timer.h>
 #include <86box/network.h>
-#include <86box/net_3c501.h>
 #include <86box/bswap.h>
 #include <86box/plat_unused.h>
 
@@ -373,7 +372,7 @@ elnkR3HardReset(threec501_t *dev)
 static __inline int
 padr_match(threec501_t *dev, const uint8_t *buf)
 {
-    const struct ether_header *hdr = (struct ether_header *) buf;
+    const struct ether_header *hdr = (const struct ether_header *) buf;
     int                        result;
 
     /* Checks own + broadcast as well as own + multicast. */
@@ -389,7 +388,7 @@ static __inline int
 padr_bcast(threec501_t *dev, const uint8_t *buf)
 {
     static uint8_t             aBCAST[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-    const struct ether_header *hdr       = (struct ether_header *) buf;
+    const struct ether_header *hdr       = (const struct ether_header *) buf;
     int                        result    = (dev->RcvCmd.adr_match == EL_ADRM_BCAST) && !memcmp(hdr->ether_dhost, aBCAST, 6);
 
     return result;
@@ -401,8 +400,8 @@ padr_bcast(threec501_t *dev, const uint8_t *buf)
 static __inline int
 padr_mcast(threec501_t *dev, const uint8_t *buf)
 {
-    struct ether_header *hdr    = (struct ether_header *) buf;
-    int                  result = (dev->RcvCmd.adr_match == EL_ADRM_MCAST) && ETHER_IS_MULTICAST(hdr->ether_dhost);
+    const struct ether_header *hdr    = (const struct ether_header *) buf;
+    int                        result = (dev->RcvCmd.adr_match == EL_ADRM_MCAST) && ETHER_IS_MULTICAST(hdr->ether_dhost);
 
     return result;
 }

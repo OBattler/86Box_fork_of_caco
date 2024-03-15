@@ -124,6 +124,9 @@ msgstr "&Négyzetes képpontok (aránytartás)"
 msgid "&Integer scale"
 msgstr "&Egész tényezős nagyítás"
 
+msgid "4:&3 Integer scale"
+msgstr "4:&3 Egész tényezős nagyítás"
+
 msgid "E&GA/(S)VGA settings"
 msgstr "E&GA/(S)VGA beállítások"
 
@@ -349,6 +352,9 @@ msgstr "Processzor:"
 msgid "Speed:"
 msgstr "Seb.:"
 
+msgid "Frequency:"
+msgstr "Frekvencia:"
+
 msgid "FPU:"
 msgstr "FPU-egység:"
 
@@ -382,8 +388,8 @@ msgstr "Videokártya:"
 msgid "Voodoo Graphics"
 msgstr "Voodoo-gyorsítókártya"
 
-msgid "IBM 8514/a Graphics"
-msgstr "IBM 8514/a-gyorsítókártya"
+msgid "IBM 8514/A Graphics"
+msgstr "IBM 8514/A-gyorsítókártya"
 
 msgid "XGA Graphics"
 msgstr "XGA-gyorsítókártya"
@@ -406,16 +412,16 @@ msgstr "Játékvez. 3..."
 msgid "Joystick 4..."
 msgstr "Játékvez. 4..."
 
-msgid "Sound card 1:"
+msgid "Sound card #1:"
 msgstr "Hangkártya 1:"
 
-msgid "Sound card 2:"
+msgid "Sound card #2:"
 msgstr "Hangkártya 2:"
 
-msgid "Sound card 3:"
+msgid "Sound card #3:"
 msgstr "Hangkártya 3:"
 
-msgid "Sound card 4:"
+msgid "Sound card #4:"
 msgstr "Hangkártya 4:"
 
 msgid "MIDI Out Device:"
@@ -808,9 +814,6 @@ msgstr "Továbbfejlesztett szektor képek"
 msgid "Flux images"
 msgstr "Flux képekfájlok"
 
-msgid "Unable to initialize SDL, SDL2.dll is required"
-msgstr "Az SDL inicializálása nem lehetséges, az SDL2.dll fájl szükséges"
-
 msgid "Are you sure you want to hard reset the emulated machine?"
 msgstr "Biztosan szeretné újraindítani az emulált gépet?"
 
@@ -853,8 +856,8 @@ msgstr "A 86Box névjegye"
 msgid "86Box v"
 msgstr "86Box v"
 
-msgid "An emulator of old computers\n\nAuthors: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
-msgstr "Régi számítógépek emulátora\n\nFejlesztők: Sarah Walker, Miran Grca, Fred N. van Kempen (waltje), SA1988, Tiseno100, reenigne, leilei, JohnElliott, greatpsycho, and others.\n\nFordította: Laci bá'\n\nMegjelent a GNU General Public License v2 vagy újabb alatt. További információért lásd a LICENSE fájlt."
+msgid "An emulator of old computers\n\nAuthors: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nReleased under the GNU General Public License version 2 or later. See LICENSE for more information."
+msgstr "Régi számítógépek emulátora\n\nFejlesztők: Miran Grča (OBattler), RichardG867, Jasmine Iwanek, TC1995, coldbrewed, Teemu Korhonen (Manaatti), Joakim L. Gilje, Adrien Moulin (elyosh), Daniel Balsom (gloriouscow), Cacodemon345, Fred N. van Kempen (waltje), Tiseno100, reenigne, and others.\n\nWith previous core contributions from Sarah Walker, leilei, JohnElliott, greatpsycho, and others.\n\nFordította: Laci bá'\n\nMegjelent a GNU General Public License v2 vagy újabb alatt. További információért lásd a LICENSE fájlt."
 
 msgid "Hardware not available"
 msgstr "Hardver nem elérhető"
@@ -938,22 +941,22 @@ msgid "OpenGL (3.0 Core) renderer could not be initialized. Use another renderer
 msgstr "Az OpenGL (3.0 Core) megjelenítő-motort nem sikerült inicializálni. Kérem használjon másik renderelőt."
 
 msgid "Resume execution"
-msgstr "Resume execution"
+msgstr "Folytassa a végrehajtást"
 
 msgid "Pause execution"
-msgstr "Pause execution"
+msgstr "Kivitelezés szüneteltetése"
 
 msgid "Press Ctrl+Alt+Del"
-msgstr "Press Ctrl+Alt+Del"
+msgstr "Nyomja meg a Ctrl+Alt+Del"
 
 msgid "Press Ctrl+Alt+Esc"
-msgstr "Press Ctrl+Alt+Esc"
+msgstr "Nyomja meg a Ctrl+Alt+Esc"
 
 msgid "Hard reset"
-msgstr "Hard reset"
+msgstr "Hardveres újraindítás"
 
 msgid "ACPI shutdown"
-msgstr "ACPI shutdown"
+msgstr "ACPI leállítás"
 
 msgid "Hard disk (%s)"
 msgstr "Merevlemez (%s)"
@@ -1196,8 +1199,34 @@ msgid "(System Default)"
 msgstr "(A rendszer nyelve)"
 
 msgid "Failed to initialize network driver"
-msgstr "Failed to initialize network driver"
+msgstr "Nem sikerült inicializálni a hálózati illesztőprogramot"
 
 msgid "The network configuration will be switched to the null driver"
-msgstr "The network configuration will be switched to the null driver"
+msgstr "A hálózati konfiguráció átvált a null illesztőprogramra"
 
+msgid "Mouse sensitivity:"
+msgstr "Egér érzékenység:"
+
+msgid "Select media images from program working directory"
+msgstr "Médiaképek kiválasztása a program munkakönyvtárából"
+
+msgid "PIT mode:"
+msgstr "PIT üzemmód:"
+
+msgid "Auto"
+msgstr "Automatikus"
+
+msgid "Slow"
+msgstr "Lassú"
+
+msgid "Fast"
+msgstr "Gyors"
+
+msgid "&Auto-pause on focus loss"
+msgstr "&Automatikus szünet fókuszvesztéskor"
+
+msgid "WinBox is no longer supported"
+msgstr "A WinBox már nem támogatott"
+
+msgid "Development of the WinBox manager stopped in 2022 due to a lack of maintainers. As we direct our efforts towards making 86Box even better, we have made the decision to no longer support WinBox as a manager.\n\nNo further updates will be provided through WinBox, and you may encounter incorrect behavior should you continue using it with newer versions of 86Box. Any bug reports related to WinBox behavior will be closed as invalid.\n\nGo to 86box.net for a list of other managers you can use."
+msgstr "A WinBox menedzser fejlesztése 2022-ben leállt karbantartók hiányában. Mivel erőfeszítéseinket a 86Box még jobbá tételére irányítjuk, úgy döntöttünk, hogy a WinBox-ot mint menedzsert nem támogatjuk tovább.\n\nA WinBoxon keresztül nem lesznek további frissítések, és hibás viselkedéssel találkozhat, ha továbbra is a 86Box újabb verzióival használja. A WinBox viselkedésével kapcsolatos hibajelentéseket érvénytelennek nyilvánítjuk.\n\nA 86box.net oldalon talál egy listát más kezelőkről, amelyeket használhat."

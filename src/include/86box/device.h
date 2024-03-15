@@ -41,38 +41,70 @@
 #ifndef EMU_DEVICE_H
 #define EMU_DEVICE_H
 
-#define CONFIG_END       -1
-#define CONFIG_STRING    0
-#define CONFIG_INT       1
-#define CONFIG_BINARY    2
-#define CONFIG_SELECTION 3
-#define CONFIG_MIDI_OUT  4
-#define CONFIG_FNAME     5
-#define CONFIG_SPINNER   6
-#define CONFIG_HEX16     7
-#define CONFIG_HEX20     8
-#define CONFIG_MAC       9
-#define CONFIG_MIDI_IN   10
-#define CONFIG_BIOS      11
-#define CONFIG_SERPORT   12
+#define CONFIG_END         -1                          /* N/A */
+
+#define CONFIG_SHIFT        4
+
+#define CONFIG_TYPE_INT     (0 << CONFIG_SHIFT)
+#define CONFIG_TYPE_STRING  (1 << CONFIG_SHIFT)
+#define CONFIG_TYPE_HEX16   (2 << CONFIG_SHIFT)
+#define CONFIG_TYPE_HEX20   (3 << CONFIG_SHIFT)
+#define CONFIG_TYPE_MAC     (4 << CONFIG_SHIFT)
+
+#define CONFIG_INT          (0 | CONFIG_TYPE_INT)      /* config_get_int() */
+#define CONFIG_BINARY       (1 | CONFIG_TYPE_INT)      /* config_get_int() */
+#define CONFIG_SELECTION    (2 | CONFIG_TYPE_INT)      /* config_get_int() */
+#define CONFIG_MIDI_OUT     (3 | CONFIG_TYPE_INT)      /* config_get_int() */
+#define CONFIG_SPINNER      (4 | CONFIG_TYPE_INT)      /* config_get_int() */
+#define CONFIG_MIDI_IN      (5 | CONFIG_TYPE_INT)      /* config_get_int() */
+
+#define CONFIG_STRING       (0 | CONFIG_TYPE_STRING)     /* config_get_string() */
+#define CONFIG_FNAME        (1 | CONFIG_TYPE_STRING)     /* config_get_string() */
+#define CONFIG_SERPORT      (2 | CONFIG_TYPE_STRING)     /* config_get_string() */
+#define CONFIG_BIOS         (3 | CONFIG_TYPE_STRING)     /* config_get_string() */
+
+#define CONFIG_HEX16        (0 | CONFIG_TYPE_HEX16)      /* config_get_hex16() */
+
+#define CONFIG_HEX20        (0 | CONFIG_TYPE_HEX20)      /* config_get_hex20() */
+
+#define CONFIG_MAC          (0 | CONFIG_TYPE_MAC)        /* N/A */
+
+#define CONFIG_SUBTYPE_MASK (CONFIG_IS_STRING - 1)
+
+#define CONFIG_DEP          (16 << CONFIG_SHIFT)
+#define CONFIG_TYPE_MASK    (CONFIG_DEP - 1)
+
+// #define CONFIG_ONBOARD    256      /* only avaialble on the on-board variant */
+// #define CONFIG_STANDALONE 257      /* not available on the on-board variant */
 
 enum {
     DEVICE_PCJR      = 2,          /* requires an IBM PCjr */
-    DEVICE_AT        = 4,          /* requires an AT-compatible system */
-    DEVICE_PS2       = 8,          /* requires a PS/1 or PS/2 system */
-    DEVICE_ISA       = 0x10,       /* requires the ISA bus */
-    DEVICE_CBUS      = 0x20,       /* requires the C-BUS bus */
-    DEVICE_MCA       = 0x40,       /* requires the MCA bus */
-    DEVICE_EISA      = 0x80,       /* requires the EISA bus */
-    DEVICE_VLB       = 0x100,      /* requires the PCI bus */
-    DEVICE_PCI       = 0x200,      /* requires the VLB bus */
-    DEVICE_AGP       = 0x400,      /* requires the AGP bus */
-    DEVICE_AC97      = 0x800,      /* requires the AC'97 bus */
-    DEVICE_COM       = 0x1000,     /* requires a serial port */
-    DEVICE_LPT       = 0x2000,     /* requires a parallel port */
-    DEVICE_KBC       = 0x4000,     /* is a keyboard controller */
+    DEVICE_XTKBC     = 4,          /* requires an XT-compatible keyboard controller */
+    DEVICE_AT        = 8,          /* requires an AT-compatible system */
+    DEVICE_ATKBC     = 0x10,       /* requires an AT-compatible keyboard controller */
+    DEVICE_PS2       = 0x20,       /* requires a PS/1 or PS/2 system */
+    DEVICE_ISA       = 0x40,       /* requires the ISA bus */
+    DEVICE_CBUS      = 0x80,       /* requires the C-BUS bus */
+    DEVICE_PCMCIA    = 0x100,      /* requires the PCMCIA bus */
+    DEVICE_MCA       = 0x200,      /* requires the MCA bus */
+    DEVICE_HIL       = 0x400,      /* requires the HP HIL bus */
+    DEVICE_EISA      = 0x800,      /* requires the EISA bus */
+    DEVICE_AT32      = 0x1000,     /* requires the Mylex AT/32 local bus */
+    DEVICE_OLB       = 0x2000,     /* requires the OPTi local bus */
+    DEVICE_VLB       = 0x4000,     /* requires the VLB bus */
+    DEVICE_PCI       = 0x8000,     /* requires the PCI bus */
+    DEVICE_CARDBUS   = 0x10000,    /* requires the CardBus bus */
+    DEVICE_USB       = 0x20000,    /* requires the USB bus */
+    DEVICE_AGP       = 0x40000,    /* requires the AGP bus */
+    DEVICE_AC97      = 0x80000,    /* requires the AC'97 bus */
+    DEVICE_COM       = 0x100000,   /* requires a serial port */
+    DEVICE_LPT       = 0x200000,   /* requires a parallel port */
+    DEVICE_KBC       = 0x400000,   /* is a keyboard controller */
 
+    DEVICE_ONBOARD   = 0x20000000, /* is on-board */
     DEVICE_EXTPARAMS = 0x40000000, /* accepts extended parameters */
+
+    DEVICE_PIT       = 0x80000000, /* device is a PIT */
 
     DEVICE_ALL       = 0xffffffff  /* match all devices */
 };
@@ -86,22 +118,20 @@ enum {
 #define BIOS_INTERLEAVED_INVERT          8
 #define BIOS_HIGH_BIT_INVERT             16
 
+#define device_common_config_t                      \
+    const char                     *name;           \
+    const char                     *description;    \
+    int                             type;           \
+    const char                     *default_string; \
+    int                             default_int;    \
+    const char                     *file_filter;    \
+    const device_config_spinner_t   spinner;        \
+    const device_config_selection_t selection[32]
+
 typedef struct device_config_selection_t {
     const char *description;
     int         value;
 } device_config_selection_t;
-
-typedef struct device_config_bios_t {
-    const char  *name;
-    const char  *internal_name;
-    int          bios_type;
-    int          files_no;
-    uint32_t     local;
-    uint32_t     size;
-    void        *dev1;
-    void        *dev2;
-    const char  *files[9];
-} device_config_bios_t;
 
 typedef struct device_config_spinner_t {
     int16_t min;
@@ -109,15 +139,28 @@ typedef struct device_config_spinner_t {
     int16_t step;
 } device_config_spinner_t;
 
-typedef struct device_config_t {
-    const char                     *name;
-    const char                     *description;
-    int                             type;
-    const char                     *default_string;
-    int                             default_int;
-    const char                     *file_filter;
-    const device_config_spinner_t   spinner;
-    const device_config_selection_t selection[32];
+typedef struct _device_dep_config_ {
+    device_common_config_t;
+} device_dep_config_t;
+
+typedef struct device_config_bios_t {
+    const char *name;
+    const char *internal_name;
+    int         bios_type;
+    int         files_no;
+    uint32_t    local;
+    uint32_t    size;
+    void       *dev1;
+    void       *dev2;
+    const char *files[9];
+    /* Configuration options that depend on the device variant.
+       To prevent excessive nesting, there is no CONFIG_BIOS
+       option a dep_config struct  */
+    const device_dep_config_t *dep_config;
+} device_config_bios_t;
+
+typedef struct _device_config_ {
+    device_common_config_t;
     const device_config_bios_t      bios[32];
 } device_config_t;
 
@@ -135,8 +178,7 @@ typedef struct _device_ {
     void (*reset)(void *priv);
     union {
         int (*available)(void);
-        int (*poll)(int x, int y, int z, int b, double abs_x, double abs_y, void *priv);
-        void (*register_pci_slot)(int device, int type, int inta, int intb, int intc, int intd, void *priv);
+        int (*poll)(void *priv);
     };
     void (*speed_changed)(void *priv);
     void (*force_redraw)(void *priv);
@@ -155,39 +197,43 @@ extern "C" {
 #endif
 
 extern void  device_init(void);
-extern void  device_set_context(device_context_t *c, const device_t *d, int inst);
-extern void  device_context(const device_t *d);
-extern void  device_context_inst(const device_t *d, int inst);
+extern void  device_set_context(device_context_t *c, const device_t *dev, int inst);
+extern void  device_context(const device_t *dev);
+extern void  device_context_inst(const device_t *dev, int inst);
 extern void  device_context_restore(void);
 extern void *device_add(const device_t *d);
-extern void *device_add_parameters(const device_t *d, void *params);
-extern void  device_add_ex(const device_t *d, void *priv);
-extern void  device_add_ex_parameters(const device_t *d, void *priv, void *params);
-extern void *device_add_inst(const device_t *d, int inst);
-extern void *device_add_inst_parameters(const device_t *d, int inst, void *params);
-extern void  device_add_inst_ex(const device_t *d, void *priv, int inst);
-extern void  device_add_inst_ex_parameters(const device_t *d, void *priv, int inst, void *params);
-extern void *device_cadd(const device_t *d, const device_t *cd);
-extern void *device_cadd_parameters(const device_t *d, const device_t *cd, void *params);
-extern void  device_cadd_ex(const device_t *d, const device_t *cd, void *priv);
-extern void  device_cadd_ex_parameters(const device_t *d, const device_t *cd, void *priv, void *params);
-extern void *device_cadd_inst(const device_t *d, const device_t *cd, int inst);
-extern void *device_cadd_inst_parameters(const device_t *d, const device_t *cd, int inst, void *params);
-extern void  device_cadd_inst_ex(const device_t *d, const device_t *cd, void *priv, int inst);
-extern void  device_cadd_inst_ex_parameters(const device_t *d, const device_t *cd, void *priv, int inst, void *params);
+extern void *device_add_linked(const device_t *d, void *priv);
+extern void *device_add_parameters(const device_t *dev, void *params);
+extern void  device_add_ex(const device_t *dev, void *priv);
+extern void  device_add_ex_parameters(const device_t *dev, void *priv, void *params);
+extern void *device_add_inst(const device_t *dev, int inst);
+extern void *device_add_inst_parameters(const device_t *dev, int inst, void *params);
+extern void  device_add_inst_ex(const device_t *dev, void *priv, int inst);
+extern void  device_add_inst_ex_parameters(const device_t *dev, void *priv, int inst, void *params);
+extern void *device_cadd(const device_t *dev, const device_t *cd);
+extern void *device_cadd_parameters(const device_t *dev, const device_t *cd, void *params);
+extern void  device_cadd_ex(const device_t *dev, const device_t *cd, void *priv);
+extern void  device_cadd_ex_parameters(const device_t *dev, const device_t *cd, void *priv, void *params);
+extern void *device_cadd_inst(const device_t *dev, const device_t *cd, int inst);
+extern void *device_cadd_inst_parameters(const device_t *dev, const device_t *cd, int inst, void *params);
+extern void  device_cadd_inst_ex(const device_t *dev, const device_t *cd, void *priv, int inst);
+extern void  device_cadd_inst_ex_parameters(const device_t *dev, const device_t *cd, void *priv, int inst, void *params);
+extern void *device_get_common_priv(void);
 extern void  device_close_all(void);
 extern void  device_reset_all(uint32_t match_flags);
-extern void *device_get_priv(const device_t *d);
-extern int   device_available(const device_t *d);
-extern int   device_poll(const device_t *d, int x, int y, int z, int b);
-extern void  device_register_pci_slot(const device_t *d, int device, int type, int inta, int intb, int intc, int intd);
+extern void *device_find_first_priv(uint32_t match_flags);
+extern void *device_get_priv(const device_t *dev);
+extern int   device_available(const device_t *dev);
+extern int   device_poll(const device_t *dev);
 extern void  device_speed_changed(void);
 extern void  device_force_redraw(void);
-extern void  device_get_name(const device_t *d, int bus, char *name);
-extern int   device_has_config(const device_t *d);
-extern const char *device_get_bios_file(const device_t *d, const char *internal_name, int file_no);
+extern void  device_get_name(const device_t *dev, int bus, char *name);
+extern int   device_has_config(const device_t *dev);
+extern const char *device_get_bios_file(const device_t *dev, const char *internal_name, int file_no);
 
 extern int device_is_valid(const device_t *, int m);
+
+extern const device_t* device_context_get_device(void);
 
 extern int         device_get_config_int(const char *name);
 extern int         device_get_config_int_ex(const char *s, int dflt_int);
@@ -202,7 +248,7 @@ extern const char *device_get_config_string(const char *name);
 extern const int   device_get_instance(void);
 #define device_get_config_bios device_get_config_string
 
-extern char *device_get_internal_name(const device_t *d);
+extern const char *device_get_internal_name(const device_t *dev);
 
 extern int   machine_get_config_int(char *s);
 extern char *machine_get_config_string(char *s);

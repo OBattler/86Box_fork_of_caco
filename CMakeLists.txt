@@ -35,7 +35,7 @@ if(MUNT_EXTERNAL)
 endif()
 
 project(86Box
-    VERSION 4.0
+    VERSION 4.1.1
     DESCRIPTION "Emulator of x86-based systems"
     HOMEPAGE_URL "https://86box.net"
     LANGUAGES C CXX)
@@ -131,7 +131,6 @@ option(RTMIDI       "RtMidi"                                                    
 option(FLUIDSYNTH   "FluidSynth"                                                    ON)
 option(MUNT         "MUNT"                                                          ON)
 option(VNC          "VNC renderer"                                                  OFF)
-option(DINPUT       "DirectInput"                                                   OFF)
 option(CPPTHREADS   "C++11 threads"                                                 ON)
 option(NEW_DYNAREC  "Use the PCem v15 (\"new\") dynamic recompiler"                 OFF)
 option(MINITRACE    "Enable Chrome tracing using the modified minitrace library"    OFF)
@@ -153,9 +152,9 @@ cmake_dependent_option(ISAMEM_RAMPAGE "AST Rampage"                             
 cmake_dependent_option(ISAMEM_IAB     "Intel Above Board"                           ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(ISAMEM_BRAT    "BocaRAM/AT"                                  ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(LASERXT        "VTech Laser XT"                              ON      "DEV_BRANCH"    OFF)
-cmake_dependent_option(MGA            "Matrox Mystique graphics adapters"           ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(OLIVETTI       "Olivetti M290"                               ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(OPEN_AT        "OpenAT"                                      ON      "DEV_BRANCH"    OFF)
+cmake_dependent_option(OPL4ML         "OPL4-ML daughterboard"                       ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(PAS16          "Pro Audio Spectrum 16"                       ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(SIO_DETECT     "Super I/O Detection Helper"                  ON      "DEV_BRANCH"    OFF)
 cmake_dependent_option(VGAWONDER      "ATI VGA Wonder (ATI-18800)"                  ON      "DEV_BRANCH"    OFF)
@@ -197,7 +196,7 @@ if(NOT EMU_BUILD_NUM)
     set(EMU_BUILD_NUM 0)
 endif()
 if(NOT EMU_COPYRIGHT_YEAR)
-    set(EMU_COPYRIGHT_YEAR 2022)
+    set(EMU_COPYRIGHT_YEAR 2024)
 endif()
 
 add_subdirectory(src)
