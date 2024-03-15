@@ -211,6 +211,7 @@ typedef struct {
 
 typedef struct {
     uint8_t dev;
+    uint8_t irq_state;
     eepro100_eeprom_t* eeprom_data;
     uint8_t pci_conf[256];
     uint8_t macaddr[6];
@@ -347,7 +348,7 @@ static void disable_interrupt(EEPRO100State * s)
 {
     if (s->int_stat) {
         //pci_irq_deassert(&s->dev);
-        pci_clear_irq(s->dev, PCI_INTA);
+        pci_clear_irq(s->dev, PCI_INTA, &s->irq_state);
         s->int_stat = 0;
     }
 }
@@ -356,7 +357,7 @@ static void enable_interrupt(EEPRO100State * s)
 {
     if (!s->int_stat) {
         //pci_irq_assert(&s->dev);
-        pci_set_irq(s->dev, PCI_INTA);
+        pci_set_irq(s->dev, PCI_INTA, &s->irq_state);
         s->int_stat = 1;
     }
 }
@@ -1928,7 +1929,7 @@ eepro100_init(const device_t* info)
     /* Need to *absolutely* fix this... */
     mem_mapping_add(&s->flash_bar, 0, 0, rom_read, rom_readw, rom_readl, rom_write, rom_writew, rom_writel, NULL, MEM_MAPPING_EXTERNAL, &s->expansion_rom);
 
-    s->dev = pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s);
+    pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s, &s->dev);
 
     return s;
 }
