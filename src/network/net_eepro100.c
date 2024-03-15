@@ -1311,8 +1311,9 @@ static void eepro100_write1(uint32_t addr, uint8_t val, void* p)
         eepro100_write_mdi(s);
         break;
     default:
-        logout("addr=%s val=0x%02x\n", regname(addr), val);
-        missing("unknown byte write");
+        //logout("addr=%s val=0x%02x\n", regname(addr), val);
+        //missing("unknown byte write");
+        break;
     }
 }
 
@@ -1896,29 +1897,23 @@ rom_writel(uint32_t addr, uint32_t val, void *priv)
 static void*
 eepro100_init(const device_t* info)
 {
-    nmc93cxx_eeprom_params_t eeprom_params = { EEPROM_SIZE };
+    nmc93cxx_eeprom_params_t eeprom_params = { EEPROM_SIZE, NULL, NULL };
     EEPRO100State *s = calloc(1, sizeof(EEPRO100State));
     FILE* eeprom_file = NULL;
 
     s->device = ((E100PCIDeviceInfo*)info->local)->device;
+    
+    rom_init(&s->expansion_rom, "roms/network/eepro100/ipxe.rom", 0, 0, 0x1FFFF, 0, MEM_MAPPING_EXTERNAL);
+
+    eeprom_params.filename = "eepro100_eeprom.nvr";
+    eeprom_params.default_content = (uint16_t*)&eepro100_plus_default;
     s->eeprom = device_add_parameters(&nmc93cxx_device, &eeprom_params);
     if (!s->eeprom) {
         free(s);
         return NULL;
     }
+
     s->eeprom_data = (eepro100_eeprom_t*)nmc93cxx_eeprom_data(s->eeprom);
-    
-    rom_init(&s->expansion_rom, "roms/network/eepro100/ipxe.rom", 0, 0, 0x1FFFF, 0, MEM_MAPPING_EXTERNAL);
-
-    eeprom_file = nvr_fopen("eepro100_eeprom.nvr", "rb");
-    if (eeprom_file)
-    {
-        fread(nmc93cxx_eeprom_data(s->eeprom), sizeof(uint16_t), EEPROM_SIZE, eeprom_file);
-        fclose(eeprom_file);
-    } else {
-        *s->eeprom_data = eepro100_plus_default;
-    }
-
     s->nic = network_attach(s, s->eeprom_data->mac_addr, nic_receive, NULL);
     s->devinfo = eepro100_plus_info;
     e100_pci_reset(s);
@@ -1943,7 +1938,6 @@ eepro100_close(void *priv)
         fwrite(nmc93cxx_eeprom_data(s->eeprom), sizeof(uint16_t), EEPROM_SIZE, eeprom_file);
         fclose(eeprom_file);
     }
-    free(s->eeprom);
     free(priv);
 }
 
