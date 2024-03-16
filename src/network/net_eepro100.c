@@ -181,7 +181,7 @@ typedef enum {
     ru_ready = 4
 } ru_state_t;
 
-#pragma pack(push, 2)
+#pragma pack(push, 1)
 typedef struct {
     uint8_t mac_addr[6];
     uint16_t compat;
@@ -1920,6 +1920,8 @@ eepro100_init(const device_t* info)
     }
 
     s->eeprom_data = (eepro100_eeprom_t*)nmc93cxx_eeprom_data(s->eeprom);
+    /* XXX: Avoid setting parameters on our own here for now. */
+    memset((void*)nmc93cxx_eeprom_data(s->eeprom), 0, EEPROM_SIZE * 2);
     s->nic = network_attach(s, s->eeprom_data->mac_addr, nic_receive, NULL);
     s->devinfo = eepro100_plus_info;
     e100_pci_reset(s);
@@ -1928,7 +1930,7 @@ eepro100_init(const device_t* info)
 
     mem_mapping_add(&s->mmio_bar, 0, 0, eepro100_read1, eepro100_read2, eepro100_read4, eepro100_write1, eepro100_write2, eepro100_write4, NULL, MEM_MAPPING_EXTERNAL, s);
     /* Need to *absolutely* fix this... */
-    mem_mapping_add(&s->flash_bar, 0, 0, rom_read, rom_readw, rom_readl, rom_write, rom_writew, rom_writel, NULL, MEM_MAPPING_EXTERNAL, &s->expansion_rom);
+    mem_mapping_add(&s->flash_bar, 0, 0, eepro100_read1, eepro100_read2, eepro100_read4, eepro100_write1, eepro100_write2, eepro100_write4, NULL, MEM_MAPPING_EXTERNAL, &s->expansion_rom);
 
     pci_add_card(PCI_CARD_NETWORK, eepro100_pci_read, eepro100_pci_write, s, &s->dev);
 
