@@ -306,14 +306,14 @@ static const uint16_t eepro100_mdi_mask[] = {
 static uint16_t e100_read_reg2(EEPRO100State *s, E100RegisterOffset addr)
 {
     assert(!((uintptr_t)&s->mem[addr] & 1));
-    return *((uint16_t*)(&s->mem[addr]));
+    return s->mem[addr] | (s->mem[addr + 1]) << 8;
 }
 
 /* Read a 32 bit control/status (CSR) register. */
 static uint32_t e100_read_reg4(EEPRO100State *s, E100RegisterOffset addr)
 {
     assert(!((uintptr_t)&s->mem[addr] & 3));
-    return *((uint32_t*)(&s->mem[addr]));
+    return s->mem[addr] | ((s->mem[addr + 1]) << 8) | ((s->mem[addr + 2]) << 16) | ((s->mem[addr + 3]) << 24);
 }
 
 /* Write a 16 bit control/status (CSR) register. */
@@ -321,7 +321,8 @@ static void e100_write_reg2(EEPRO100State *s, E100RegisterOffset addr,
                             uint16_t val)
 {
     assert(!((uintptr_t)&s->mem[addr] & 1));
-    *((uint16_t*)&s->mem[addr]) = val;
+    s->mem[addr] = val & 0xFF;
+    s->mem[addr + 1] = (val >> 8) & 0xFF;
 }
 
 /* Write a 32 bit control/status (CSR) register. */
@@ -329,7 +330,11 @@ static void e100_write_reg4(EEPRO100State *s, E100RegisterOffset addr,
                             uint32_t val)
 {
     assert(!((uintptr_t)&s->mem[addr] & 3));
-    *((uint32_t*)&s->mem[addr]) = val;
+
+    s->mem[addr] = val & 0xFF;
+    s->mem[addr + 1] = (val >> 8) & 0xFF;
+    s->mem[addr + 2] = (val >> 16) & 0xFF;
+    s->mem[addr + 3] = (val >> 24) & 0xFF;
 }
 
 enum scb_stat_ack {
@@ -1158,7 +1163,7 @@ static uint8_t eepro100_read1(uint32_t addr, void* p)
 {
     uint8_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= PCI_MEM_SIZE - 1;
+    addr &= 0xFFF;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = s->mem[addr];
     }
@@ -1196,8 +1201,9 @@ static uint8_t eepro100_read1(uint32_t addr, void* p)
         val = 0x07;
         break;
     default:
-        logout("addr=%s val=0x%02x\n", regname(addr), val);
-        missing("unknown byte read");
+        //logout("addr=%s val=0x%02x\n", regname(addr), val);
+        //missing("unknown byte read");
+        break;
     }
     return val;
 }
@@ -1206,7 +1212,7 @@ static uint16_t eepro100_read2(uint32_t addr, void* p)
 {
     uint16_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= PCI_MEM_SIZE - 1;
+    addr &= 0xFFF;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = e100_read_reg2(s, addr);
     }
@@ -1233,7 +1239,7 @@ static uint32_t eepro100_read4(uint32_t addr, void* p)
 {
     uint32_t val = 0;
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= PCI_MEM_SIZE - 1;
+    addr &= 0xFFF;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         val = e100_read_reg4(s, addr);
     }
@@ -1262,7 +1268,7 @@ static uint32_t eepro100_read4(uint32_t addr, void* p)
 static void eepro100_write1(uint32_t addr, uint8_t val, void* p)
 {
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= (PCI_MEM_SIZE - 1);
+    addr &= 0xFFF;
     /* SCBStatus is readonly. */
     if (addr > SCBStatus && addr <= sizeof(s->mem) - sizeof(val)) {
         s->mem[addr] = val;
@@ -1320,7 +1326,7 @@ static void eepro100_write1(uint32_t addr, uint8_t val, void* p)
 static void eepro100_write2(uint32_t addr, uint16_t val, void* p)
 {
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= (PCI_MEM_SIZE - 1);
+    addr &= 0xFFF;
     /* SCBStatus is readonly. */
     if (addr > SCBStatus && addr <= sizeof(s->mem) - sizeof(val)) {
         e100_write_reg2(s, addr, val);
@@ -1360,7 +1366,7 @@ static void eepro100_write2(uint32_t addr, uint16_t val, void* p)
 static void eepro100_write4(uint32_t addr, uint32_t val, void* p)
 {
     EEPRO100State *s = (EEPRO100State*)p;
-    addr &= (PCI_MEM_SIZE - 1);
+    addr &= 0xFFF;
     if (addr <= sizeof(s->mem) - sizeof(val)) {
         e100_write_reg4(s, addr, val);
     }
@@ -1422,6 +1428,8 @@ static int nic_receive(void *priv, uint8_t * buf, int size)
      */
     EEPRO100State *s = (EEPRO100State*)priv;
     uint16_t rfd_status = 0xa000;
+    eepro100_rx_t rx;
+    uint16_t rfd_command, rfd_size;
 #if defined(CONFIG_PAD_RECEIVED_FRAMES)
     uint8_t min_buf[60];
 #endif
@@ -1506,11 +1514,10 @@ static int nic_receive(void *priv, uint8_t * buf, int size)
         return 0;
     }
     /* !!! */
-    eepro100_rx_t rx;
     dma_bm_read(s->ru_base + s->ru_offset,
                  (uint8_t*)&rx, sizeof(eepro100_rx_t), 1);
-    uint16_t rfd_command = (rx.command);
-    uint16_t rfd_size = (rx.size);
+    rfd_command = (rx.command);
+    rfd_size = (rx.size);
 
     if (size > rfd_size) {
         logout("Receive buffer (%hd bytes) too small for data "
@@ -1794,10 +1801,9 @@ eepro100_pci_write(UNUSED(int func), int addr, uint8_t val, void *priv)
             val &= 0xC0;
             val |= 1;
         case 0x15:
-        case 0x16:
-        case 0x17:
             io_removehandler((dev->pci_conf[0x14] & 0xC0) | (dev->pci_conf[0x15] << 8), PCI_IO_SIZE, eepro100_read1_io, eepro100_read2_io, eepro100_read4_io, eepro100_write1_io, eepro100_write2_io, eepro100_write4_io, priv);
             dev->pci_conf[addr & 0xFF] = val;
+            pclog("IOADDR = 0x%X\n", (dev->pci_conf[0x14] & 0xC0) | (dev->pci_conf[0x15] << 8));
             io_sethandler((dev->pci_conf[0x14] & 0xC0) | (dev->pci_conf[0x15] << 8), PCI_IO_SIZE, eepro100_read1_io, eepro100_read2_io, eepro100_read4_io, eepro100_write1_io, eepro100_write2_io, eepro100_write4_io, priv);
             break;
         case 0x1A:
