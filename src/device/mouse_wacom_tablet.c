@@ -423,10 +423,13 @@ wacom_write(UNUSED(struct serial_s *serial), void *priv, uint8_t data)
     }
 }
 
-static int
-wacom_poll(void *priv)
+static mouse_wacom_t* instance;
+
+
+static void
+wacom_poll(void)
 {
-    mouse_wacom_t *wacom = (mouse_wacom_t *) priv;
+    mouse_wacom_t *wacom = (mouse_wacom_t *) instance;
     int delta_x;
     int delta_y;
     int b = mouse_get_buttons_ex();
@@ -456,7 +459,6 @@ wacom_poll(void *priv)
     if (wacom->b != b)
         wacom->oldb = wacom->b;
     wacom->b = b;
-    return 0;
 }
 
 static int
@@ -570,6 +572,8 @@ wacom_report_timer(void *priv)
     int            y_diff          = abs(relative_mode ? wacom->rel_y : (wacom->abs_y - wacom->last_abs_y));
     int            increment       = wacom->suppressed_increment ? wacom->suppressed_increment : wacom->increment;
 
+    pclog("x_diff = %d, y_diff = %d\n", x_diff, y_diff);
+
     timer_on_auto(&wacom->report_timer, wacom->transmit_period);
     if ((((double) (tsc - wacom->reset_tsc)) / cpuclock * 1000.0) <= 10)
         return;
@@ -665,6 +669,15 @@ wacom_init(const device_t *info)
     }
     else wacom_reset(dev);
 
+    serial_set_ri(dev->serial, 1);
+    serial_set_dcd(dev->serial, 1);
+    serial_set_cts(dev->serial, 1);
+    serial_set_dsr(dev->serial, 1);
+    
+    mouse_set_poll_ex(wacom_poll);
+
+    instance = dev;
+
     return dev;
 }
 
@@ -687,6 +700,7 @@ wacom_close(void *priv)
     if (dev && dev->serial && dev->serial->sd)
         memset(dev->serial->sd, 0, sizeof(serial_device_t));
 
+    instance = NULL;
     free(dev);
 }
 
@@ -720,7 +734,7 @@ const device_t mouse_wacom_device = {
     .init          = wacom_init,
     .close         = wacom_close,
     .reset         = NULL,
-    { .poll = wacom_poll },
+    { .poll = NULL },
     .speed_changed = wacom_speed_changed,
     .force_redraw  = NULL,
     .config        = wacom_config
@@ -734,7 +748,7 @@ const device_t mouse_wacom_artpad_device = {
     .init          = wacom_init,
     .close         = wacom_close,
     .reset         = NULL,
-    { .poll = wacom_poll },
+    { .poll = NULL },
     .speed_changed = wacom_speed_changed,
     .force_redraw  = NULL,
     .config        = wacom_config

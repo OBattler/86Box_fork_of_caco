@@ -1627,6 +1627,7 @@ pipc_reset(void *priv)
 static void *
 pipc_init(const device_t *info)
 {
+    usb_params_t usb_params;
     pipc_t *dev = (pipc_t *) malloc(sizeof(pipc_t));
     memset(dev, 0, sizeof(pipc_t));
 
@@ -1634,6 +1635,9 @@ pipc_init(const device_t *info)
 
     dev->local = info->local;
     pci_add_card(PCI_ADD_SOUTHBRIDGE, pipc_read, pipc_write, dev, &dev->pci_slot);
+
+    usb_params.pci_dev = &dev->pci_slot;
+    usb_params.pci_conf = &dev->usb_regs[0][0];
 
     dev->bm[0] = device_add_inst(&sff8038i_device, 1);
     sff_set_irq_mode(dev->bm[0], IRQ_MODE_LEGACY);
@@ -1658,9 +1662,9 @@ pipc_init(const device_t *info)
         acpi_set_trap_update(dev->acpi, pipc_trap_update_586, dev);
     }
 
-    dev->usb[0] = device_add_inst(&usb_device, 1);
+    dev->usb[0] = device_add_inst_parameters(&usb_device, 1, &usb_params);
     if (dev->local >= VIA_PIPC_686A) {
-        dev->usb[1] = device_add_inst(&usb_device, 2);
+        dev->usb[1] = device_add_inst_parameters(&usb_device, 2, &usb_params);
 
         dev->ac97 = device_add(&ac97_via_device);
 

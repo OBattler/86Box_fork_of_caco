@@ -1538,6 +1538,7 @@ piix_speed_changed(void *priv)
 static void *
 piix_init(const device_t *info)
 {
+    usb_params_t params;
     piix_t *dev = (piix_t *) malloc(sizeof(piix_t));
     memset(dev, 0, sizeof(piix_t));
 
@@ -1551,6 +1552,8 @@ piix_init(const device_t *info)
     pci_add_card(PCI_ADD_SOUTHBRIDGE, piix_read, piix_write, dev, &dev->pci_slot);
     piix_log("PIIX%i: Added to slot: %02X\n", dev->type, dev->pci_slot);
     piix_log("PIIX%i: Added to slot: %02X\n", dev->type, dev->pci_slot);
+    params.pci_dev = &dev->pci_slot;
+    params.pci_conf = &dev->regs[2][0];
 
     dev->bm[0] = device_add_inst(&sff8038i_device, 1);
     dev->bm[1] = device_add_inst(&sff8038i_device, 2);
@@ -1569,7 +1572,7 @@ piix_init(const device_t *info)
         sff_set_irq_mode(dev->bm[1], IRQ_MODE_MIRQ_0);
 
     if (dev->type >= 3)
-        dev->usb   = device_add(&usb_device);
+        dev->usb   = device_add_parameters(&usb_device, &params);
 
     if (dev->type > 3) {
         dev->nvr   = device_add(&piix4_nvr_device);

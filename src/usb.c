@@ -123,9 +123,14 @@ uhci_reg_writew(uint16_t addr, uint16_t val, void *priv)
     }
 }
 
+extern void uhci_update_io_mapping_new(void *priv, uint8_t base_l, uint8_t base_h, int enable);
+
 void
 uhci_update_io_mapping(usb_t *dev, uint8_t base_l, uint8_t base_h, int enable)
 {
+    uhci_update_io_mapping_new(dev->usb_uhci_priv, base_l, base_h, enable);
+
+    return;
     if (dev->uhci_enable && (dev->uhci_io_base != 0x0000))
         io_removehandler(dev->uhci_io_base, 0x20, uhci_reg_read, NULL, NULL, uhci_reg_write, uhci_reg_writew, NULL, dev);
 
@@ -368,10 +373,17 @@ ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3,
         mem_mapping_set_addr(&dev->ohci_mmio_mapping, dev->ohci_mem_base, 0x1000);
 }
 
+extern void *
+usb_uhci_init_ext(UNUSED(const device_t *info), void* params);
+extern void
+usb_uhci_reset(void *priv);
+
 static void
 usb_reset(void *priv)
 {
     usb_t *dev = (usb_t *) priv;
+
+    usb_uhci_reset(dev->usb_uhci_priv);
 
     memset(dev->uhci_io, 0x00, 128);
     dev->uhci_io[0x0c] = 0x40;
@@ -394,11 +406,12 @@ usb_close(void *priv)
 {
     usb_t *dev = (usb_t *) priv;
 
+    free(dev->usb_uhci_priv);
     free(dev);
 }
 
 static void *
-usb_init(UNUSED(const device_t *info))
+usb_init_ext(UNUSED(const device_t *info), void* params)
 {
     usb_t *dev;
 
@@ -420,6 +433,7 @@ usb_init(UNUSED(const device_t *info))
                     ohci_mmio_read, NULL, NULL,
                     ohci_mmio_write, NULL, NULL,
                     NULL, MEM_MAPPING_EXTERNAL, dev);
+    dev->usb_uhci_priv = usb_uhci_init_ext(info, params);
     usb_reset(dev);
 
     return dev;
@@ -428,9 +442,9 @@ usb_init(UNUSED(const device_t *info))
 const device_t usb_device = {
     .name          = "Universal Serial Bus",
     .internal_name = "usb",
-    .flags         = DEVICE_PCI,
+    .flags         = DEVICE_PCI | DEVICE_EXTPARAMS,
     .local         = 0,
-    .init          = usb_init,
+    { .init_ext      = usb_init_ext, },
     .close         = usb_close,
     .reset         = usb_reset,
     { .available = NULL },

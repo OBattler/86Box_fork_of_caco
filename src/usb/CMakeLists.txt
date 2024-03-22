@@ -1,0 +1,1 @@
+add_library(usb usb_hid.c usb_uhci_bochs.c usb_common.c)

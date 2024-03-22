@@ -22,6 +22,11 @@
 extern "C" {
 #endif
 
+typedef struct usb_params_t {
+    uint8_t* pci_dev;
+    uint8_t* pci_conf;
+} usb_params_t;
+
 typedef struct usb_t {
     uint8_t       uhci_io[32];
     uint8_t       ohci_mmio[4096];
@@ -30,10 +35,12 @@ typedef struct usb_t {
     int           ohci_enable;
     uint32_t      ohci_mem_base;
     mem_mapping_t ohci_mmio_mapping;
+
+    void* usb_uhci_priv;
 } usb_t;
 
 /* Global variables. */
-extern const device_t usb_device;
+extern const device_t usb_device, usb_uhci_device;
 
 /* Functions. */
 extern void uhci_update_io_mapping(usb_t *dev, uint8_t base_l, uint8_t base_h, int enable);
