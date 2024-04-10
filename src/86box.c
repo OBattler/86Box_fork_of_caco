@@ -103,6 +103,7 @@
 #include <86box/machine_status.h>
 #include <86box/apm.h>
 #include <86box/acpi.h>
+#include <86box/irda.h>
 
 // Disable c99-designator to avoid the warnings about int ng
 #ifdef __clang__
@@ -185,6 +186,7 @@ int      sound_is_float                         = 1;              /* (C) sound u
 int      voodoo_enabled                         = 0;              /* (C) video option */
 int      lba_enhancer_enabled                   = 0;              /* (C) enable Vision Systems LBA Enhancer */
 int      ibm8514_standalone_enabled             = 0;              /* (C) video option */
+int      esi9680_ir_dongle_enabled              = 0;              /* (C) ESI-9680 JetEye PC dongle enabled. */
 int      xga_standalone_enabled                 = 0;              /* (C) video option */
 uint32_t mem_size                               = 0;              /* (C) memory size (Installed on
                                                                          system board)*/
@@ -1115,6 +1117,8 @@ pc_reset_hard_close(void)
     cpu_close();
 
     serial_set_next_inst(0);
+
+    irda_reset();
 }
 
 /*
@@ -1134,6 +1138,9 @@ pc_reset_hard_init(void)
 
     /* Mark ACPI as unavailable */
     acpi_enabled = 0;
+
+    /* Make sure no IrDA devices have been added. */
+    irda_reset();
 
     /* Reset the general machine support modules. */
     io_init();
@@ -1237,6 +1244,9 @@ pc_reset_hard_init(void)
 
     if (novell_keycard_enabled)
         device_add(&novell_keycard_device);
+
+    if (esi9680_ir_dongle_enabled)
+        device_add(&esi9680_device);
 
     if (IS_ARCH(machine, MACHINE_BUS_PCI)) {
         pci_register_cards();
