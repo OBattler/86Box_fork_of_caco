@@ -74,7 +74,7 @@ void esi9680_write_from_serial_host(UNUSED(struct serial_s *serial), void *priv,
     irda_broadcast_data(&esi9680->irda, val);
 }
 
-void esi9680_receive(uint8_t data, void *priv)
+void esi9680_receive(void *priv, uint8_t data)
 {
     esi9680_t* esi9680 = (esi9680_t*)priv;
 
@@ -112,11 +112,16 @@ void* esi9680_init(const device_t* info)
 {
     esi9680_t* esi9680 = calloc(1, sizeof(esi9680_t));
     esi9680->serial = serial_attach_ex_3(device_get_config_int("port"), esi9680_rts_callback, esi9680_write_from_serial_host, esi9680_dtr_callback, esi9680);
+    esi9680->irda.write = esi9680_receive;
+    esi9680->irda.priv = esi9680;
     irda_register_device(&esi9680->irda);
 
     serial_set_cts(esi9680->serial, 1);
     serial_set_dcd(esi9680->serial, 1);
     serial_set_dsr(esi9680->serial, 1);
+
+    extern device_t irda_obex_device;
+    device_add(&irda_obex_device);
 
     return esi9680;
 }

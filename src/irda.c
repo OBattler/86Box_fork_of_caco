@@ -30,7 +30,7 @@ void irda_broadcast_data(irda_device_t* broadcaster, uint8_t data)
     int i = 0;
     pclog("IrDA broadcast data: 0x%X\n", data);
     for (i = 0; i < irda_count; i++) {
-        if (devices[i] != broadcaster)
+        if (devices[i] != broadcaster && devices[i]->write)
             devices[i]->write(devices[i]->priv, data);
     }
 }

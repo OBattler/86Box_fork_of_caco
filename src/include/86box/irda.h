@@ -1,3 +1,10 @@
+typedef struct irda_parameter_t
+{
+    unsigned char type;
+    unsigned char length;
+    unsigned char value[];
+} irda_parameter_t;
+
 /* Function definition. */
 typedef void irda_write(void* priv, uint8_t data);
 
