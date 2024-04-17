@@ -100,6 +100,7 @@ enum {
     DEVICE_COM       = 0x100000,   /* requires a serial port */
     DEVICE_LPT       = 0x200000,   /* requires a parallel port */
     DEVICE_KBC       = 0x400000,   /* is a keyboard controller */
+    DEVICE_IRDA      = 0x800000,   /* requires the IrDA bus */
 
     DEVICE_ONBOARD   = 0x20000000, /* is on-board */
     DEVICE_EXTPARAMS = 0x40000000, /* accepts extended parameters */

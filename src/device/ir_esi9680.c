@@ -48,8 +48,15 @@ void esi9680_update_baud_rate(esi9680_t* esi9680)
 {
     if (!esi9680->dtr && !esi9680->rts) {
         timer_disable(&esi9680->timer);
+        serial_set_cts(esi9680->serial, 0);
+        serial_set_dcd(esi9680->serial, 0);
+        serial_set_dsr(esi9680->serial, 0);
         return;
     }
+
+    serial_set_cts(esi9680->serial, 1);
+    serial_set_dcd(esi9680->serial, 1);
+    serial_set_dsr(esi9680->serial, 1);
 
     if (!esi9680->dtr && esi9680->rts) {
         timer_on_auto(&esi9680->timer, (1. / 9600.) * 9.);
@@ -114,11 +121,12 @@ void* esi9680_init(const device_t* info)
     esi9680->serial = serial_attach_ex_3(device_get_config_int("port"), esi9680_rts_callback, esi9680_write_from_serial_host, esi9680_dtr_callback, esi9680);
     esi9680->irda.write = esi9680_receive;
     esi9680->irda.priv = esi9680;
+    fifo8_create(&esi9680->fifo, 0x10000);
     irda_register_device(&esi9680->irda);
 
-    serial_set_cts(esi9680->serial, 1);
-    serial_set_dcd(esi9680->serial, 1);
-    serial_set_dsr(esi9680->serial, 1);
+    serial_set_cts(esi9680->serial, 0);
+    serial_set_dcd(esi9680->serial, 0);
+    serial_set_dsr(esi9680->serial, 0);
 
     extern device_t irda_obex_device;
     device_add(&irda_obex_device);
@@ -130,6 +138,7 @@ void esi9680_close(void* priv)
 {
     esi9680_t* esi9680 = (esi9680_t*)priv;
 
+    fifo8_destroy(&esi9680->fifo);
     /* Detach serial port from the dongle. */
     if (esi9680 && esi9680->serial && esi9680->serial->sd)
         memset(esi9680->serial->sd, 0, sizeof(serial_device_t));
