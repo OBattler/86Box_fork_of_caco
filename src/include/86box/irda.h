@@ -5,6 +5,16 @@ typedef struct irda_parameter_t
     unsigned char value[];
 } irda_parameter_t;
 
+#pragma pack(push, 1)
+typedef struct irda_xid_info_t
+{
+    unsigned char format;
+    unsigned int source, dest;
+    unsigned char flags, slot, version;
+    unsigned char discovery_info[];
+} irda_xid_info_t;
+#pragma pack(pop)
+
 /* Function definition. */
 typedef void irda_write(void* priv, uint8_t data);
 

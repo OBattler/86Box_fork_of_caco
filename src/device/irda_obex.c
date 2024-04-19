@@ -11,6 +11,7 @@
 #include <86box/plat.h>
 #include <86box/fifo8.h>
 #include <86box/irda.h>
+#include <86box/random.h>
 
 
 typedef struct irda_obex_t
@@ -19,8 +20,13 @@ typedef struct irda_obex_t
 
     uint32_t data_count;
     uint8_t data[0x10000];
+    uint8_t resp_data[0x10000];
     uint8_t in_frame;
     uint8_t complement_next;
+
+    uint8_t connection_address;
+    uint32_t address, address_dest;
+    uint8_t slot;
 } irda_obex_t;
 
 void irda_obex_process_frame(irda_obex_t* irda_obex)
@@ -30,13 +36,73 @@ void irda_obex_process_frame(irda_obex_t* irda_obex)
         return;
     pclog("Connection address: 0x%x\n", irda_obex->data[0]);
     pclog("Connection control: 0x%X\n", irda_obex->data[1]);
+
+    if ((irda_obex->data[0] & 0xFE) != 0xFE && (irda_obex->data[0] & 0xFE) != (irda_obex->connection_address & 0xFE))
+        return;
+
+    if ((irda_obex->connection_address & 0xFE) == 0xFE && (irda_obex->data[1] & 3) == 3) {
+        switch (irda_obex->data[1] & ~(0x10)) {
+            case 0b0010111: /* XID */
+            {
+                irda_xid_info_t* xid = (irda_xid_info_t*)&irda_obex[2];
+                if (xid->slot == 0 && (irda_obex->data[1] & 0x10) && (xid->dest == ~0 || xid->dest == irda_obex->address)) {
+                    int i = 0;
+                    irda_xid_info_t* resp_xid = (irda_xid_info_t*)&irda_obex->resp_data[2];
+                    irda_obex->resp_data[0] = 0xFE;
+                    irda_obex->resp_data[1] = 0b10111111;
+                    irda_obex->address_dest = xid->source;
+                    irda_obex->address = random_generate() | (random_generate() << 8) | (random_generate() << 16) | (random_generate() << 24);
+                    memset(resp_xid, 0, sizeof(*resp_xid));
+                    resp_xid->format = 1;
+                    resp_xid->source = irda_obex->address;
+                    resp_xid->dest = irda_obex->address_dest;
+                    resp_xid->version = 0;
+                    resp_xid->flags = xid->flags;
+                    resp_xid->discovery_info[0] = 0x4;
+                    resp_xid->discovery_info[1] = 0x20;
+                    resp_xid->discovery_info[2] = 'I';
+                    resp_xid->discovery_info[3] = 'r';
+                    resp_xid->discovery_info[4] = 'D';
+                    resp_xid->discovery_info[5] = 'A';
+                    resp_xid->discovery_info[6] = ' ';
+                    resp_xid->discovery_info[7] = 'O';
+                    resp_xid->discovery_info[8] = 'B';
+                    resp_xid->discovery_info[9] = 'E';
+                    resp_xid->discovery_info[10] = 'X';
+                    
+                    for (i = 0; i < 11; i++) {
+                        irda_broadcast_data(&irda_obex->irda, 0xC0);
+                    }
+                    for (i = 0; i < sizeof(*resp_xid) + 9 + 2; i++) {
+                        irda_broadcast_data(&irda_obex->irda, irda_obex->resp_data[i]);
+                    }
+
+                    irda_broadcast_data(&irda_obex->irda, 0xC1);
+                }
+                break;
+            }
+        }
+    }
 }
 
 void irda_obex_receive(void *priv, uint8_t data)
 {
     irda_obex_t* irda_obex = (irda_obex_t*)priv;
 
-    if (data == 0xc0) {
+    if (data == 0xFF && irda_obex->in_frame == 0)
+        return;
+
+    if (data == 0x7e && irda_obex->in_frame == 0) {
+        irda_obex->in_frame = 2;
+        return;
+    }
+    if (data == 0x7e && irda_obex->in_frame == 2) {
+        irda_obex_process_frame(irda_obex);
+        irda_obex->data_count = 0;
+        irda_obex->in_frame = 0;
+        return;
+    }
+    if (data == 0xc0 && irda_obex->in_frame != 2) {
         irda_obex->in_frame = 1;
         return;
     }
@@ -76,6 +142,7 @@ void* irda_obex_init(const device_t* info)
     irda_obex->irda.write = irda_obex_receive;
     irda_obex->irda.priv = irda_obex;
     irda_register_device(&irda_obex->irda);
+    irda_obex->connection_address = 0xFE;
 
     return irda_obex;
 }
