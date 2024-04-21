@@ -29,6 +29,29 @@ typedef struct irda_obex_t
     uint8_t slot;
 } irda_obex_t;
 
+static void irda_obex_process_args(irda_obex_t* irda_obex, uint8_t* parameters)
+{
+    while (1) {
+        switch (*parameters) {
+            case 0x00:
+            case 0xc1:
+            case 0xc0:
+            default:
+                return;
+            case 0x01:
+            {
+                uint8_t len = *(parameters + 1);
+                parameters++;
+                if (len) {
+                    /* We ignore baud rate here. */
+                    parameters += len;
+                }
+                break;
+            }
+        }
+    }
+}
+
 void irda_obex_process_frame(irda_obex_t* irda_obex)
 {
     pclog("Received frame of %u bytes\n", irda_obex->data_count);
