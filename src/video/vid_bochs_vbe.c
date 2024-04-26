@@ -211,6 +211,10 @@ bochs_vbe_inw(uint16_t addr, void *priv)
         {
             return bochs_vbe->svga.vram_max >> 16;
         }
+        case VBE_DISPI_INDEX_BANK:
+        {
+            return vbe_get_caps ? (VBE_DISPI_BANK_GRANULARITY_32K << 8) : bochs_vbe->vbe_regs[bochs_vbe->vbe_index];
+        }
         default:
             return bochs_vbe->vbe_regs[bochs_vbe->vbe_index];
     }
@@ -264,8 +268,9 @@ bochs_vbe_outw(uint16_t addr, uint16_t val, void *priv)
 
             case VBE_DISPI_INDEX_ENABLE: {
                 uint32_t new_bank_gran = 64;
+                bochs_vbe->vbe_regs[bochs_vbe->vbe_index] = val;
                 if ((val & VBE_DISPI_ENABLED) && !(bochs_vbe->vbe_regs[VBE_DISPI_ENABLED] & VBE_DISPI_ENABLED)) {
-                    bochs_vbe->vbe_regs[bochs_vbe->vbe_index] = (val & VBE_DISPI_ENABLED);
+                    bochs_vbe->vbe_regs[bochs_vbe->vbe_index] = val;
                     bochs_vbe->vbe_regs[VBE_DISPI_INDEX_X_OFFSET] = 0;
                     bochs_vbe->vbe_regs[VBE_DISPI_INDEX_Y_OFFSET] = 0;
                     bochs_vbe->vbe_regs[VBE_DISPI_INDEX_VIRT_WIDTH] = 0;
@@ -292,6 +297,7 @@ bochs_vbe_outw(uint16_t addr, uint16_t val, void *priv)
                     bochs_vbe->svga.adv_flags &= ~FLAG_RAMDAC_SHIFT; 
                 else
                     bochs_vbe->svga.adv_flags |= FLAG_RAMDAC_SHIFT;
+                bochs_vbe->vbe_regs[bochs_vbe->vbe_index] &= ~VBE_DISPI_NOCLEARMEM;
             }
         }
     }
