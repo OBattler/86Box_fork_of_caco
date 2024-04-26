@@ -239,6 +239,21 @@ bochs_vbe_outw(uint16_t addr, uint16_t val, void *priv)
                 svga_recalctimings(&bochs_vbe->svga);
                 break;
 
+            case VBE_DISPI_INDEX_BANK: 
+            {
+                uint16_t rw_mode = VBE_DISPI_BANK_RW; // compatibility mode
+                if ((val & VBE_DISPI_BANK_RW) != 0) {
+                    rw_mode = (val & VBE_DISPI_BANK_RW);
+                }
+                if (val & VBE_DISPI_BANK_RD) {
+                    bochs_vbe->svga.read_bank = (val & 0x1ff) * (bochs_vbe->bank_gran << 10);
+                }
+                if (val & VBE_DISPI_BANK_WR) {
+                    bochs_vbe->svga.write_bank = (val & 0x1ff) * (bochs_vbe->bank_gran << 10);
+                }
+                break;
+            }
+
             case VBE_DISPI_INDEX_ENABLE: {
                 uint32_t new_bank_gran = 64;
                 if ((val & VBE_DISPI_ENABLED) && !(bochs_vbe->vbe_regs[VBE_DISPI_ENABLED] & VBE_DISPI_ENABLED)) {
@@ -413,7 +428,7 @@ bochs_vbe_force_redraw(void *priv)
     bochs_vbe->svga.fullchange = changeframecount;
 }
 
-const device_t vga_device = {
+const device_t bochs_svga_device = {
     .name          = "Bochs SVGA",
     .internal_name = "bochs_svga",
     .flags         = DEVICE_PCI,

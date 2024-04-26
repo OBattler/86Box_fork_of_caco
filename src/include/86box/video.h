@@ -583,6 +583,9 @@ extern const device_t wy700_device;
 extern const device_t chips_69000_device;
 extern const device_t chips_69000_onboard_device;
 
+/* Bochs */
+extern const device_t bochs_svga_device;
+
 #endif
 
 #endif /*EMU_VIDEO_H*/
