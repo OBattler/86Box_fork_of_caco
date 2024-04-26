@@ -1130,9 +1130,9 @@ svga_poll(void *priv)
                 svga->linecountff = 0;
                 svga->sc          = 0;
 
-                svga->maback += (svga->rowoffset << 3);
+                svga->maback += (svga->adv_flags & FLAG_NO_SHIFT3) ? svga->rowoffset : (svga->rowoffset << 3);
                 if (svga->interlace)
-                    svga->maback += (svga->rowoffset << 3);
+                    svga->maback += (svga->adv_flags & FLAG_NO_SHIFT3) ? svga->rowoffset : (svga->rowoffset << 3);
 
                 svga->maback &= svga->vram_display_mask;
                 svga->ma = svga->maback;
