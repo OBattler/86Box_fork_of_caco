@@ -393,6 +393,9 @@ bochs_vbe_init(const device_t *info)
     bochs_vbe->svga.bpp     = 8;
     bochs_vbe->svga.miscout = 1;
 
+    svga_set_ramdac_type(&bochs_vbe->svga, RAMDAC_8BIT);
+    bochs_vbe->svga.adv_flags |= FLAG_RAMDAC_SHIFT;
+
     return bochs_vbe;
 }
 
