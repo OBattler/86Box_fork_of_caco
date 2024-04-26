@@ -380,7 +380,7 @@ bochs_vbe_in(uint16_t addr, void *priv)
 }
 
 static uint8_t
-chips_69000_pci_read(int func, int addr, void *p)
+bochs_vbe_pci_read(int func, int addr, void *p)
 {
     bochs_vbe_t *bochs_vbe = (bochs_vbe_t *) p;
 
@@ -433,7 +433,7 @@ chips_69000_pci_read(int func, int addr, void *p)
 }
 
 static void
-chips_69000_pci_write(int func, int addr, uint8_t val, void *p)
+bochs_vbe_pci_write(int func, int addr, uint8_t val, void *p)
 {
     bochs_vbe_t *bochs_vbe = (bochs_vbe_t *) p;
 
@@ -520,6 +520,8 @@ bochs_vbe_init(const device_t *info)
 
     svga_set_ramdac_type(&bochs_vbe->svga, RAMDAC_8BIT);
     bochs_vbe->svga.adv_flags |= FLAG_RAMDAC_SHIFT;
+
+    pci_add_card(PCI_ADD_VIDEO, bochs_vbe_pci_read, bochs_vbe_pci_write, bochs_vbe, &bochs_vbe->slot);
 
     return bochs_vbe;
 }
