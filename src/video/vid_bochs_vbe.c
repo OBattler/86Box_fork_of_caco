@@ -12,6 +12,7 @@
 #include <86box/video.h>
 #include <86box/vid_svga.h>
 #include <86box/vid_svga_render.h>
+#include <86box/pci.h>
 
 #include "cvt/libxcvt.h"
 
@@ -70,6 +71,13 @@ typedef struct bochs_vbe_t {
     uint16_t vbe_index;
 
     uint16_t bank_gran;
+    mem_mapping_t linear_mapping;
+
+    uint8_t pci_conf_status, pci_regs[256];
+    uint8_t pci_rom_enable;
+    uint8_t pci_line_interrupt;
+    uint8_t slot;
+    uint16_t rom_addr;
 } bochs_vbe_t;
 
 void
@@ -371,6 +379,120 @@ bochs_vbe_in(uint16_t addr, void *priv)
     return temp;
 }
 
+static uint8_t
+chips_69000_pci_read(int func, int addr, void *p)
+{
+    bochs_vbe_t *bochs_vbe = (bochs_vbe_t *) p;
+
+    {
+        switch (addr) {
+            case 0x00:
+                return 0x34;
+            case 0x01:
+                return 0x12;
+            case 0x02:
+                return 0x11;
+            case 0x03:
+                return 0x11;
+            case 0x04:
+                return (bochs_vbe->pci_conf_status & 0b11100011) | 0x80;
+            case 0x06:
+                return 0x80;
+            case 0x07:
+                return 0x02;
+            case 0x08:
+            case 0x09:
+            case 0x0a:
+                return 0x00;
+            case 0x0b:
+                return 0x03;
+            case 0x13:
+                return bochs_vbe->linear_mapping.base >> 24;
+            case 0x30:
+                return bochs_vbe->pci_rom_enable & 0x1;
+            case 0x31:
+                return 0x0;
+            case 0x32:
+                return bochs_vbe->rom_addr & 0xFF;
+            case 0x33:
+                return (bochs_vbe->rom_addr & 0xFF00) >> 8;
+            case 0x3c:
+                return bochs_vbe->pci_line_interrupt;
+            case 0x3d:
+                return 0x01;
+            case 0x2C:
+            case 0x2D:
+                return 0;
+            case 0x2E:
+            case 0x2F:
+                return 0;
+            default:
+                return 0x00;
+        }
+    }
+}
+
+static void
+chips_69000_pci_write(int func, int addr, uint8_t val, void *p)
+{
+    bochs_vbe_t *bochs_vbe = (bochs_vbe_t *) p;
+
+    {
+        switch (addr) {
+            case 0x04:
+                {
+                    bochs_vbe->pci_conf_status = val;
+                    io_removehandler(0x03c0, 0x0020, bochs_vbe_in, NULL, NULL, bochs_vbe_out, NULL, NULL, bochs_vbe);
+                    io_removehandler(0x1ce, 3, bochs_vbe_in, bochs_vbe_inw, 0, bochs_vbe_out, bochs_vbe_outw, 0, bochs_vbe);
+                    mem_mapping_disable(&bochs_vbe->linear_mapping);
+                    mem_mapping_disable(&bochs_vbe->svga.mapping);
+                    if (bochs_vbe->pci_conf_status & PCI_COMMAND_IO) {
+                        io_sethandler(0x03c0, 0x0020, bochs_vbe_in, NULL, NULL, bochs_vbe_out, NULL, NULL, bochs_vbe);
+                        io_sethandler(0x1ce, 3, bochs_vbe_in, bochs_vbe_inw, 0, bochs_vbe_out, bochs_vbe_outw, 0, bochs_vbe);
+                    }
+                    if (bochs_vbe->pci_conf_status & PCI_COMMAND_MEM) {
+                        mem_mapping_enable(&bochs_vbe->svga.mapping);
+                        if (bochs_vbe->linear_mapping.base)
+                            mem_mapping_enable(&bochs_vbe->linear_mapping);
+                    }
+                    break;
+                }
+            case 0x13:
+                {
+                    if (!bochs_vbe->linear_mapping.enable) {
+                        bochs_vbe->linear_mapping.base = val << 24;
+                        break;
+                    }
+                    mem_mapping_set_addr(&bochs_vbe->linear_mapping, val << 24, (1 << 24));
+                    break;
+                }
+            case 0x3c:
+                bochs_vbe->pci_line_interrupt = val;
+                break;
+            case 0x30:
+                bochs_vbe->pci_rom_enable = val & 0x1;
+                mem_mapping_disable(&bochs_vbe->bios_rom.mapping);
+                if (bochs_vbe->pci_rom_enable & 1) {
+                    mem_mapping_set_addr(&bochs_vbe->bios_rom.mapping, bochs_vbe->rom_addr << 16, 0x10000);
+                }
+                break;
+            case 0x32:
+                bochs_vbe->rom_addr &= ~0xFF;
+                bochs_vbe->rom_addr |= val & 0xFC;
+                if (bochs_vbe->pci_rom_enable & 1) {
+                    mem_mapping_set_addr(&bochs_vbe->bios_rom.mapping, bochs_vbe->rom_addr << 16, 0x10000);
+                }
+                break;
+            case 0x33:
+                bochs_vbe->rom_addr &= ~0xFF00;
+                bochs_vbe->rom_addr |= (val << 8);
+                if (bochs_vbe->pci_rom_enable & 1) {
+                    mem_mapping_set_addr(&bochs_vbe->bios_rom.mapping, bochs_vbe->rom_addr << 16, 0x10000);
+                }
+        }
+    }
+}
+
 static void *
 bochs_vbe_init(const device_t *info)
 {
@@ -389,6 +511,9 @@ bochs_vbe_init(const device_t *info)
 
     io_sethandler(0x03c0, 0x0020, bochs_vbe_in, NULL, NULL, bochs_vbe_out, NULL, NULL, bochs_vbe);
     io_sethandler(0x1ce, 3, bochs_vbe_in, bochs_vbe_inw, 0, bochs_vbe_out, bochs_vbe_outw, 0, bochs_vbe);
+    
+    mem_mapping_disable(&bochs_vbe->bios_rom.mapping);
+    mem_mapping_add(&bochs_vbe->linear_mapping, 0, 0, svga_readb_linear, svga_readw_linear, svga_readl_linear, svga_writeb_linear, svga_writew_linear, svga_writel_linear, NULL, MEM_MAPPING_EXTERNAL, &bochs_vbe->svga);
 
     bochs_vbe->svga.bpp     = 8;
     bochs_vbe->svga.miscout = 1;
