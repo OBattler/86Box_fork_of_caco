@@ -377,7 +377,7 @@ bochs_vbe_init(const device_t *info)
     bochs_vbe_t *bochs_vbe = malloc(sizeof(bochs_vbe_t));
     memset(bochs_vbe, 0, sizeof(bochs_vbe_t));
 
-    rom_init(&bochs_vbe->bios_rom, "roms/video/bochs/bochs.bin", 0xc0000, 0x8000, 0x7fff, 0x2000, MEM_MAPPING_EXTERNAL);
+    rom_init(&bochs_vbe->bios_rom, "roms/video/bochs/VGABIOS-lgpl-latest.bin", 0xc0000, 0x8000, 0x7fff, 0x2000, MEM_MAPPING_EXTERNAL);
 
     video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_ps1_svga_isa);
 
@@ -402,7 +402,7 @@ bochs_vbe_init(const device_t *info)
 static int
 bochs_vbe_available(void)
 {
-    return rom_present("roms/video/bochs/bochs.bin");
+    return rom_present("roms/video/bochs/VGABIOS-lgpl-latest.bin");
 }
 
 void
