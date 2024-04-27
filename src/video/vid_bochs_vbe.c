@@ -165,7 +165,7 @@ bochs_vbe_recalctimings(svga_t* svga)
             break;
         default:
         case 8:
-            svga->render = svga_render_8bpp_highres;
+            svga->render = svga_render_8bpp_clone_highres;
             break;
         case 15:
             svga->render = svga_render_15bpp_highres;
@@ -523,6 +523,7 @@ bochs_vbe_init(const device_t *info)
 
     bochs_vbe->svga.bpp     = 8;
     bochs_vbe->svga.miscout = 1;
+    bochs_vbe->bank_gran    = 64;
 
     svga_set_ramdac_type(&bochs_vbe->svga, RAMDAC_8BIT);
     bochs_vbe->svga.adv_flags |= FLAG_RAMDAC_SHIFT;
