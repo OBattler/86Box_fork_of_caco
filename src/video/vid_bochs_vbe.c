@@ -1,3 +1,30 @@
+/*
+ * 86Box    A hypervisor and IBM PC system emulator that specializes in
+ *          running old operating systems and software designed for IBM
+ *          PC systems and compatibles from 1981 through fairly recent
+ *          system designs based on the PCI bus.
+ *
+ *          This file is part of the 86Box distribution.
+ *
+ *          Bochs VBE SVGA emulation.
+ *
+ *          Uses code from libxcvt to calculate CRTC timings.
+ *
+ * Authors: Cacodemon345
+ *          The Bochs Project
+ *          Fabrice Bellard
+ *          The libxcvt authors
+ *
+ *          Copyright 2024 Cacodemon345
+ *          Copyright 2003 Fabrice Bellard
+ *          Copyright 2002-2024 The Bochs Project
+ *          Copyright 2002-2003 Mike Nordell
+ *          Copyright 2000-2021 The libxcvt authors
+ *
+ *          See https://gitlab.freedesktop.org/xorg/lib/libxcvt/-/blob/master/COPYING for libxcvt license details
+ */
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -13,10 +40,9 @@
 #include <86box/vid_svga.h>
 #include <86box/vid_svga_render.h>
 #include <86box/pci.h>
+#include <86box/i2c.h>
+#include <86box/vid_ddc.h>
 
-#include "cvt/libxcvt.h"
-
-#define VBE_DISPI_BANK_ADDRESS           0xA0000
 #define VBE_DISPI_BANK_SIZE_KB           64
 #define VBE_DISPI_BANK_GRANULARITY_KB    32
 
@@ -58,9 +84,22 @@
 #define VBE_DISPI_BANK_RD                0x8000
 #define VBE_DISPI_BANK_RW                0xc000
 
-#define VBE_DISPI_LFB_PHYSICAL_ADDRESS   0xE0000000
 
 static video_timings_t timing_bochs  = { .type = VIDEO_PCI, .write_b = 2, .write_w = 2, .write_l = 1, .read_b = 20, .read_w = 20, .read_l = 21 };
+
+struct vbe_mode_info {
+    uint32_t                hdisplay;
+    uint32_t                vdisplay;
+    float                   vrefresh;
+    float                   hsync;
+    uint64_t                dot_clock;
+    uint16_t                hsync_start;
+    uint16_t                hsync_end;
+    uint16_t                htotal;
+    uint16_t                vsync_start;
+    uint16_t                vsync_end;
+    uint16_t                vtotal;
+};
 
 typedef struct bochs_vbe_t {
     svga_t svga;
@@ -77,7 +116,185 @@ typedef struct bochs_vbe_t {
     uint8_t pci_line_interrupt;
     uint8_t slot;
     uint16_t rom_addr;
+
+    void *i2c;
+    void *ddc;
 } bochs_vbe_t;
+
+static void
+gen_mode_info(int hdisplay, int vdisplay, float vrefresh, struct vbe_mode_info* mode_info)
+{
+    bool margins = false;
+    float vfield_rate, hperiod;
+    int hdisplay_rnd, hmargin;
+    int vdisplay_rnd, vmargin, vsync;
+    float interlace;            /* Please rename this */
+
+    if (!mode_info)
+        return;
+
+    mode_info->hdisplay = hdisplay;
+    mode_info->vdisplay = vdisplay;
+    mode_info->vrefresh = vrefresh;
+
+    /* 1) top/bottom margin size (% of height) - default: 1.8 */
+#define CVT_MARGIN_PERCENTAGE 1.8
+
+    /* 2) character cell horizontal granularity (pixels) - default 8 */
+#define CVT_H_GRANULARITY 8
+
+    /* 4) Minimum vertical front porch (lines) - default 3 */
+#define CVT_MIN_V_PORCH_RND 3
+
+    /* 4) Minimum number of vertical back porch lines - default 6 */
+#define CVT_MIN_V_BPORCH 6
+
+    /* Pixel Clock step (kHz) */
+#define CVT_CLOCK_STEP 250
+
+    /* CVT default is 60.0Hz */
+    if (!mode_info->vrefresh)
+        mode_info->vrefresh = 60.0;
+
+    /* 1. Required field rate */
+    vfield_rate = mode_info->vrefresh;
+
+    /* 2. Horizontal pixels */
+    hdisplay_rnd = mode_info->hdisplay - (mode_info->hdisplay % CVT_H_GRANULARITY);
+
+    /* 3. Determine left and right borders */
+    if (margins) {
+        /* right margin is actually exactly the same as left */
+        hmargin = (((float) hdisplay_rnd) * CVT_MARGIN_PERCENTAGE / 100.0);
+        hmargin -= hmargin % CVT_H_GRANULARITY;
+    }
+    else {
+        hmargin = 0;
+    }
+
+    /* 4. Find total active pixels */
+    mode_info->hdisplay = hdisplay_rnd + 2 * hmargin;
+
+    /* 5. Find number of lines per field */
+    vdisplay_rnd = mode_info->vdisplay;
+
+    /* 6. Find top and bottom margins */
+    /* nope. */
+    if (margins)
+        /* top and bottom margins are equal again. */
+        vmargin = (((float) vdisplay_rnd) * CVT_MARGIN_PERCENTAGE / 100.0);
+    else
+        vmargin = 0;
+
+    mode_info->vdisplay = mode_info->vdisplay + 2 * vmargin;
+
+    /* 7. interlace */
+    interlace = 0.0;
+
+    /* Determine vsync Width from aspect ratio */
+    if (!(mode_info->vdisplay % 3) && ((mode_info->vdisplay * 4 / 3) == mode_info->hdisplay))
+        vsync = 4;
+    else if (!(mode_info->vdisplay % 9) && ((mode_info->vdisplay * 16 / 9) == mode_info->hdisplay))
+        vsync = 5;
+    else if (!(mode_info->vdisplay % 10) && ((mode_info->vdisplay * 16 / 10) == mode_info->hdisplay))
+        vsync = 6;
+    else if (!(mode_info->vdisplay % 4) && ((mode_info->vdisplay * 5 / 4) == mode_info->hdisplay))
+        vsync = 7;
+    else if (!(mode_info->vdisplay % 9) && ((mode_info->vdisplay * 15 / 9) == mode_info->hdisplay))
+        vsync = 7;
+    else                        /* Custom */
+        vsync = 10;
+
+    {             /* simplified GTF calculation */
+
+        /* 4) Minimum time of vertical sync + back porch interval (µs)
+         * default 550.0 */
+#define CVT_MIN_VSYNC_BP 550.0
+
+        /* 3) Nominal HSync width (% of line period) - default 8 */
+#define CVT_HSYNC_PERCENTAGE 8
+
+        float hblank_percentage;
+        int vsync_and_back_porch, vback_porch;
+        int hblank, hsync_w;
+
+        /* 8. Estimated Horizontal period */
+        hperiod = ((float) (1000000.0 / vfield_rate - CVT_MIN_VSYNC_BP)) /
+            (vdisplay_rnd + 2 * vmargin + CVT_MIN_V_PORCH_RND + interlace);
+
+        /* 9. Find number of lines in sync + backporch */
+        if (((int) (CVT_MIN_VSYNC_BP / hperiod) + 1) <
+            (vsync + CVT_MIN_V_BPORCH))
+            vsync_and_back_porch = vsync + CVT_MIN_V_BPORCH;
+        else
+            vsync_and_back_porch = (int) (CVT_MIN_VSYNC_BP / hperiod) + 1;
+
+        /* 10. Find number of lines in back porch */
+        vback_porch = vsync_and_back_porch - vsync;
+        (void) vback_porch;
+
+        /* 11. Find total number of lines in vertical field */
+        mode_info->vtotal =
+            vdisplay_rnd + 2 * vmargin + vsync_and_back_porch + interlace +
+            CVT_MIN_V_PORCH_RND;
+
+        /* 5) Definition of Horizontal blanking time limitation */
+        /* Gradient (%/kHz) - default 600 */
+#define CVT_M_FACTOR 600
+
+        /* Offset (%) - default 40 */
+#define CVT_C_FACTOR 40
+
+        /* Blanking time scaling factor - default 128 */
+#define CVT_K_FACTOR 128
+
+        /* Scaling factor weighting - default 20 */
+#define CVT_J_FACTOR 20
+
+#define CVT_M_PRIME CVT_M_FACTOR * CVT_K_FACTOR / 256
+#define CVT_C_PRIME (CVT_C_FACTOR - CVT_J_FACTOR) * CVT_K_FACTOR / 256 + \
+        CVT_J_FACTOR
+
+        /* 12. Find ideal blanking duty cycle from formula */
+        hblank_percentage = CVT_C_PRIME - CVT_M_PRIME * hperiod / 1000.0;
+
+        /* 13. Blanking time */
+        if (hblank_percentage < 20)
+            hblank_percentage = 20;
+
+        hblank = mode_info->hdisplay * hblank_percentage / (100.0 - hblank_percentage);
+        hblank -= hblank % (2 * CVT_H_GRANULARITY);
+
+        /* 14. Find total number of pixels in a line. */
+        mode_info->htotal = mode_info->hdisplay + hblank;
+
+        /* Fill in HSync values */
+        mode_info->hsync_end = mode_info->hdisplay + hblank / 2;
+
+        hsync_w = (mode_info->htotal * CVT_HSYNC_PERCENTAGE) / 100;
+        hsync_w -= hsync_w % CVT_H_GRANULARITY;
+        mode_info->hsync_start = mode_info->hsync_end - hsync_w;
+
+        /* Fill in vsync values */
+        mode_info->vsync_start = mode_info->vdisplay + CVT_MIN_V_PORCH_RND;
+        mode_info->vsync_end = mode_info->vsync_start + vsync;
+
+    }
+
+    /* 15/13. Find pixel clock frequency (kHz for xf86) */
+    mode_info->dot_clock = mode_info->htotal * 1000.0 / hperiod;
+    mode_info->dot_clock -= mode_info->dot_clock % CVT_CLOCK_STEP;
+
+    /* 16/14. Find actual Horizontal Frequency (kHz) */
+    mode_info->hsync = ((float) mode_info->dot_clock) / ((float) mode_info->htotal);
+
+    /* 17/15. Find actual Field rate */
+    mode_info->vrefresh = (1000.0 * ((float) mode_info->dot_clock)) /
+        ((float) (mode_info->htotal * mode_info->vtotal));
+
+    /* 18/16. Find actual vertical frame frequency */
+    /* ignore - we don't do interlace here */
+}
 
 void
 bochs_vbe_recalctimings(svga_t* svga)
@@ -86,10 +303,7 @@ bochs_vbe_recalctimings(svga_t* svga)
     uint32_t maxy = 0;
 
     if (bochs_vbe->vbe_regs[VBE_DISPI_INDEX_ENABLE] & VBE_DISPI_ENABLED) {
-        struct libxcvt_mode_info* mode = libxcvt_gen_mode_info(bochs_vbe->vbe_regs[VBE_DISPI_INDEX_XRES], bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES], 72.f, false, false);
-        if (!mode) {
-            fatal("bochs_vbe: Out of memory!\n");
-        }
+        struct vbe_mode_info mode = {};
         svga->bpp = bochs_vbe->vbe_regs[VBE_DISPI_INDEX_BPP];
         bochs_vbe->vbe_regs[VBE_DISPI_INDEX_XRES] &= ~7;
         if (bochs_vbe->vbe_regs[VBE_DISPI_INDEX_XRES] == 0) {
@@ -114,18 +328,19 @@ bochs_vbe_recalctimings(svga_t* svga)
         if (bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES] > VBE_DISPI_MAX_YRES) {
             bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES] = VBE_DISPI_MAX_YRES;
         }
-
+        gen_mode_info(bochs_vbe->vbe_regs[VBE_DISPI_INDEX_XRES], bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES], 72.f, &mode);
         svga->char_width = 1;
         svga->dots_per_clock = 1;
-        svga->clock = (cpuclock * (double) (1ULL << 32)) / (mode->dot_clock * 1000.);
-        svga->dispend = mode->vdisplay;
-        svga->hdisp = mode->hdisplay;
-        svga->vsyncstart = mode->vsync_start;
-        svga->vtotal = mode->vtotal;
-        svga->htotal = mode->htotal;
-        svga->hblankstart = mode->hdisplay;
-        svga->hblankend = mode->hdisplay + (mode->htotal - mode->hdisplay - 1);
+        svga->clock = (cpuclock * (double) (1ULL << 32)) / (mode.dot_clock * 1000.);
+        svga->dispend = mode.vdisplay;
+        svga->hdisp = mode.hdisplay;
+        svga->vsyncstart = mode.vsync_start;
+        svga->vtotal = mode.vtotal;
+        svga->htotal = mode.htotal;
+        svga->hblankstart = mode.hdisplay;
+        svga->hblankend = mode.hdisplay + (mode.htotal - mode.hdisplay - 1);
         svga->vblankstart = svga->dispend; /* no vertical overscan. */
+        svga->rowcount = 0;
         if (bochs_vbe->vbe_regs[VBE_DISPI_INDEX_BPP] != 4) {
             svga->fb_only = 1;
             svga->adv_flags |= FLAG_NO_SHIFT3;
@@ -177,7 +392,6 @@ bochs_vbe_recalctimings(svga_t* svga)
             svga->render = svga_render_32bpp_highres;
             break;
         }
-        free(mode);
     } else {
         svga->fb_only = 0;
         svga->packed_4bpp = 0;
@@ -190,6 +404,8 @@ bochs_vbe_inw(uint16_t addr, void *priv)
 {
     bochs_vbe_t  *bochs_vbe  = (bochs_vbe_t *) priv;
     bool vbe_get_caps = !!(bochs_vbe->vbe_regs[VBE_DISPI_INDEX_ENABLE] & VBE_DISPI_GETCAPS);
+    if (addr == 0x1ce)
+        return bochs_vbe->vbe_index;
 
     switch (bochs_vbe->vbe_index) {
         case VBE_DISPI_INDEX_XRES:
@@ -211,6 +427,17 @@ bochs_vbe_inw(uint16_t addr, void *priv)
         case VBE_DISPI_INDEX_BANK:
         {
             return vbe_get_caps ? (VBE_DISPI_BANK_GRANULARITY_32K << 8) : bochs_vbe->vbe_regs[bochs_vbe->vbe_index];
+        }
+        case VBE_DISPI_INDEX_DDC:
+        {
+            if (bochs_vbe->vbe_regs[bochs_vbe->vbe_index] & (1 << 7)) {
+                uint16_t ret = bochs_vbe->vbe_regs[bochs_vbe->vbe_index] & ((1 << 7) | 0x3);
+                ret |= i2c_gpio_get_scl(bochs_vbe->i2c) << 2;
+                ret |= i2c_gpio_get_sda(bochs_vbe->i2c) << 3;
+                return ret;
+            } else {
+                return 0x000f;
+            }
         }
         default:
             return bochs_vbe->vbe_regs[bochs_vbe->vbe_index];
@@ -263,6 +490,17 @@ bochs_vbe_outw(uint16_t addr, uint16_t val, void *priv)
                 break;
             }
 
+            case VBE_DISPI_INDEX_DDC:
+            {
+                if (val & (1 << 7)) {
+                    i2c_gpio_set(bochs_vbe->i2c, !!(val & 1), !!(val & 2));
+                    bochs_vbe->vbe_regs[bochs_vbe->vbe_index] = val;
+                } else {
+                    bochs_vbe->vbe_regs[bochs_vbe->vbe_index] &= ~(1 << 7);
+                }
+                break;
+            }
+
             case VBE_DISPI_INDEX_ENABLE: {
                 uint32_t new_bank_gran = 64;
                 bochs_vbe->vbe_regs[bochs_vbe->vbe_index] = val;
@@ -309,12 +547,12 @@ bochs_vbe_out(uint16_t addr, uint8_t val, void *priv)
         addr ^= 0x60;
 
     switch (addr) {
-        case 0x1CE:
+        case VBE_DISPI_IOPORT_INDEX:
             bochs_vbe->vbe_index = val;
             break;
-        case 0x1CF:
+        case VBE_DISPI_IOPORT_DATA:
             return bochs_vbe_outw(0x1cf, val | (bochs_vbe_inw(0x1cf, bochs_vbe) & 0xFF00), bochs_vbe);
-        case 0x1D0:
+        case VBE_DISPI_IOPORT_DATA + 1:
             return bochs_vbe_outw(0x1cf, (val << 8) | (bochs_vbe_inw(0x1cf, bochs_vbe) & 0xFF), bochs_vbe);
         case 0x3D4:
             svga->crtcreg = val & 0x3f;
@@ -358,11 +596,11 @@ bochs_vbe_in(uint16_t addr, void *priv)
         addr ^= 0x60;
 
     switch (addr) {
-        case 0x1CE:
+        case VBE_DISPI_IOPORT_INDEX:
             return bochs_vbe->vbe_index;
-        case 0x1CF:
+        case VBE_DISPI_IOPORT_DATA:
             return bochs_vbe_inw(0x1cf, bochs_vbe);
-        case 0x1D0:
+        case VBE_DISPI_IOPORT_DATA + 1:
             return bochs_vbe_inw(0x1cf, bochs_vbe) >> 8;
         case 0x3D4:
             temp = svga->crtcreg;
@@ -522,6 +760,10 @@ bochs_vbe_init(const device_t *info)
 
     svga_set_ramdac_type(&bochs_vbe->svga, RAMDAC_8BIT);
     bochs_vbe->svga.adv_flags |= FLAG_RAMDAC_SHIFT;
+    bochs_vbe->svga.decode_mask = 0xffffff;
+
+    bochs_vbe->i2c = i2c_gpio_init("ddc_bochs");
+    bochs_vbe->ddc = ddc_init(i2c_gpio_get_bus(bochs_vbe->i2c));
 
     pci_add_card(PCI_ADD_VIDEO, bochs_vbe_pci_read, bochs_vbe_pci_write, bochs_vbe, &bochs_vbe->slot);
 
@@ -537,11 +779,14 @@ bochs_vbe_available(void)
 void
 bochs_vbe_close(void *priv)
 {
-    bochs_vbe_t *vga = (bochs_vbe_t *) priv;
+    bochs_vbe_t *bochs_vbe = (bochs_vbe_t *) priv;
 
-    svga_close(&vga->svga);
+    ddc_close(bochs_vbe->ddc);
+    i2c_gpio_close(bochs_vbe->i2c);
 
-    free(vga);
+    svga_close(&bochs_vbe->svga);
+
+    free(bochs_vbe);
 }
 
 void
