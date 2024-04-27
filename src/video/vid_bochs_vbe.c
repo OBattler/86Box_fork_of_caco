@@ -60,8 +60,7 @@
 
 #define VBE_DISPI_LFB_PHYSICAL_ADDRESS   0xE0000000
 
-static video_timings_t timing_ps1_svga_isa = { .type = VIDEO_ISA, .write_b = 6, .write_w = 8, .write_l = 16, .read_b = 6, .read_w = 8, .read_l = 16 };
-static video_timings_t timing_ps1_svga_mca = { .type = VIDEO_MCA, .write_b = 6, .write_w = 8, .write_l = 16, .read_b = 6, .read_w = 8, .read_l = 16 };
+static video_timings_t timing_bochs  = { .type = VIDEO_PCI, .write_b = 2, .write_w = 2, .write_l = 1, .read_b = 20, .read_w = 20, .read_l = 21 };
 
 typedef struct bochs_vbe_t {
     svga_t svga;
@@ -116,11 +115,9 @@ bochs_vbe_recalctimings(svga_t* svga)
             bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES] = VBE_DISPI_MAX_YRES;
         }
 
-
-        /* Is this okay? */
         svga->char_width = 1;
         svga->dots_per_clock = 1;
-        svga->clock = mode->dot_clock * 1000.;
+        svga->clock = (cpuclock * (double) (1ULL << 32)) / (mode->dot_clock * 1000.);
         svga->dispend = mode->vdisplay;
         svga->hdisp = mode->hdisplay;
         svga->vsyncstart = mode->vsync_start;
@@ -279,8 +276,6 @@ bochs_vbe_outw(uint16_t addr, uint16_t val, void *priv)
                         memset(bochs_vbe->svga.vram, 0,
                             bochs_vbe->vbe_regs[VBE_DISPI_INDEX_YRES] * bochs_vbe->svga.rowoffset);
                     }
-
-                    break;
                 } else {
                     bochs_vbe->svga.read_bank = bochs_vbe->svga.write_bank = 0;
                 }
@@ -507,7 +502,7 @@ bochs_vbe_init(const device_t *info)
 
     rom_init(&bochs_vbe->bios_rom, "roms/video/bochs/VGABIOS-lgpl-latest.bin", 0xc0000, 0x10000, 0xffff, 0x0000, MEM_MAPPING_EXTERNAL);
 
-    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_ps1_svga_isa);
+    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_bochs);
 
     svga_init(info, &bochs_vbe->svga, bochs_vbe, 1 << 24, /*16mb*/
               bochs_vbe_recalctimings,
