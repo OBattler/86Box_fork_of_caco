@@ -110,6 +110,7 @@ typedef struct bochs_vbe_t {
 
     uint16_t bank_gran;
     mem_mapping_t linear_mapping;
+    mem_mapping_t linear_mapping_fixed;
 
     uint8_t pci_conf_status, pci_regs[256];
     uint8_t pci_rom_enable;
@@ -753,6 +754,8 @@ bochs_vbe_init(const device_t *info)
     
     mem_mapping_disable(&bochs_vbe->bios_rom.mapping);
     mem_mapping_add(&bochs_vbe->linear_mapping, 0, 0, svga_readb_linear, svga_readw_linear, svga_readl_linear, svga_writeb_linear, svga_writew_linear, svga_writel_linear, NULL, MEM_MAPPING_EXTERNAL, &bochs_vbe->svga);
+    /* HACK: For NT 3.1 and NT 3.5 that can't handle PCI cards well or even at all on drivers. */
+    mem_mapping_add(&bochs_vbe->linear_mapping_fixed, 0xE0000000, 1 << 24, svga_readb_linear, svga_readw_linear, svga_readl_linear, svga_writeb_linear, svga_writew_linear, svga_writel_linear, NULL, MEM_MAPPING_EXTERNAL, &bochs_vbe->svga);
 
     bochs_vbe->svga.bpp     = 8;
     bochs_vbe->svga.miscout = 1;
