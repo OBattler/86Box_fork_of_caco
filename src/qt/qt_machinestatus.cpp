@@ -272,13 +272,13 @@ MachineStatus::hasCassette()
 bool
 MachineStatus::hasIDE()
 {
-    return machine_has_flags(machine, MACHINE_IDE_QUAD) > 0;
+    return (machine_has_flags(machine, MACHINE_IDE_QUAD) > 0) || other_ide_present;
 }
 
 bool
 MachineStatus::hasSCSI()
 {
-    return machine_has_flags(machine, MACHINE_SCSI) > 0;
+    return (machine_has_flags(machine, MACHINE_SCSI) > 0) || other_scsi_present;
 }
 
 void
@@ -533,7 +533,7 @@ MachineStatus::refresh(QStatusBar *sbar)
 
     iterateCDROM([this, sbar](int i) {
         d->cdrom[i].label = std::make_unique<ClickableLabel>();
-        d->cdrom[i].setEmpty(cdrom[i].host_drive != 200 || QString(cdrom[i].image_path).isEmpty());
+        d->cdrom[i].setEmpty(QString(cdrom[i].image_path).isEmpty());
         d->cdrom[i].setActive(false);
         d->cdrom[i].refresh();
         connect((ClickableLabel *) d->cdrom[i].label.get(), &ClickableLabel::clicked, [i](QPoint pos) {
@@ -596,21 +596,21 @@ MachineStatus::refresh(QStatusBar *sbar)
         d->hdds[HDD_BUS_MFM].label = std::make_unique<QLabel>();
         d->hdds[HDD_BUS_MFM].setActive(false);
         d->hdds[HDD_BUS_MFM].refresh();
-        d->hdds[HDD_BUS_MFM].label->setToolTip(tr("Hard disk (%s)").replace("%s", "MFM/RLL"));
+        d->hdds[HDD_BUS_MFM].label->setToolTip(tr("Hard disk (%1)").arg("MFM/RLL"));
         sbar->addWidget(d->hdds[HDD_BUS_MFM].label.get());
     }
     if ((has_esdi || (hdc_name.left(4) == QStringLiteral("esdi"))) && (c_esdi > 0)) {
         d->hdds[HDD_BUS_ESDI].label = std::make_unique<QLabel>();
         d->hdds[HDD_BUS_ESDI].setActive(false);
         d->hdds[HDD_BUS_ESDI].refresh();
-        d->hdds[HDD_BUS_ESDI].label->setToolTip(tr("Hard disk (%s)").replace("%s", "ESDI"));
+        d->hdds[HDD_BUS_ESDI].label->setToolTip(tr("Hard disk (%1)").arg("ESDI"));
         sbar->addWidget(d->hdds[HDD_BUS_ESDI].label.get());
     }
     if ((has_xta || (hdc_name.left(3) == QStringLiteral("xta"))) && (c_xta > 0)) {
         d->hdds[HDD_BUS_XTA].label = std::make_unique<QLabel>();
         d->hdds[HDD_BUS_XTA].setActive(false);
         d->hdds[HDD_BUS_XTA].refresh();
-        d->hdds[HDD_BUS_XTA].label->setToolTip(tr("Hard disk (%s)").replace("%s", "XTA"));
+        d->hdds[HDD_BUS_XTA].label->setToolTip(tr("Hard disk (%1)").arg("XTA"));
         sbar->addWidget(d->hdds[HDD_BUS_XTA].label.get());
     }
     if (hasIDE() || (hdc_name.left(5) == QStringLiteral("xtide")) ||
@@ -620,14 +620,14 @@ MachineStatus::refresh(QStatusBar *sbar)
             d->hdds[HDD_BUS_IDE].label = std::make_unique<QLabel>();
             d->hdds[HDD_BUS_IDE].setActive(false);
             d->hdds[HDD_BUS_IDE].refresh();
-            d->hdds[HDD_BUS_IDE].label->setToolTip(tr("Hard disk (%s)").replace("%s", "IDE"));
+            d->hdds[HDD_BUS_IDE].label->setToolTip(tr("Hard disk (%1)").arg("IDE"));
             sbar->addWidget(d->hdds[HDD_BUS_IDE].label.get());
         }
         if (c_atapi > 0) {
             d->hdds[HDD_BUS_ATAPI].label = std::make_unique<QLabel>();
             d->hdds[HDD_BUS_ATAPI].setActive(false);
             d->hdds[HDD_BUS_ATAPI].refresh();
-            d->hdds[HDD_BUS_ATAPI].label->setToolTip(tr("Hard disk (%s)").replace("%s", "ATAPI"));
+            d->hdds[HDD_BUS_ATAPI].label->setToolTip(tr("Hard disk (%1)").arg("ATAPI"));
             sbar->addWidget(d->hdds[HDD_BUS_ATAPI].label.get());
         }
     }
@@ -638,7 +638,7 @@ MachineStatus::refresh(QStatusBar *sbar)
         d->hdds[HDD_BUS_SCSI].label = std::make_unique<QLabel>();
         d->hdds[HDD_BUS_SCSI].setActive(false);
         d->hdds[HDD_BUS_SCSI].refresh();
-        d->hdds[HDD_BUS_SCSI].label->setToolTip(tr("Hard disk (%s)").replace("%s", "SCSI"));
+        d->hdds[HDD_BUS_SCSI].label->setToolTip(tr("Hard disk (%1)").arg("SCSI"));
         sbar->addWidget(d->hdds[HDD_BUS_SCSI].label.get());
     }
 

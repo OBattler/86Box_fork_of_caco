@@ -206,6 +206,12 @@ int      video_fullscreen_scale_maximized       = 0;              /* (C) Whether
                                                                          also apply when maximized. */
 int      do_auto_pause                          = 0;              /* (C) Auto-pause the emulator on focus
                                                                          loss */
+char     uuid[MAX_UUID_LEN]                     = { '\0' };       /* (C) UUID or machine identifier */
+
+int      other_ide_present = 0;                                   /* IDE controllers from non-IDE cards are
+                                                                     present */
+int      other_scsi_present = 0;                                  /* SCSI controllers from non-SCSI cards are
+                                                                     present */
 
 /* Statistics. */
 extern int mmuflush;
@@ -954,12 +960,12 @@ pc_init_modules(void)
 
     /* Load the ROMs for the selected machine. */
     if (!machine_available(machine)) {
-        swprintf(temp, sizeof_w(temp), plat_get_string(IDS_2063), machine_getname());
+        swprintf(temp, sizeof_w(temp), plat_get_string(STRING_HW_NOT_AVAILABLE_MACHINE), machine_getname());
         c       = 0;
         machine = -1;
         while (machine_get_internal_name_ex(c) != NULL) {
             if (machine_available(c)) {
-                ui_msgbox_header(MBX_INFO, (wchar_t *) IDS_2129, temp);
+                ui_msgbox_header(MBX_INFO, plat_get_string(STRING_HW_NOT_AVAILABLE_TITLE), temp);
                 machine = c;
                 config_save();
                 break;
@@ -976,12 +982,12 @@ pc_init_modules(void)
     if (!video_card_available(gfxcard[0])) {
         memset(tempc, 0, sizeof(tempc));
         device_get_name(video_card_getdevice(gfxcard[0]), 0, tempc);
-        swprintf(temp, sizeof_w(temp), plat_get_string(IDS_2064), tempc);
+        swprintf(temp, sizeof_w(temp), plat_get_string(STRING_HW_NOT_AVAILABLE_VIDEO), tempc);
         c = 0;
         while (video_get_internal_name(c) != NULL) {
             gfxcard[0] = -1;
             if (video_card_available(c)) {
-                ui_msgbox_header(MBX_INFO, (wchar_t *) IDS_2129, temp);
+                ui_msgbox_header(MBX_INFO, plat_get_string(STRING_HW_NOT_AVAILABLE_TITLE), temp);
                 gfxcard[0] = c;
                 config_save();
                 break;
@@ -997,8 +1003,8 @@ pc_init_modules(void)
     if (!video_card_available(gfxcard[1])) {
         char tempc[512] = { 0 };
         device_get_name(video_card_getdevice(gfxcard[1]), 0, tempc);
-        swprintf(temp, sizeof_w(temp), plat_get_string(IDS_2163), tempc);
-        ui_msgbox_header(MBX_INFO, (wchar_t *) IDS_2129, temp);
+        swprintf(temp, sizeof_w(temp), plat_get_string(STRING_HW_NOT_AVAILABLE_VIDEO2), tempc);
+        ui_msgbox_header(MBX_INFO, plat_get_string(STRING_HW_NOT_AVAILABLE_TITLE), temp);
         gfxcard[1] = 0;
     }
 
@@ -1079,17 +1085,21 @@ pc_reset_hard_close(void)
     /* Close all the memory mappings. */
     mem_close();
 
+    suppress_overscan = 0;
+
     /* Turn off timer processing to avoid potential segmentation faults. */
     timer_close();
 
-    suppress_overscan = 0;
+    lpt_devices_close();
+
+#ifdef UNCOMMENT_LATER
+    lpt_close();
+#endif
 
     nvr_save();
     nvr_close();
 
     mouse_close();
-
-    lpt_devices_close();
 
     device_close_all();
 
@@ -1130,6 +1140,9 @@ pc_reset_hard_init(void)
      * the actual machine, but which support some of the
      * modules that are.
      */
+
+    /* Reset the IDE and SCSI presences */
+    other_ide_present = other_scsi_present = 0;
 
     /* Mark ACPI as unavailable */
     acpi_enabled = 0;
@@ -1289,17 +1302,17 @@ update_mouse_msg(void)
     mbstowcs(wcpu, cpu_s->name, strlen(cpu_s->name) + 1);
 #ifdef _WIN32
     swprintf(mouse_msg[0], sizeof_w(mouse_msg[0]), L"%%i%%%% - %ls",
-             plat_get_string(IDS_2077));
+             plat_get_string(STRING_MOUSE_CAPTURE));
     swprintf(mouse_msg[1], sizeof_w(mouse_msg[1]), L"%%i%%%% - %ls",
-             (mouse_get_buttons() > 2) ? plat_get_string(IDS_2078) : plat_get_string(IDS_2079));
+             (mouse_get_buttons() > 2) ? plat_get_string(STRING_MOUSE_RELEASE) : plat_get_string(STRING_MOUSE_RELEASE_MMB));
     wcsncpy(mouse_msg[2], L"%i%%", sizeof_w(mouse_msg[2]));
 #else
     swprintf(mouse_msg[0], sizeof_w(mouse_msg[0]), L"%ls v%ls - %%i%%%% - %ls - %ls/%ls - %ls",
              EMU_NAME_W, EMU_VERSION_FULL_W, wmachine, wcpufamily, wcpu,
-             plat_get_string(IDS_2077));
+             plat_get_string(STRING_MOUSE_CAPTURE));
     swprintf(mouse_msg[1], sizeof_w(mouse_msg[1]), L"%ls v%ls - %%i%%%% - %ls - %ls/%ls - %ls",
              EMU_NAME_W, EMU_VERSION_FULL_W, wmachine, wcpufamily, wcpu,
-             (mouse_get_buttons() > 2) ? plat_get_string(IDS_2078) : plat_get_string(IDS_2079));
+             (mouse_get_buttons() > 2) ? plat_get_string(STRING_MOUSE_RELEASE) : plat_get_string(STRING_MOUSE_RELEASE_MMB));
     swprintf(mouse_msg[2], sizeof_w(mouse_msg[2]), L"%ls v%ls - %%i%%%% - %ls - %ls/%ls",
              EMU_NAME_W, EMU_VERSION_FULL_W, wmachine, wcpufamily, wcpu);
 #endif

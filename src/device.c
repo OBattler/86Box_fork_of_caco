@@ -51,6 +51,8 @@
 #include <86box/ini.h>
 #include <86box/config.h>
 #include <86box/device.h>
+#include <86box/timer.h>
+#include <86box/lpt.h>
 #include <86box/machine.h>
 #include <86box/mem.h>
 #include <86box/rom.h>
@@ -345,6 +347,12 @@ device_reset_all(uint32_t match_flags)
                 devices[c]->reset(device_priv[c]);
         }
     }
+
+#ifdef UNCOMMENT_LATER
+    /* TODO: Actually convert the LPT devices to device_t's. */
+    if ((match_flags == DEVICE_ALL) || (match_flags == DEVICE_PCI))
+        lpt_reset();
+#endif
 }
 
 void *
@@ -467,8 +475,7 @@ device_has_config(const device_t *dev)
     config = dev->config;
 
     while (config->type != -1) {
-        if (config->type != CONFIG_MAC)
-            c++;
+        c++;
         config++;
     }
 

@@ -90,6 +90,7 @@ svga_set_override(svga_t *svga, int val)
         svga->fullchange = svga->monitor->mon_changeframecount;
     svga->override = val;
 
+#ifdef OVERRIDE_OVERSCAN
     if (!val) {
         /* Override turned off, restore overscan X and Y per the CRTC. */
         svga->monitor->mon_overscan_y = (svga->rowcount + 1) << 1;
@@ -104,6 +105,7 @@ svga_set_override(svga_t *svga, int val)
     } else
         svga->monitor->mon_overscan_x = svga->monitor->mon_overscan_y = 16;
     /* Override turned off, fix overcan X and Y to 16. */
+#endif
 }
 
 void
@@ -957,7 +959,7 @@ svga_recalctimings(svga_t *svga)
             video_blit_memtoscreen_monitor(x_start, y_start, svga->monitor->mon_xsize + x_add, svga->monitor->mon_ysize + y_add, svga->monitor_index);
             video_wait_for_buffer_monitor(svga->monitor_index);
             svga->dpms_ui = 1;
-            ui_sb_set_text_w(plat_get_string(IDS_2143));
+            ui_sb_set_text_w(plat_get_string(STRING_MONITOR_SLEEP));
         }
     } else if (svga->dpms_ui) {
         svga->dpms_ui = 0;
@@ -1128,9 +1130,9 @@ svga_poll(void *priv)
                 svga->linecountff = 0;
                 svga->sc          = 0;
 
-                svga->maback += (svga->rowoffset << 3);
+                svga->maback += (svga->adv_flags & FLAG_NO_SHIFT3) ? svga->rowoffset : (svga->rowoffset << 3);
                 if (svga->interlace)
-                    svga->maback += (svga->rowoffset << 3);
+                    svga->maback += (svga->adv_flags & FLAG_NO_SHIFT3) ? svga->rowoffset : (svga->rowoffset << 3);
 
                 svga->maback &= svga->vram_display_mask;
                 svga->ma = svga->maback;
@@ -1235,8 +1237,10 @@ svga_poll(void *priv)
                 svga->ma = svga->maback = svga->ma_latch + svga->hblank_sub;
 
             svga->ca     = ((svga->crtc[0xe] << 8) | svga->crtc[0xf]) + ((svga->crtc[0xb] & 0x60) >> 5) + svga->ca_adj;
-            svga->ma     = (svga->ma << 2);
-            svga->maback = (svga->maback << 2);
+            if (!(svga->adv_flags & FLAG_NO_SHIFT3)) {
+                svga->ma     = (svga->ma << 2);
+                svga->maback = (svga->maback << 2);
+            }
             svga->ca     = (svga->ca << 2);
 
             if (svga->vsync_callback)
@@ -1339,6 +1343,7 @@ svga_init(const device_t *info, svga_t *svga, void *priv, int memsize,
     svga->hwcursor_draw                       = hwcursor_draw;
     svga->overlay_draw                        = overlay_draw;
     svga->conv_16to32                         = svga_conv_16to32;
+    svga->render                              = svga_render_blank;
 
     svga->hwcursor.cur_xsize = svga->hwcursor.cur_ysize = 32;
 

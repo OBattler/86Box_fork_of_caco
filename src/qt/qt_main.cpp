@@ -30,6 +30,7 @@
 #include <QFont>
 #include <QDialog>
 #include <QMessageBox>
+#include <QPushButton>
 
 #ifdef QT_STATIC
 /* Static builds need plugin imports */
@@ -71,6 +72,7 @@ extern "C" {
 #include "cocoa_mouse.hpp"
 #include "qt_styleoverride.hpp"
 #include "qt_unixmanagerfilter.hpp"
+#include "qt_util.hpp"
 
 // Void Cast
 #define VC(x) const_cast<wchar_t *>(x)
@@ -89,26 +91,23 @@ void qt_set_sequence_auto_mnemonic(bool b);
 void
 main_thread_fn()
 {
-    uint64_t old_time;
-    uint64_t new_time;
-    int      drawits;
     int      frames;
 
     QThread::currentThread()->setPriority(QThread::HighestPriority);
-    plat_set_thread_name(NULL, "main_thread_fn");
+    plat_set_thread_name(nullptr, "main_thread_fn");
     framecountx = 0;
     // title_update = 1;
-    old_time = elapsed_timer.elapsed();
-    drawits = frames = 0;
+    uint64_t old_time = elapsed_timer.elapsed();
+    int drawits = frames = 0;
     while (!is_quit && cpu_thread_run) {
         /* See if it is time to run a frame of code. */
-        new_time = elapsed_timer.elapsed();
+        const uint64_t new_time = elapsed_timer.elapsed();
 #ifdef USE_GDBSTUB
         if (gdbstub_next_asap && (drawits <= 0))
             drawits = 10;
         else
 #endif
-            drawits += (new_time - old_time);
+            drawits += static_cast<int>(new_time - old_time);
         old_time = new_time;
         if (drawits > 0 && !dopause) {
             /* Yes, so do one frame now. */
@@ -191,9 +190,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "Qt: version %s, platform \"%s\"\n", qVersion(), QApplication::platformName().toUtf8().data());
     ProgSettings::loadTranslators(&app);
 #ifdef Q_OS_WINDOWS
-    auto font_name = QObject::tr("FONT_NAME");
-    auto font_size = QObject::tr("FONT_SIZE");
-    QApplication::setFont(QFont(font_name, font_size.toInt()));
+    QApplication::setFont(QFont(ProgSettings::getFontName(lang_id), 9));
     SetCurrentProcessExplicitAppUserModelID(L"86Box.86Box");
 #endif
 
@@ -214,8 +211,31 @@ main(int argc, char *argv[])
 #endif
 
     if (!pc_init_modules()) {
-        ui_msgbox_header(MBX_FATAL, (void *) IDS_2121, (void *) IDS_2056);
+        QMessageBox fatalbox(QMessageBox::Icon::Critical, QObject::tr("No ROMs found"),
+                             QObject::tr("86Box could not find any usable ROM images.\n\nPlease <a href=\"https://github.com/86Box/roms/releases/latest\">download</a> a ROM set and extract it into the \"roms\" directory."),
+                             QMessageBox::Ok);
+        fatalbox.setTextFormat(Qt::TextFormat::RichText);
+        fatalbox.exec();
         return 6;
+    }
+
+    // UUID / copy / move detection
+    if(!util::compareUuid()) {
+        QMessageBox movewarnbox;
+        movewarnbox.setIcon(QMessageBox::Icon::Warning);
+        movewarnbox.setText("This machine might have been moved or copied.");
+        movewarnbox.setInformativeText("In order to ensure proper networking functionality, 86Box needs to know if this machine was moved or copied.\n\nSelect \"I Copied It\" if you are not sure.");
+        const QPushButton *movedButton  = movewarnbox.addButton(QObject::tr("I Moved It"), QMessageBox::AcceptRole);
+        const QPushButton *copiedButton = movewarnbox.addButton(QObject::tr("I Copied It"), QMessageBox::DestructiveRole);
+        QPushButton       *cancelButton = movewarnbox.addButton(QObject::tr("Cancel"), QMessageBox::RejectRole);
+        movewarnbox.setDefaultButton(cancelButton);
+        movewarnbox.exec();
+        if (movewarnbox.clickedButton() == copiedButton) {
+            util::storeCurrentUuid();
+            util::generateNewMacAdresses();
+        } else if (movewarnbox.clickedButton() == movedButton) {
+            util::storeCurrentUuid();
+        }
     }
 
 #ifdef Q_OS_WINDOWS
@@ -372,7 +392,7 @@ main(int argc, char *argv[])
             plat_pause(0);
     });
 
-    auto ret       = app.exec();
+    const auto ret       = app.exec();
     cpu_thread_run = 0;
     main_thread->join();
     pc_close(nullptr);

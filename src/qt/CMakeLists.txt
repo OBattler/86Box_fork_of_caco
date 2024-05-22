@@ -61,7 +61,6 @@ add_library(plat STATIC
 
 add_library(ui STATIC
     qt_ui.cpp
-    qt_cdrom.c
 
     qt_mainwindow.cpp
     qt_mainwindow.hpp
@@ -224,6 +223,13 @@ if(WIN32)
     target_sources(plat PRIVATE win_serial_passthrough.c win_netsocket.c)
 else()
     target_sources(plat PRIVATE ../unix/unix_serial_passthrough.c ../unix/unix_netsocket.c)
+endif()
+
+if(WIN32)
+    target_sources(plat PRIVATE win_cdrom_ioctl.c)
+else()
+# Replace with proper *nix and mac handler files once they are done.
+    target_sources(plat PRIVATE dummy_cdrom_ioctl.c)
 endif()
 
 if (APPLE)

@@ -143,8 +143,7 @@ machine_at_spitfire_init(const machine_t *model)
     pci_register_slot(0x01, PCI_CARD_AGPBRIDGE,   1, 2, 3, 4);
     device_add(&i440lx_device);
     device_add(&piix4e_device);
-    device_add(&keyboard_ps2_pci_device);
-    device_add(&fdc37c935_device);
+    device_add(&fdc37c935_no_nvr_device);
     device_add(&intel_flash_bxt_device);
     spd_register(SPD_TYPE_SDRAM, 0xF, 256);
     device_add(&lm78_device); /* no reporting in BIOS */
@@ -821,7 +820,7 @@ machine_at_p6f99_init(const machine_t *model)
 
     machine_at_common_init_ex(model, 2);
 
-    pci_init(PCI_CONFIG_TYPE_1);
+    pci_init(PCI_CONFIG_TYPE_1 | FLAG_TRC_CONTROLS_CPURST);
     pci_register_slot(0x00, PCI_CARD_NORTHBRIDGE, 0, 0, 0, 0);
     pci_register_slot(0x01, PCI_CARD_SOUTHBRIDGE, 0, 0, 0, 0);
     pci_register_slot(0x09, PCI_CARD_NORMAL,      1, 2, 3, 4);
@@ -854,7 +853,7 @@ machine_at_m747_init(const machine_t *model)
 
     machine_at_common_init_ex(model, 2);
 
-    pci_init(PCI_CONFIG_TYPE_1);
+    pci_init(PCI_CONFIG_TYPE_1 | FLAG_TRC_CONTROLS_CPURST);
     pci_register_slot(0x00, PCI_CARD_NORTHBRIDGE, 0, 0, 0, 0);
     pci_register_slot(0x01, PCI_CARD_SOUTHBRIDGE, 0, 0, 0, 0);
     pci_register_slot(0x09, PCI_CARD_NORMAL,      1, 2, 3, 4);

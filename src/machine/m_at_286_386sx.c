@@ -70,7 +70,7 @@ machine_at_headland_common_init(int type)
 {
     device_add(&keyboard_at_ami_device);
 
-    if (fdc_type == FDC_INTERNAL)
+    if ((type != 2) && (fdc_type == FDC_INTERNAL))
         device_add(&fdc_at_device);
 
     if (type == 2)
@@ -116,6 +116,8 @@ machine_at_ama932j_init(const machine_t *model)
         device_add(&oti067_ama932j_device);
 
     machine_at_headland_common_init(2);
+
+    device_add(&ali5105_device);
 
     return ret;
 }
@@ -346,6 +348,25 @@ machine_at_gw286ct_init(const machine_t *model)
     machine_at_scat_init(model, 1, 0);
 
     device_add(&ide_isa_device);
+
+    return ret;
+}
+
+int
+machine_at_senor_scat286_init(const machine_t *model)
+{
+    int ret;
+
+    ret = bios_load_linear("roms/machines/senor286/AMI-DSC2-1115-061390-K8.rom",
+                           0x000f0000, 65536, 0);
+
+    if (bios_only || !ret)
+        return ret;
+
+    machine_at_scat_init(model, 0, 1);
+
+    if (fdc_type == FDC_INTERNAL)
+        device_add(&fdc_at_device);
 
     return ret;
 }

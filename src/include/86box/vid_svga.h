@@ -29,6 +29,7 @@
 #    define FLAG_ATI          128
 #    define FLAG_S3_911_16BIT 256
 #    define FLAG_512K_MASK    512
+#    define FLAG_NO_SHIFT3    1024 /* Needed for Bochs VBE. */
 struct monitor_t;
 
 typedef struct hwcursor_t {
@@ -129,6 +130,7 @@ typedef struct svga_t {
     int hblank_end_mask;
     int hblank_sub;
     int packed_4bpp;
+    int ps_bit_bug;
     int ati_4color;
 
     /*The three variables below allow us to implement memory maps like that seen on a 1MB Trio64 :
