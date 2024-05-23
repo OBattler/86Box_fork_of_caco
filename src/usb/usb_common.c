@@ -1,11 +1,10 @@
-#include "usb_common.h"
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 
 #include <86box/86box.h>
+#include "usb_common.h"
 
 // Generic USB packet handler
 #define SETUP_STATE_IDLE      0
@@ -51,7 +50,7 @@ void usb_packet_complete(USBPacket *p)
 
 // Async packet support
 
-USBAsync* create_async_packet(USBAsync **base, Bit64u addr, int maxlen)
+USBAsync* create_async_packet(USBAsync **base, uint64_t addr, int maxlen)
 {
   USBAsync *p;
 
@@ -88,7 +87,7 @@ void remove_async_packet(USBAsync **base, USBAsync *p)
   free(p);
 }
 
-USBAsync* find_async_packet(USBAsync **base, Bit64u addr)
+USBAsync* find_async_packet(USBAsync **base, uint64_t addr)
 {
   USBAsync *p = *base;
 
@@ -104,20 +103,20 @@ USBAsync* find_async_packet(USBAsync **base, Bit64u addr)
 /* Default callbacks. */
 void usb_device_handle_reset(usb_device_c* device) {}
 void usb_device_handle_iface_change(usb_device_c* device, int iface) {}
-int usb_device_handle_control(usb_device_c* device, int request, int value, int index, int length, Bit8u *data) { return -1; }
+int usb_device_handle_control(usb_device_c* device, int request, int value, int index, int length, uint8_t *data) { return -1; }
 int usb_device_handle_data(usb_device_c* device, USBPacket *p) { return 0; }
 void handle_iface_change(usb_device_c* device, int iface) {}
 void usb_device_cancel_packet(usb_device_c* device, USBPacket *p) {}
 
-Bit8u usb_device_get_type(usb_device_c* device) {
+uint8_t usb_device_get_type(usb_device_c* device) {
     return device->type;
 }
 
-Bit8u usb_device_get_alt_iace(usb_device_c* device) {
+uint8_t usb_device_get_alt_iace(usb_device_c* device) {
     return device->alt_iface;
 }
 
-Bit8u usb_device_get_address(usb_device_c* device) {
+uint8_t usb_device_get_address(usb_device_c* device) {
     return device->addr;
 }
 
@@ -191,15 +190,15 @@ bool usb_device_get_halted(usb_device_c* device, int ep) {
   return ((ep & 0x7F) < USB_MAX_ENDPOINTS) ? device->endpoint_info[(ep & 0x7F)].halted : 0;
 }
 
-int usb_set_usb_string(Bit8u *buf, const char *str)
+int usb_set_usb_string(uint8_t *buf, const char *str)
 {
-  Bit8u *q = buf;
+  uint8_t *q = buf;
   size_t len = strlen(str);
   if (len > 32) {
     *q = 0;
     return 0;
   }
-  *q++ = (Bit8u)(2 * len + 2);
+  *q++ = (uint8_t)(2 * len + 2);
   *q++ = 3;
   for(size_t i = 0; i < len; i++) {
     *q++ = str[i];
@@ -208,7 +207,7 @@ int usb_set_usb_string(Bit8u *buf, const char *str)
   return (int)(q - buf);
 }
 
-int usb_device_handle_control_common(usb_device_c* device, int request, int value, int index, int length, Bit8u *data)
+int usb_device_handle_control_common(usb_device_c* device, int request, int value, int index, int length, uint8_t *data)
 {
   // if this function returns -1, the device's handle_control() function will have a chance to execute the request
   int ret = -1;
@@ -431,7 +430,7 @@ int usb_device_handle_packet(usb_device_c* device, USBPacket *p)
   int mps = 8;
   int ret = 0;
   int len = p->len;
-  Bit8u *data = p->data;
+  uint8_t *data = p->data;
 
   switch (p->pid) {
     case USB_MSG_ATTACH:

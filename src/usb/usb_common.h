@@ -2,15 +2,7 @@
 #define USB_COMMON_H
 
 #include <stdbool.h>
-
-typedef unsigned long long Bit64u;
-typedef long long          Bit64s;
-typedef unsigned int       Bit32u;
-typedef   signed int       Bit32s;
-typedef unsigned short int Bit16u;
-typedef   signed short int Bit16s;
-typedef unsigned char      Bit8u;
-typedef   signed char      Bit8s;
+#include <stdint.h>
 
 // for the Packet Capture code to work, these four must remain as is
 enum {
@@ -150,15 +142,15 @@ typedef struct usb_device_c usb_device_c;
 struct USBPacket {
   int pid;
   /* Target USB device address. */
-  Bit8u devaddr;
+  uint8_t devaddr;
   /* Target USB device endpoint. */
-  Bit8u devep;
-  Bit8u speed;           // packet's speed definition
+  uint8_t devep;
+  uint8_t speed;           // packet's speed definition
 #if HANDLE_TOGGLE_CONTROL
   int   toggle;          // packet's toggle bit (0, 1, or -1 for xHCI)
 #endif
   /* Packet data. */
-  Bit8u *data;
+  uint8_t *data;
   /* Packet length. */
   int len;
   /* Completion/async callback (Set by host controller interface). */
@@ -175,11 +167,11 @@ typedef struct USBAsync {
   /* USB packet. */
   USBPacket packet;
   /* Host-side packet data address. */
-  Bit64u    td_addr;
+  uint64_t    td_addr;
   /* Packet handled. */
   bool done;
   /* Slot endpoint. */
-  Bit16u  slot_ep;
+  uint16_t  slot_ep;
 
   struct USBAsync *next;
 } USBAsync;
@@ -198,7 +190,7 @@ typedef struct USBEndPoint {
 
 struct usb_device_c {
     /* Type of device (specific to device implementation.)*/
-    Bit8u type;
+    uint8_t type;
     /* Is the device connected? */
     bool connected;
     /* Minimum Speed. */
@@ -208,13 +200,13 @@ struct usb_device_c {
     /* Current Speed. */
     int speed;
     /* Address of device. */
-    Bit8u addr;
+    uint8_t addr;
     /* Current configuration of device. */
-    Bit8u config;
+    uint8_t config;
     /* Currently selected alternate interface. */
-    Bit8u alt_iface;
+    uint8_t alt_iface;
     /* Maximum alternate interface usable. */
-    Bit8u alt_iface_max;
+    uint8_t alt_iface_max;
     /* Name of device. */
     char devname[32];
     /* Endpoints. */
@@ -222,8 +214,8 @@ struct usb_device_c {
 
     bool first8;
     /* Pointer to device and configuration descriptors. */
-    const Bit8u *dev_descriptor;
-    const Bit8u *config_descriptor;
+    const uint8_t *dev_descriptor;
+    const uint8_t *config_descriptor;
     /* Size of device and configuration descriptors. */
     int device_desc_size;
     int config_desc_size;
@@ -236,8 +228,8 @@ struct usb_device_c {
 
     /* Setup packets' state information. */
     int state;
-    Bit8u setup_buf[8];
-    Bit8u data_buf[1024];
+    uint8_t setup_buf[8];
+    uint8_t data_buf[1024];
     int remote_wakeup;
     int setup_state;
     int setup_len;
@@ -261,7 +253,7 @@ struct usb_device_c {
     /* Resets the USB device. */
     void (*handle_reset)(usb_device_c* device);
     /* Handles control packets. Returns 0 on success, or a negative value matching one of USB_RET_* defines on failure. */
-    int (*handle_control)(usb_device_c* device, int request, int value, int index, int length, Bit8u *data);
+    int (*handle_control)(usb_device_c* device, int request, int value, int index, int length, uint8_t *data);
     /* Handles data packets. Returns 0 on success, or a negative value matching one of USB_RET_* defines on failure. */
     int (*handle_data)(usb_device_c* device, USBPacket *p);
     /* Notifications on interface changes. */
@@ -283,22 +275,22 @@ void usb_cancel_packet(USBPacket *p);
 /* Signals completion of processing of packet. */
 void usb_packet_complete(USBPacket *p);
 /* Creates async packet container with host-side descriptor address with maximum length of `maxlen` bytes and assigns it to `base` list. */
-USBAsync* create_async_packet(USBAsync **base, Bit64u addr, int maxlen);
+USBAsync* create_async_packet(USBAsync **base, uint64_t addr, int maxlen);
 /* Removes async packet container from `base` list. */
 void remove_async_packet(USBAsync **base, USBAsync *p);
 /* Finds in-progress packets with host-side descriptor address equal to `addr`. */
-USBAsync* find_async_packet(USBAsync **base, Bit64u addr);
+USBAsync* find_async_packet(USBAsync **base, uint64_t addr);
 
 /* For host controller interface implementations. Sets message/event handler the device can use to signal the host. */
 void usb_device_set_event_handler(usb_device_c* device, void *dev, USBCallback *cb, int port);
 /* Sends message (USB_MSG_*) to device. */
 void usb_device_send_msg(usb_device_c* device, int msg);
 /* Called by USB device implementations to handle control messages targeted at default endpoint. */
-int usb_device_handle_control_common(usb_device_c* device, int request, int value, int index, int length, Bit8u *data);
+int usb_device_handle_control_common(usb_device_c* device, int request, int value, int index, int length, uint8_t *data);
 /* Is the endpoint of device halted? */
 bool usb_device_get_halted(usb_device_c* device, int ep);
 /* Processes 'str' to produce a string suitable for reporting back to the host. */
-int usb_set_usb_string(Bit8u *buf, const char *str);
+int usb_set_usb_string(uint8_t *buf, const char *str);
 /* Get maximum packet size the device can handle for an endpoint. */
 int usb_device_get_mps(usb_device_c* device, const int ep);
 

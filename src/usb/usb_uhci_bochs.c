@@ -1,4 +1,3 @@
-#include "86box/timer.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -15,6 +14,7 @@
 #include "cpu.h"
 #include <86box/pci.h>
 #include <86box/plat_unused.h>
+#include <86box/timer.h>
 
 #include "usb_common.h"
 
@@ -34,7 +34,7 @@
 
 struct USB_UHCI_QUEUE_STACK {
     int    queue_cnt;
-    Bit32u queue_stack[USB_UHCI_QUEUE_STACK_SIZE];
+    uint32_t queue_stack[USB_UHCI_QUEUE_STACK_SIZE];
 };
 
 typedef struct {
@@ -89,7 +89,7 @@ typedef struct {
         bool  resume;          //(bit 2)
         bool  error_interrupt; //(bit 1)
         bool  interrupt;       //(bit 0)
-        Bit8u status2;         // bit 0 and 1 are used to generate the interrupt
+        uint8_t status2;         // bit 0 and 1 are used to generate the interrupt
     } usb_status;
 
     // Interrupt Enable Register
@@ -109,14 +109,14 @@ typedef struct {
     //  Bits 15-11 are reserved
     //  Bits 10-0  Frame List Current Index/Frame Number
     struct {
-        Bit16u frame_num;
+        uint16_t frame_num;
     } usb_frame_num;
 
     // Frame List Base Address Register
     //  Bits 31-12  Base
     //  Bits 11-0   *must* be zeros when written to
     struct {
-        Bit32u frame_base;
+        uint32_t frame_base;
     } usb_frame_base;
 
     // Start of Frame Modify Register
@@ -124,7 +124,7 @@ typedef struct {
     //  Bits 6-0 SOF timing value (default 64)
     // SOF cycle time equals 11936+timing value
     struct {
-        Bit8u sof_timing;
+        uint8_t sof_timing;
     } usb_sof;
 
     // Port Register (0-1)
@@ -167,7 +167,7 @@ typedef struct {
     int   max_bandwidth; // standard USB 1.1 is 1280 bytes (VTxxxxx models allowed a few less (1023))
     int   loop_reached;  // did we reach our bandwidth loop limit
     uint8_t* devfunc;
-    Bit8u irq_state;
+    uint8_t irq_state;
     bool  global_reset;
 
     USBAsync *packets;
@@ -183,15 +183,15 @@ typedef struct {
 
 #pragma pack(push, 1)
 struct TD {
-    Bit32u dword0;
-    Bit32u dword1;
-    Bit32u dword2;
-    Bit32u dword3;
+    uint32_t dword0;
+    uint32_t dword1;
+    uint32_t dword2;
+    uint32_t dword3;
 };
 
 struct QUEUE {
-    Bit32u horz;
-    Bit32u vert;
+    uint32_t horz;
+    uint32_t vert;
 };
 #pragma pack(pop)
 
@@ -208,7 +208,7 @@ const char *usb_speed[4] = {
 #define BX_DEBUG(x) pclog x ; pclog ("\n")
 #define BX_PANIC(x) fatal x ; pclog ("\n")
 
-bool usb_uhci_do_transfer(bx_uhci_core_t *hub, Bit32u address, struct TD *td);
+bool usb_uhci_do_transfer(bx_uhci_core_t *hub, uint32_t address, struct TD *td);
 
 void
 usb_uhci_update_irq(bx_uhci_core_t *hub)
@@ -226,7 +226,7 @@ usb_uhci_update_irq(bx_uhci_core_t *hub)
 }
 
 bool
-usb_uhci_set_connect_status(bx_uhci_core_t *hub, Bit8u port, bool connected)
+usb_uhci_set_connect_status(bx_uhci_core_t *hub, uint8_t port, bool connected)
 {
     usb_device_c *device = hub->usb_port[port].device;
     if (device != NULL) {
@@ -305,7 +305,7 @@ usb_uhci_broadcast_packet(bx_uhci_core_t *hub, USBPacket *p)
 
 static void
 set_status(struct TD *td, bool stalled, bool data_buffer_error, bool babble,
-           bool nak, bool crc_time_out, bool bitstuff_error, Bit16u act_len)
+           bool nak, bool crc_time_out, bool bitstuff_error, uint16_t act_len)
 {
     // clear out the bits we can modify and/or want zero
     td->dword1 &= 0xDF00F800;
@@ -323,7 +323,7 @@ set_status(struct TD *td, bool stalled, bool data_buffer_error, bool babble,
 }
 
 int
-usb_uhci_add_queue(bx_uhci_core_t *hub, struct USB_UHCI_QUEUE_STACK *stack, const Bit32u addr)
+usb_uhci_add_queue(bx_uhci_core_t *hub, struct USB_UHCI_QUEUE_STACK *stack, const uint32_t addr)
 {
     // check to see if this queue has been processed before
     for (int i = 0; i < stack->queue_cnt; i++) {
@@ -379,16 +379,16 @@ usb_uhci_timer(void *priv)
         int                         count           = USB_UHCI_LOOP_COUNT;
         int                         bytes_processed = 0; // The UHCI (USB 1.1) allows up to 1280 bytes to be processed per frame.
         bool                        interrupt = 0, shortpacket = 0, stalled = 0;
-        Bit32u                      item, queue_addr = 0;
+        uint32_t                      item, queue_addr = 0;
         struct QUEUE                queue;
         struct TD                   td;
-        Bit32u                      address = hub->usb_frame_base.frame_base + ((hub->usb_frame_num.frame_num & 0x3FF) * sizeof(Bit32u));
+        uint32_t                      address = hub->usb_frame_base.frame_base + ((hub->usb_frame_num.frame_num & 0x3FF) * sizeof(uint32_t));
 
         // reset our queue stack to zero
         queue_stack.queue_cnt = 0;
 
         // read in the frame pointer
-        dma_bm_read(address, (Bit8u *) &item, sizeof(Bit32u), 4);
+        dma_bm_read(address, (uint8_t *) &item, sizeof(uint32_t), 4);
 
         // BX_DEBUG(("Start of Frame %d", hub->usb_frame_num.frame_num & 0x3FF));
 
@@ -422,7 +422,7 @@ usb_uhci_timer(void *priv)
                 }
 
                 // read in the queue
-                dma_bm_read(item & ~0xF, (Bit8u *) &queue, sizeof(struct QUEUE), 4);
+                dma_bm_read(item & ~0xF, (uint8_t *) &queue, sizeof(struct QUEUE), 4);
 
                 // this massively populates the log file, so I keep it commented out
                 // BX_DEBUG(("Queue at 0x%08X:  horz = 0x%08X, vert = 0x%08X", item & ~0xF, queue.horz, queue.vert));
@@ -448,7 +448,7 @@ usb_uhci_timer(void *priv)
 
             // else, we found a Transfer Descriptor
             address = item & ~0xF;
-            dma_bm_read(address, (Bit8u *) &td, sizeof(struct TD), 4);
+            dma_bm_read(address, (uint8_t *) &td, sizeof(struct TD), 4);
             const bool depthbreadth = (td.dword0 & 0x0004) ? 1 : 0; // 1 = depth first, 0 = breadth first
             const bool is_active    = (td.dword1 & (1 << 23)) > 0;
             bool       was_short = 0, was_stall = 0;
@@ -474,7 +474,7 @@ usb_uhci_timer(void *priv)
                         stalled = was_stall = 1;
 
                     // write back the status to the TD
-                    dma_bm_write(address + sizeof(Bit32u), (Bit8u *) &td.dword1, sizeof(Bit32u), 4);
+                    dma_bm_write(address + sizeof(uint32_t), (uint8_t *) &td.dword1, sizeof(uint32_t), 4);
                     // we processed another td within this queue line
                     td_count++;
                     bytes_processed += r_actlen;
@@ -485,7 +485,7 @@ usb_uhci_timer(void *priv)
                         if (queue_addr != 0) {
                             if (!was_short) {
                                 // copy pointer for next queue item into vert queue head
-                                dma_bm_write((queue_addr & ~0xF) + sizeof(Bit32u), (Bit8u *) &item, sizeof(Bit32u), 4);
+                                dma_bm_write((queue_addr & ~0xF) + sizeof(uint32_t), (uint8_t *) &item, sizeof(uint32_t), 4);
                             }
                             // if breadth first, short packet, or last in the element list, move on to next queue item
                             if (!depthbreadth || !USB_UHCI_IS_LINK_VALID(item) || was_short) {
@@ -605,12 +605,12 @@ usb_uhci_event_handler(int event, void *ptr, void *priv, int port)
 }
 
 bool
-usb_uhci_do_transfer(bx_uhci_core_t *hub, Bit32u address, struct TD *td)
+usb_uhci_do_transfer(bx_uhci_core_t *hub, uint32_t address, struct TD *td)
 {
-    Bit16u maxlen = (td->dword2 >> 21);
-    Bit8u  addr   = (td->dword2 >> 8) & 0x7F;
-    Bit8u  endpt  = (td->dword2 >> 15) & 0x0F;
-    Bit8u  pid    = td->dword2 & 0xFF;
+    uint16_t maxlen = (td->dword2 >> 21);
+    uint8_t  addr   = (td->dword2 >> 8) & 0x7F;
+    uint8_t  endpt  = (td->dword2 >> 15) & 0x0F;
+    uint8_t  pid    = td->dword2 & 0xFF;
 
     USBAsync *p          = find_async_packet(&hub->packets, address);
     bool      completion = (p != NULL);
@@ -787,10 +787,10 @@ usb_uhci_set_port_device(void *priv, int port, usb_device_c *dev)
 uint8_t
 usb_uhci_read(uint16_t address, void *priv)
 {
-    Bit32u          val = 0x0;
-    Bit8u           port;
+    uint32_t          val = 0x0;
+    uint8_t           port;
     bx_uhci_core_t *hub    = (bx_uhci_core_t *) priv;
-    Bit8u           offset = 0;
+    uint8_t           offset = 0;
     bool            odd    = address & 1;
 
     // if the host driver has not cleared the reset bit, do nothing (reads are
@@ -809,7 +809,7 @@ usb_uhci_read(uint16_t address, void *priv)
                 | hub->usb_command.suspend << 3
                 | hub->usb_command.reset << 2
                 | hub->usb_command.host_reset << 1
-                | (Bit16u) hub->usb_command.schedule;
+                | (uint16_t) hub->usb_command.schedule;
             break;
 
         case 0x02: // status register (16-bit)
@@ -818,14 +818,14 @@ usb_uhci_read(uint16_t address, void *priv)
                 | hub->usb_status.pci_error << 3
                 | hub->usb_status.resume << 2
                 | hub->usb_status.error_interrupt << 1
-                | (Bit16u) hub->usb_status.interrupt;
+                | (uint16_t) hub->usb_status.interrupt;
             break;
 
         case 0x04: // interrupt enable register (16-bit)
             val = hub->usb_enable.short_packet << 3
                 | hub->usb_enable.on_complete << 2
                 | hub->usb_enable.resume << 1
-                | (Bit16u) hub->usb_enable.timeout_crc;
+                | (uint16_t) hub->usb_enable.timeout_crc;
             break;
 
         case 0x06: // frame number register (16-bit)
@@ -866,7 +866,7 @@ usb_uhci_read(uint16_t address, void *priv)
                     | hub->usb_port[port].enable_changed << 3
                     | hub->usb_port[port].enabled << 2
                     | hub->usb_port[port].connect_changed << 1
-                    | (Bit16u) hub->usb_port[port].status;
+                    | (uint16_t) hub->usb_port[port].status;
                 if (offset & 1) {
                     odd = false;
                     val >>= 8;
@@ -892,9 +892,9 @@ void
 usb_uhci_write(uint16_t address, uint8_t value, void *priv)
 {
     bx_uhci_core_t *hub = (bx_uhci_core_t *) priv;
-    Bit8u           port;
+    uint8_t           port;
 
-    Bit8u offset = address & 0x1f;
+    uint8_t offset = address & 0x1f;
 
     // if the reset bit is not cleared and this write is not clearing the bit,
     // do nothing
@@ -1069,7 +1069,7 @@ void
 usb_uhci_writew(uint16_t addr, uint16_t value, void *priv)
 {
     bx_uhci_core_t *hub    = (bx_uhci_core_t *) priv;
-    Bit8u           offset = addr & 0x1f;
+    uint8_t           offset = addr & 0x1f;
     uint8_t         port   = 0;
 
     if (hub->usb_command.reset && ((offset != 0) || (value & 0x04)))

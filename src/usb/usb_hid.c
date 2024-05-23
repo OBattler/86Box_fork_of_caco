@@ -1,4 +1,3 @@
-#include "86box/timer.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -15,7 +14,8 @@
 #include <86box/dma.h>
 #include "cpu.h"
 #include <86box/pci.h>
-#include "86box/mouse.h"
+#include <86box/timer.h>
+#include <86box/mouse.h>
 
 #include "usb_common.h"
 
@@ -116,28 +116,28 @@ struct usb_device_hid {
     usb_device_c device;
     struct HID_STATE {
         bool   has_events;
-        Bit8u  idle;
+        uint8_t  idle;
         int    mouse_delayed_dx;
         int    mouse_delayed_dy;
-        Bit16s mouse_x;
-        Bit16s mouse_y;
-        Bit8s  mouse_z;
-        Bit8u  b_state;
-        Bit8u  mouse_event_count;
-        Bit8u  mouse_event_buf[BX_KBD_ELEMENTS][BX_M_ELEMENTS_SIZE];
+        int16_t mouse_x;
+        int16_t mouse_y;
+        int8_t  mouse_z;
+        uint8_t  b_state;
+        uint8_t  mouse_event_count;
+        uint8_t  mouse_event_buf[BX_KBD_ELEMENTS][BX_M_ELEMENTS_SIZE];
         int    mouse_event_buf_len[BX_KBD_ELEMENTS];
-        Bit8u  kbd_packet[8];
+        uint8_t  kbd_packet[8];
         int    kbd_packet_indx;
-        Bit8u  indicators;
-        Bit8u  kbd_event_count;
-        Bit32u kbd_event_buf[BX_KBD_ELEMENTS];
+        uint8_t  indicators;
+        uint8_t  kbd_event_count;
+        uint32_t kbd_event_buf[BX_KBD_ELEMENTS];
         // the remaining does not get cleared on a handle_reset()
         HID_MODEL    model;
-        Bit8u        report_use_id; // id that we will use as soon as the HID report has been requested
-        Bit8u        report_id;     // id that we will use after the HID report has been requested
+        uint8_t        report_use_id; // id that we will use as soon as the HID report has been requested
+        uint8_t        report_id;     // id that we will use after the HID report has been requested
         bool         boot_protocol; // 0 = boot protocol, 1 = report protocol
         int          bx_mouse_hid_report_descriptor_len;
-        const Bit8u *bx_mouse_hid_report_descriptor;
+        const uint8_t *bx_mouse_hid_report_descriptor;
     } s;
     pc_timer_t idle_timer;
 };
@@ -171,7 +171,7 @@ typedef struct usb_device_hid usb_device_hid;
 
 ////////////////////////////////////////////////
 // Mouse
-static const Bit8u bx_mouse_dev_descriptor[] = {
+static const uint8_t bx_mouse_dev_descriptor[] = {
     0x12,       /*  u8 bLength; */
     0x01,       /*  u8 bDescriptorType; Device */
     0x01, 0x01, /*  u16 bcdUSB; v1.1 */
@@ -191,7 +191,7 @@ static const Bit8u bx_mouse_dev_descriptor[] = {
     0x01  /*  u8  bNumConfigurations; */
 };
 
-static const Bit8u bx_mouse_dev_descriptor2[] = {
+static const uint8_t bx_mouse_dev_descriptor2[] = {
     0x12,       /*  u8 bLength; */
     0x01,       /*  u8 bDescriptorType; Device */
     0x00, 0x02, /*  u16 bcdUSB; v2.0 */
@@ -220,7 +220,7 @@ static const Bit8u bx_mouse_dev_descriptor2[] = {
 // 000000BB
 // XXXXXXXX
 // YYYYYYYY
-static const Bit8u bx_mouse_hid_report_descriptor_228[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_228[] = {
     0x05, 0x01,           // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,           // Usage (Mouse)
     0xA1, 0x01,           // Collection (Application)
@@ -258,7 +258,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_228[] = {
 // XXXXXXXX
 // YYYYYYYY
 // WWWWWWWW
-static const Bit8u bx_mouse_hid_report_descriptor_338[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_338[] = {
     0x05, 0x01,           // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,           // Usage (Mouse)
     0xA1, 0x01,           // Collection (Application)
@@ -304,7 +304,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_338[] = {
 // 0B00WWWW - bit 6 is Button #2 (right button)
 // XXXXX0B0 - 9 bit X displacement, bit 1 is Button #1 (left button)
 // 0B00XXXX - bit 6 is Button #3 (middle button)
-static const Bit8u bx_mouse_hid_report_descriptor_33debug[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_33debug[] = {
     0x05, 0x01,       // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,       // Usage (Mouse)
     0xA1, 0x01,       // Collection (Application)
@@ -374,7 +374,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_33debug[] = {
 // YYYYXXXX (lsb of y, msb of x)
 // YYYYYYYY (msb)
 // WWWWWWWW
-static const Bit8u bx_mouse_hid_report_descriptor_3312[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_3312[] = {
     0x05, 0x01,       // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,       // Usage (Mouse)
     0xA1, 0x01,       // Collection (Application)
@@ -417,7 +417,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_3312[] = {
 // YYYYYYYY  (lsb)
 // YYYYYYYY  (msb)
 // WWWWWWWW
-static const Bit8u bx_mouse_hid_report_descriptor_3316[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_3316[] = {
     0x05, 0x01,       // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,       // Usage (Mouse)
     0xA1, 0x01,       // Collection (Application)
@@ -461,7 +461,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_3316[] = {
 // XXXXXXXX
 // YYYYYYYY
 // WWWWWWWW
-static const Bit8u bx_mouse_hid_report_descriptor_338phy[] = {
+static const uint8_t bx_mouse_hid_report_descriptor_338phy[] = {
     0x05, 0x01,           // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,           // Usage (Mouse)
     0xA1, 0x01,           // Collection (Application)
@@ -498,7 +498,7 @@ static const Bit8u bx_mouse_hid_report_descriptor_338phy[] = {
 // standard low-, full-speed configuration (w/o physical descriptor)
 // (this define must be the zero based byte offset of the HID length field below)
 #define BX_Mouse_Config_Descriptor0_pos 25
-static Bit8u bx_mouse_config_descriptor0[] = {
+static uint8_t bx_mouse_config_descriptor0[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -544,7 +544,7 @@ static Bit8u bx_mouse_config_descriptor0[] = {
 };
 
 #define HID_PHYS_DESC_SET_LEN 7
-static const Bit8u bx_mouse_phys_descriptor[] = {
+static const uint8_t bx_mouse_phys_descriptor[] = {
     /* HID Physical descriptor */
     /* Descriptor set 0 */
     0x02,                         /*  u8  Number of physical Descriptor sets to follow */
@@ -567,7 +567,7 @@ static const Bit8u bx_mouse_phys_descriptor[] = {
 // standard low-, full-speed configuration (w/ physical descriptor)
 // (this define must be the zero based byte offset of the HID length field below)
 #define BX_Mouse_Config_Descriptor1_pos 25
-static Bit8u bx_mouse_config_descriptor1[] = {
+static uint8_t bx_mouse_config_descriptor1[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -617,7 +617,7 @@ static Bit8u bx_mouse_config_descriptor1[] = {
 // standard high-speed configuration (w/o physical descriptor)
 // (this define must be the zero based byte offset of the HID length field below)
 #define BX_Mouse_Config_Descriptor2_pos 25
-static Bit8u bx_mouse_config_descriptor2[] = {
+static uint8_t bx_mouse_config_descriptor2[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -664,7 +664,7 @@ static Bit8u bx_mouse_config_descriptor2[] = {
 // standard hid descriptor (w/o physical descriptor)
 // (this define must be the zero based byte offset of the HID length field below)
 #define BX_Mouse_Hid_Descriptor0 7
-static Bit8u bx_mouse_hid_descriptor0[] = {
+static uint8_t bx_mouse_hid_descriptor0[] = {
     /* HID descriptor */
     0x09,       /*  u8  bLength; */
     0x21,       /*  u8 bDescriptorType; */
@@ -678,7 +678,7 @@ static Bit8u bx_mouse_hid_descriptor0[] = {
 // standard hid descriptor (w/ physical descriptor)
 // (this define must be the zero based byte offset of the HID length field below)
 #define BX_Mouse_Hid_Descriptor1 7
-static Bit8u bx_mouse_hid_descriptor1[] = {
+static uint8_t bx_mouse_hid_descriptor1[] = {
     /* HID descriptor */
     0x0C,       /*  u8  bLength; */
     0x21,       /*  u8 bDescriptorType; */
@@ -694,7 +694,7 @@ static Bit8u bx_mouse_hid_descriptor1[] = {
 
 ////////////////////////////////////////////////
 // tablet
-static const Bit8u bx_tablet_hid_report_descriptor[] = {
+static const uint8_t bx_tablet_hid_report_descriptor[] = {
     0x05, 0x01,       // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,       // Usage (Mouse)
     0xA1, 0x01,       // Collection (Application)
@@ -734,7 +734,7 @@ static const Bit8u bx_tablet_hid_report_descriptor[] = {
     0xC0,             // End Collection
 };
 
-static const Bit8u bx_tablet_config_descriptor[] = {
+static const uint8_t bx_tablet_config_descriptor[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -779,7 +779,7 @@ static const Bit8u bx_tablet_config_descriptor[] = {
     0x0a,       /*  u8  ep_bInterval; (0 - 255ms -- usb 2.0 spec) */
 };
 
-static const Bit8u bx_tablet_config_descriptor2[] = {
+static const uint8_t bx_tablet_config_descriptor2[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -824,7 +824,7 @@ static const Bit8u bx_tablet_config_descriptor2[] = {
     0x04,       /*  u8  ep_bInterval; (2 ^ (4-1) * 125 usecs = 1 ms) */
 };
 
-static const Bit8u bx_tablet_hid_descriptor[] = {
+static const uint8_t bx_tablet_hid_descriptor[] = {
     /* HID descriptor */
     0x09,       /*  u8  bLength; */
     0x21,       /*  u8 bDescriptorType; */
@@ -838,7 +838,7 @@ static const Bit8u bx_tablet_hid_descriptor[] = {
 
 ////////////////////////////////////////////////
 // keyboard/keypad
-static const Bit8u bx_keypad_hid_report_descriptor[] = {
+static const uint8_t bx_keypad_hid_report_descriptor[] = {
     0x05, 0x01,       // Usage Page (Generic Desktop Ctrls)
     0x09, 0x06,       // Usage (Keyboard)
     0xA1, 0x01,       // Collection (Application)
@@ -873,7 +873,7 @@ static const Bit8u bx_keypad_hid_report_descriptor[] = {
     0xC0,             // End Collection
 };
 
-static const Bit8u bx_keypad_dev_descriptor[] = {
+static const uint8_t bx_keypad_dev_descriptor[] = {
     0x12,       /*  u8 bLength; */
     0x01,       /*  u8 bDescriptorType; Device */
     0x01, 0x01, /*  u16 bcdUSB; v1.1 */
@@ -893,7 +893,7 @@ static const Bit8u bx_keypad_dev_descriptor[] = {
     0x01  /*  u8  bNumConfigurations; */
 };
 
-static const Bit8u bx_keypad_dev_descriptor2[] = {
+static const uint8_t bx_keypad_dev_descriptor2[] = {
     0x12,       /*  u8 bLength; */
     0x01,       /*  u8 bDescriptorType; Device */
     0x00, 0x02, /*  u16 bcdUSB; v2.0 */
@@ -913,7 +913,7 @@ static const Bit8u bx_keypad_dev_descriptor2[] = {
     0x01  /*  u8  bNumConfigurations; */
 };
 
-static const Bit8u bx_keypad_config_descriptor[] = {
+static const uint8_t bx_keypad_config_descriptor[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -958,7 +958,7 @@ static const Bit8u bx_keypad_config_descriptor[] = {
     0x0a,       /*  u8  ep_bInterval; (255ms -- usb 2.0 spec) */
 };
 
-static const Bit8u bx_keypad_config_descriptor2[] = {
+static const uint8_t bx_keypad_config_descriptor2[] = {
     /* one configuration */
     0x09,       /*  u8  bLength; */
     0x02,       /*  u8  bDescriptorType; Configuration */
@@ -1003,7 +1003,7 @@ static const Bit8u bx_keypad_config_descriptor2[] = {
     0x07,       /*  u8  ep_bInterval; (2 ^ (8-1) * 125 usecs = 8 ms) */
 };
 
-static const Bit8u bx_keypad_hid_descriptor[] = {
+static const uint8_t bx_keypad_hid_descriptor[] = {
     /* HID descriptor */
     0x09,       /*  u8  bLength; */
     0x21,       /*  u8 bDescriptorType; */
@@ -1021,15 +1021,15 @@ static const Bit8u bx_keypad_hid_descriptor[] = {
 #define BX_PANIC(x) fatal x
 
 int
-usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
+usb_device_hid_create_mouse_packet(usb_device_hid *hid, uint8_t *buf)
 {
     int l = 0;
 
     // The HID Boot Protocol report is only three bytes long
     if (hid->s.boot_protocol == PROTOCOL_BOOT) {
-        buf[0] = (Bit8u) hid->s.b_state;
-        buf[1] = (Bit8s) hid->s.mouse_x;
-        buf[2] = (Bit8s) hid->s.mouse_y;
+        buf[0] = (uint8_t) hid->s.b_state;
+        buf[1] = (int8_t) hid->s.mouse_x;
+        buf[2] = (int8_t) hid->s.mouse_y;
         l      = 3;
     } else { // do the Report Protocol
 
@@ -1040,12 +1040,12 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
         }
 
         if (hid->device.type == USB_HID_TYPE_TABLET) {
-            *buf++ = (Bit8u) hid->s.b_state;
-            *buf++ = (Bit8u) (hid->s.mouse_x & 0xff);
-            *buf++ = (Bit8u) (hid->s.mouse_x >> 8);
-            *buf++ = (Bit8u) (hid->s.mouse_y & 0xff);
-            *buf++ = (Bit8u) (hid->s.mouse_y >> 8);
-            *buf++ = (Bit8s) hid->s.mouse_z;
+            *buf++ = (uint8_t) hid->s.b_state;
+            *buf++ = (uint8_t) (hid->s.mouse_x & 0xff);
+            *buf++ = (uint8_t) (hid->s.mouse_x >> 8);
+            *buf++ = (uint8_t) (hid->s.mouse_y & 0xff);
+            *buf++ = (uint8_t) (hid->s.mouse_y >> 8);
+            *buf++ = (int8_t) hid->s.mouse_z;
             l += 6;
         } else {
             // USB_HID_TYPE_MOUSE
@@ -1056,8 +1056,8 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
                 // YYYYYYYY
                 case hid_mouse_2x2x8:
                     *buf++ = (hid->s.b_state & 3);
-                    *buf++ = (Bit8s) hid->s.mouse_x;
-                    *buf++ = (Bit8s) hid->s.mouse_y;
+                    *buf++ = (int8_t) hid->s.mouse_x;
+                    *buf++ = (int8_t) hid->s.mouse_y;
                     l += 3;
                     break;
 
@@ -1069,9 +1069,9 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
                 case hid_mouse_3x3x8:
                 case hid_mouse_3x3x8phy:
                     *buf++ = hid->s.b_state & 7;
-                    *buf++ = (Bit8s) hid->s.mouse_x;
-                    *buf++ = (Bit8s) hid->s.mouse_y;
-                    *buf++ = (Bit8s) hid->s.mouse_z;
+                    *buf++ = (int8_t) hid->s.mouse_x;
+                    *buf++ = (int8_t) hid->s.mouse_y;
+                    *buf++ = (int8_t) hid->s.mouse_z;
                     l += 4;
                     break;
 
@@ -1082,11 +1082,11 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
                 // XXXXX0B0 - 9 bit X displacement, bit 1 is Button #1 (left button)
                 // 0B00XXXX - bit 6 is Button #3 (middle button)
                 case hid_mouse_3x3xDebug:
-                    *buf++ = (Bit8u) (((Bit16u) hid->s.mouse_y & 0x7F) << 1);
-                    *buf++ = (Bit8u) ((((Bit16u) hid->s.mouse_y >> 7) & 0x07) | (((Bit16u) hid->s.mouse_z & 0x0F) << 4));
-                    *buf++ = (Bit8u) ((((Bit16u) hid->s.mouse_z >> 4) & 0x0F) | (((hid->s.b_state & 2) >> 1) << 6));
-                    *buf++ = (Bit8u) ((((hid->s.b_state & 1) >> 0) << 1) | (((Bit16u) hid->s.mouse_x & 0x1F) << 3));
-                    *buf++ = (Bit8u) ((((Bit16u) hid->s.mouse_x >> 5) & 0x0F) | (((hid->s.b_state & 4) >> 2) << 6));
+                    *buf++ = (uint8_t) (((uint16_t) hid->s.mouse_y & 0x7F) << 1);
+                    *buf++ = (uint8_t) ((((uint16_t) hid->s.mouse_y >> 7) & 0x07) | (((uint16_t) hid->s.mouse_z & 0x0F) << 4));
+                    *buf++ = (uint8_t) ((((uint16_t) hid->s.mouse_z >> 4) & 0x0F) | (((hid->s.b_state & 2) >> 1) << 6));
+                    *buf++ = (uint8_t) ((((hid->s.b_state & 1) >> 0) << 1) | (((uint16_t) hid->s.mouse_x & 0x1F) << 3));
+                    *buf++ = (uint8_t) ((((uint16_t) hid->s.mouse_x >> 5) & 0x0F) | (((hid->s.b_state & 4) >> 2) << 6));
                     l += 5;
                     break;
 
@@ -1098,10 +1098,10 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
                 // WWWWWWWW
                 case hid_mouse_3x3x12:
                     *buf++ = hid->s.b_state & 7;
-                    *buf++ = (Bit8u) ((Bit16u) hid->s.mouse_x & 0xFF);
-                    *buf++ = (Bit8u) ((((Bit16u) hid->s.mouse_x >> 8) & 0x0F) | (((Bit16u) hid->s.mouse_y & 0x0F) << 4));
-                    *buf++ = (Bit8u) (((Bit16u) hid->s.mouse_y >> 4) & 0xFF);
-                    *buf++ = (Bit8s) hid->s.mouse_z;
+                    *buf++ = (uint8_t) ((uint16_t) hid->s.mouse_x & 0xFF);
+                    *buf++ = (uint8_t) ((((uint16_t) hid->s.mouse_x >> 8) & 0x0F) | (((uint16_t) hid->s.mouse_y & 0x0F) << 4));
+                    *buf++ = (uint8_t) (((uint16_t) hid->s.mouse_y >> 4) & 0xFF);
+                    *buf++ = (int8_t) hid->s.mouse_z;
                     l += 5;
                     break;
 
@@ -1114,11 +1114,11 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
                 // WWWWWWWW
                 case hid_mouse_3x3x16:
                     *buf++ = hid->s.b_state & 7;
-                    *buf++ = (Bit8u) ((Bit16u) hid->s.mouse_x & 0xFF);
-                    *buf++ = (Bit8u) ((Bit16u) hid->s.mouse_x >> 8) & 0xFF;
-                    *buf++ = (Bit8u) ((Bit16u) hid->s.mouse_y & 0xFF);
-                    *buf++ = (Bit8u) ((Bit16u) hid->s.mouse_y >> 8) & 0xFF;
-                    *buf++ = (Bit8s) hid->s.mouse_z;
+                    *buf++ = (uint8_t) ((uint16_t) hid->s.mouse_x & 0xFF);
+                    *buf++ = (uint8_t) ((uint16_t) hid->s.mouse_x >> 8) & 0xFF;
+                    *buf++ = (uint8_t) ((uint16_t) hid->s.mouse_y & 0xFF);
+                    *buf++ = (uint8_t) ((uint16_t) hid->s.mouse_y >> 8) & 0xFF;
+                    *buf++ = (int8_t) hid->s.mouse_z;
                     l += 6;
                     break;
             }
@@ -1134,7 +1134,7 @@ usb_device_hid_create_mouse_packet(usb_device_hid *hid, Bit8u *buf)
 void
 mouse_enq(usb_device_hid *hid, int delta_x, int delta_y, int delta_z, unsigned button_state, bool absxy)
 {
-    Bit16s prev_x, prev_y;
+    int16_t prev_x, prev_y;
 
     if (hid->device.type == USB_HID_TYPE_MOUSE) {
         // scale down the motion
@@ -1176,11 +1176,11 @@ mouse_enq(usb_device_hid *hid, int delta_x, int delta_y, int delta_z, unsigned b
             hid->s.mouse_delayed_dy = 0;
         }
 
-        hid->s.mouse_x = (Bit8s) delta_x;
-        hid->s.mouse_y = (Bit8s) delta_y;
-        hid->s.mouse_z = (Bit8s) delta_z;
+        hid->s.mouse_x = (int8_t) delta_x;
+        hid->s.mouse_y = (int8_t) delta_y;
+        hid->s.mouse_z = (int8_t) delta_z;
         if ((hid->s.mouse_x != 0) || (hid->s.mouse_y != 0) || (hid->s.mouse_z != 0) || (button_state != hid->s.b_state)) {
-            hid->s.b_state = (Bit8u) button_state;
+            hid->s.b_state = (uint8_t) button_state;
             if (hid->s.mouse_event_count < BX_KBD_ELEMENTS) {
                 hid->s.mouse_event_buf_len[hid->s.mouse_event_count] = usb_device_hid_create_mouse_packet(hid, hid->s.mouse_event_buf[hid->s.mouse_event_count]);
                 hid->s.mouse_event_count++;
@@ -1191,7 +1191,7 @@ mouse_enq(usb_device_hid *hid, int delta_x, int delta_y, int delta_z, unsigned b
 }
 
 int
-usb_device_hid_get_mouse_packet(usb_device_hid *hid, Bit8u *buf)
+usb_device_hid_get_mouse_packet(usb_device_hid *hid, uint8_t *buf)
 {
     int l = USB_RET_NAK;
 
@@ -1241,7 +1241,7 @@ usb_hid_poll_wrapper(void *priv)
 }
 
 int
-usb_mouse_poll(usb_device_hid *hid, Bit8u *buf, bool force)
+usb_mouse_poll(usb_device_hid *hid, uint8_t *buf, bool force)
 {
     int l = USB_RET_NAK;
 
@@ -1265,7 +1265,7 @@ usb_mouse_poll(usb_device_hid *hid, Bit8u *buf, bool force)
 }
 
 int
-usb_device_hid_handle_control(usb_device_c *device, int request, int value, int index, int length, Bit8u *data)
+usb_device_hid_handle_control(usb_device_c *device, int request, int value, int index, int length, uint8_t *data)
 {
     int             ret = 0;
     usb_device_hid *hid = (usb_device_hid *) device;
@@ -1590,7 +1590,7 @@ usb_hid_device_init(usb_device_c* device)
             hid->s.bx_mouse_hid_report_descriptor_len = sizeof(bx_mouse_hid_report_descriptor_338phy);
         }
         // update the hid descriptor length fields
-        *(Bit16u *) &bx_mouse_config_descriptor0[BX_Mouse_Config_Descriptor0_pos] = *(Bit16u *) &bx_mouse_config_descriptor1[BX_Mouse_Config_Descriptor1_pos] = *(Bit16u *) &bx_mouse_config_descriptor2[BX_Mouse_Config_Descriptor2_pos] = *(Bit16u *) &bx_mouse_hid_descriptor0[BX_Mouse_Hid_Descriptor0] = *(Bit16u *) &bx_mouse_hid_descriptor1[BX_Mouse_Hid_Descriptor1] = hid->s.bx_mouse_hid_report_descriptor_len;
+        *(uint16_t *) &bx_mouse_config_descriptor0[BX_Mouse_Config_Descriptor0_pos] = *(uint16_t *) &bx_mouse_config_descriptor1[BX_Mouse_Config_Descriptor1_pos] = *(uint16_t *) &bx_mouse_config_descriptor2[BX_Mouse_Config_Descriptor2_pos] = *(uint16_t *) &bx_mouse_hid_descriptor0[BX_Mouse_Hid_Descriptor0] = *(uint16_t *) &bx_mouse_hid_descriptor1[BX_Mouse_Hid_Descriptor1] = hid->s.bx_mouse_hid_report_descriptor_len;
     }
 
     hid->device.connected     = 1;
