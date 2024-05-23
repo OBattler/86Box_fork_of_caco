@@ -350,9 +350,6 @@ usb_uhci_add_queue(bx_uhci_core_t *hub, struct USB_UHCI_QUEUE_STACK *stack, cons
 void
 usb_uhci_timer(void *priv)
 {
-#if BX_USE_WIN32USBDEBUG
-    win32_usb_trigger(USB_DEBUG_UHCI, USB_DEBUG_FRAME, 0, 0);
-#endif
     bx_uhci_core_t *hub = (bx_uhci_core_t*)priv;
     timer_on_auto(&hub->timer, 1000.0);
     // If the "global reset" bit was set by software
@@ -478,10 +475,6 @@ usb_uhci_timer(void *priv)
 
                     // write back the status to the TD
                     dma_bm_write(address + sizeof(Bit32u), (Bit8u *) &td.dword1, sizeof(Bit32u), 4);
-#if BX_USE_WIN32USBDEBUG
-                    // trigger again so that the user can see the processed packet
-                    win32_usb_trigger(USB_DEBUG_UHCI, USB_DEBUG_COMMAND, address, USB_LPARAM_FLAG_AFTER);
-#endif
                     // we processed another td within this queue line
                     td_count++;
                     bytes_processed += r_actlen;
@@ -572,8 +565,7 @@ usb_uhci_event_handler(int event, void *ptr, void *priv, int port)
     switch (event) {
         // packet events start here
         case USB_EVENT_ASYNC:
-            // BX_DEBUG(("Async packet completion"));
-            //fatal("Aync not implemented\n");
+            BX_DEBUG(("Async packet completion"));
             p = ptr;
             p->done = 1;
             break;

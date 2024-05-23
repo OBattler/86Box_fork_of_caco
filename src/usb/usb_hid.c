@@ -1221,7 +1221,23 @@ void
 usb_device_hid_start_timer(usb_device_hid *hid)
 {
     if (hid->s.idle > 0)
-        timer_on_auto(&hid->idle_timer, HID_IDLE_TIME * hid->s.idle);
+        timer_on_auto(&hid->idle_timer, 1);
+}
+
+int
+usb_hid_poll_wrapper(void *priv)
+{
+    usb_device_hid *hid = priv;
+    int delta_x, delta_y;
+    int overflow_x, overflow_y;
+    int delta_z;
+    int b = mouse_get_buttons_ex();
+
+    mouse_subtract_coords(&delta_x, &delta_y, &overflow_x, &overflow_y,
+                          -128, 127, 1, 0);
+    mouse_subtract_z(&delta_z, -8, 7, 1);
+    mouse_enq(hid, delta_x, delta_y, delta_z, b, 0);
+    return 1;
 }
 
 int
@@ -1230,6 +1246,7 @@ usb_mouse_poll(usb_device_hid *hid, Bit8u *buf, bool force)
     int l = USB_RET_NAK;
 
     if (hid->device.type == USB_HID_TYPE_MOUSE) {
+        (void)usb_hid_poll_wrapper(hid);
         if (!hid->s.has_events) {
             // if there's no new movement, handle delayed one
             mouse_enq(hid, 0, 0, hid->s.mouse_z, hid->s.b_state, 0);
@@ -1595,22 +1612,6 @@ usb_hid_handle_reset(usb_device_c *device)
     hid->s.kbd_packet_indx = 1;
 }
 
-int
-usb_hid_poll_wrapper(void *priv)
-{
-    usb_device_hid *hid = priv;
-    int delta_x, delta_y;
-    int overflow_x, overflow_y;
-    int delta_z;
-    int b = mouse_get_buttons_ex();
-
-    mouse_subtract_coords(&delta_x, &delta_y, &overflow_x, &overflow_y,
-                          -128, 127, 1, 0);
-    mouse_subtract_z(&delta_z, -8, 7, 1);
-    mouse_enq(hid, delta_x, delta_y, delta_z, b, 0);
-    return 1;
-}
-
 void *
 usb_hid_device_create(const device_t *info)
 {
@@ -1645,6 +1646,7 @@ usb_hid_device_create(const device_t *info)
 
     mouse_set_poll(usb_hid_poll_wrapper, hid);
     mouse_set_buttons(3);
+    mouse_set_sample_rate(-1);
 
     return hid;
 }
