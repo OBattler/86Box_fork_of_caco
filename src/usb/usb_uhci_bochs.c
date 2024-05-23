@@ -573,7 +573,9 @@ usb_uhci_event_handler(int event, void *ptr, void *priv, int port)
         // packet events start here
         case USB_EVENT_ASYNC:
             // BX_DEBUG(("Async packet completion"));
-            fatal("Aync not implemented\n");
+            //fatal("Aync not implemented\n");
+            p = ptr;
+            p->done = 1;
             break;
         case USB_EVENT_WAKEUP:
             if (hub->usb_port[port].suspend && !hub->usb_port[port].resume) {

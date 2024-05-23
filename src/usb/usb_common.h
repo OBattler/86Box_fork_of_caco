@@ -55,6 +55,8 @@ enum {
   USB_STATE_SUSPENDED   = 6
 };
 
+/* Refer to the USB standards for information on these. */
+
 #define USB_DIR_OUT  0
 #define USB_DIR_IN   0x80
 
@@ -122,8 +124,6 @@ enum {
 #define USB_DT_DEVICE_QUALIFIER         0x06
 #define USB_DT_OTHER_SPEED_CONFIG       0x07
 #define USB_DT_INTERFACE_POWER          0x08
-// USB 3.0
-#define USB_DT_BIN_DEV_OBJ_STORE        0x0F
 
 typedef struct USBPacket USBPacket;
 
@@ -147,25 +147,38 @@ typedef struct usb_device_c usb_device_c;
 
 struct USBPacket {
   int pid;
+  /* Target USB device address. */
   Bit8u devaddr;
+  /* Target USB device endpoint. */
   Bit8u devep;
   Bit8u speed;           // packet's speed definition
 #if HANDLE_TOGGLE_CONTROL
   int   toggle;          // packet's toggle bit (0, 1, or -1 for xHCI)
 #endif
+  /* Packet data. */
   Bit8u *data;
+  /* Packet length. */
   int len;
+  /* Completion/async callback (Set by host controller interface). */
   USBCallback *complete_cb;
+  /* Opaque pointer to host controller interface-specific data */
   void *complete_dev;
+  /* Pointer to target USB device. */
   usb_device_c *dev;
   int strm_pid;         // stream primary id
 };
 
+/* Asynchronous USB packet container. */
 typedef struct USBAsync {
+  /* USB packet. */
   USBPacket packet;
+  /* Host-side packet data address. */
   Bit64u    td_addr;
+  /* Packet handled. */
   bool done;
+  /* Slot endpoint. */
   Bit16u  slot_ep;
+
   struct USBAsync *next;
 } USBAsync;
 
@@ -182,27 +195,44 @@ typedef struct USBEndPoint {
 } USBEndPoint;
 
 struct usb_device_c {
+    /* Type of device (specific to device implementation.)*/
     Bit8u type;
+    /* Is the device connected? */
     bool connected;
+    /* Minimum Speed. */
     int minspeed;  // must be no more than FULL speed for *any* device
+    /* Maximum speed. */
     int maxspeed;
+    /* Current Speed. */
     int speed;
+    /* Address of device. */
     Bit8u addr;
+    /* Current configuration of device. */
     Bit8u config;
+    /* Currently selected alternate interface. */
     Bit8u alt_iface;
+    /* Maximum alternate interface usable. */
     Bit8u alt_iface_max;
+    /* Name of device. */
     char devname[32];
+    /* Endpoints. */
     USBEndPoint endpoint_info[USB_MAX_ENDPOINTS];
 
     bool first8;
+    /* Pointer to device and configuration descriptors. */
     const Bit8u *dev_descriptor;
     const Bit8u *config_descriptor;
+    /* Size of device and configuration descriptors. */
     int device_desc_size;
     int config_desc_size;
+    /* String description of vendor. */
     const char *vendor_desc;
+    /* String description of product. */
     const char *product_desc;
+    /* Serial number. */
     const char *serial_num;
 
+    /* Setup packets' state information. */
     int state;
     Bit8u setup_buf[8];
     Bit8u data_buf[1024];
@@ -210,38 +240,64 @@ struct usb_device_c {
     int setup_state;
     int setup_len;
     int setup_index;
+    /* Is device stalled (errored out)? */
     bool stall;
+    /* Is device able to operate asynchronously? */
     bool async_mode;
+    /* Event structure. */
     struct {
       USBCallback *cb;
       void *dev;
       int port;
     } event;
 
+    /* Callbacks. */
+    /* Cancels in-progress USB packets. No-op by default. */
     void (*cancel_packet)(usb_device_c* device, USBPacket* p);
+    /* Handles USB packets. Returns 0 on success, or a negative value matching one of USB_RET_* defines on failure. */
     int (*handle_packet)(usb_device_c* device, USBPacket* p);
+    /* Resets the USB device. */
     void (*handle_reset)(usb_device_c* device);
+    /* Handles control packets. Returns 0 on success, or a negative value matching one of USB_RET_* defines on failure. */
     int (*handle_control)(usb_device_c* device, int request, int value, int index, int length, Bit8u *data);
+    /* Handles data packets. Returns 0 on success, or a negative value matching one of USB_RET_* defines on failure. */
     int (*handle_data)(usb_device_c* device, USBPacket *p);
+    /* Notifications on interface changes. */
     void (*handle_iface_change)(usb_device_c* device, int iface);
+    /* Initializes the device. Returns true on success. */
     bool (*init)(usb_device_c *init);
 };
 
+/* Default inits the device. */
 void usb_device_create(usb_device_c* device);
+/* Allocate USB packet data of 'size' bytes. */
 void usb_packet_init(USBPacket *p, int size);
+/* Deallocates USB packet data. */
 void usb_packet_cleanup(USBPacket *p);
+/* Simply assigns 'dev' to the packet. */
 void usb_defer_packet(USBPacket *p, usb_device_c *dev);
+/* Cancels an in-progress packet. */
 void usb_cancel_packet(USBPacket *p);
+/* Signals completion of processing of packet. */
 void usb_packet_complete(USBPacket *p);
+/* Creates async packet container with host-side descriptor address with maximum length of `maxlen` bytes and assigns it to `base` list. */
 USBAsync* create_async_packet(USBAsync **base, Bit64u addr, int maxlen);
+/* Removes async packet container from `base` list. */
 void remove_async_packet(USBAsync **base, USBAsync *p);
+/* Finds in-progress packets with host-side descriptor address equal to `addr`. */
 USBAsync* find_async_packet(USBAsync **base, Bit64u addr);
 
+/* For host controller interface implementations. Sets message/event handler the device can use to signal the host. */
 void usb_device_set_event_handler(usb_device_c* device, void *dev, USBCallback *cb, int port);
+/* Sends message (USB_MSG_*) to device. */
 void usb_device_send_msg(usb_device_c* device, int msg);
+/* Called by USB device implementations to handle control messages targeted at default endpoint. */
 int usb_device_handle_control_common(usb_device_c* device, int request, int value, int index, int length, Bit8u *data);
+/* Is the endpoint of device halted? */
 bool usb_device_get_halted(usb_device_c* device, int ep);
+/* Processes 'str' to produce a string suitable for reporting back to the host. */
 int usb_set_usb_string(Bit8u *buf, const char *str);
+/* Get maximum packet size the device can handle for an endpoint. */
 int usb_device_get_mps(usb_device_c* device, const int ep);
 
 #endif
