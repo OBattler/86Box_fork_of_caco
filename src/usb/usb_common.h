@@ -128,7 +128,9 @@ enum {
 typedef struct USBPacket USBPacket;
 
 // packet events
+/* Signals wakeup to host. */
 #define USB_EVENT_WAKEUP        0
+/* Signals packet completion to host. */
 #define USB_EVENT_ASYNC         1
 // controller events
 #define USB_EVENT_DEFAULT_SPEED  10
