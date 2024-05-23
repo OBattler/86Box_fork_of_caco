@@ -15,6 +15,7 @@
 #include <86box/dma.h>
 #include "cpu.h"
 #include <86box/pci.h>
+#include "86box/mouse.h"
 
 #include "usb_common.h"
 
@@ -1487,6 +1488,7 @@ usb_device_hid_handle_data(usb_device_c *device, USBPacket *p)
         case USB_TOKEN_IN:
             if (p->devep == 1) {
                 if ((device->type == USB_HID_TYPE_MOUSE) || (device->type == USB_HID_TYPE_TABLET)) {
+                    pclog("USB MOUSE POLLING\n");
                     ret = usb_mouse_poll((usb_device_hid *) device, p->data, 0);
                 } else {
                     goto fail;
@@ -1593,6 +1595,22 @@ usb_hid_handle_reset(usb_device_c *device)
     hid->s.kbd_packet_indx = 1;
 }
 
+int
+usb_hid_poll_wrapper(void *priv)
+{
+    usb_device_hid *hid = priv;
+    int delta_x, delta_y;
+    int overflow_x, overflow_y;
+    int delta_z;
+    int b = mouse_get_buttons_ex();
+
+    mouse_subtract_coords(&delta_x, &delta_y, &overflow_x, &overflow_y,
+                          -128, 127, 1, 0);
+    mouse_subtract_z(&delta_z, -8, 7, 1);
+    mouse_enq(hid, delta_x, delta_y, delta_z, b, 0);
+    return 1;
+}
+
 void *
 usb_hid_device_create(const device_t *info)
 {
@@ -1625,10 +1643,13 @@ usb_hid_device_create(const device_t *info)
 
     timer_add(&hid->idle_timer, usb_device_hid_idle_timer, hid, 0);
 
+    mouse_set_poll(usb_hid_poll_wrapper, hid);
+    mouse_set_buttons(3);
+
     return hid;
 }
 
-void usb_uhci_close(void* priv)
+static void usb_uhci_close(void* priv)
 {
     free(priv);
 }

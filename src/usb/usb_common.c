@@ -597,7 +597,7 @@ int usb_device_handle_packet(usb_device_c* device, USBPacket *p)
             usb_device_set_toggle(device, p->devep, usb_device_get_toggle(device, p->devep) ^ 1); // toggle the bit
           }
 #endif
-          ret = usb_device_handle_data(device, p);
+          ret = device->handle_data(device, p);
           break;
       }
       break;
@@ -667,7 +667,7 @@ int usb_device_handle_packet(usb_device_c* device, USBPacket *p)
             usb_device_set_toggle(device, p->devep, usb_device_get_toggle(device, p->devep) ^ 1);  // toggle the bit
           }
 #endif
-          ret = usb_device_handle_data(device, p);
+          ret = device->handle_data(device, p);
           break;
       }
       break;
