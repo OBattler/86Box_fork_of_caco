@@ -1221,7 +1221,7 @@ void
 usb_device_hid_start_timer(usb_device_hid *hid)
 {
     if (hid->s.idle > 0)
-        timer_on_auto(&hid->idle_timer, 1);
+        timer_on_auto(&hid->idle_timer, HID_IDLE_TIME * hid->s.idle);
 }
 
 int
