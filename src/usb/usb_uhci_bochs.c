@@ -220,9 +220,9 @@ usb_uhci_update_irq(bx_uhci_core_t *hub)
     }
 
     if (hub->pci_conf[0xc1] & (1 << 5))
-        pci_irq(*hub->devfunc, PCI_INTD, 0, level, &hub->irq_state);
+        pci_irq(PCI_IIRQ_BASE | PCI_INTD, 0, 0, level, &hub->irq_state);
     else
-        pci_irq(*hub->devfunc, PCI_INTD, 0, 0, &hub->irq_state);
+        pci_irq(PCI_IIRQ_BASE | PCI_INTD, 0, 0, 0, &hub->irq_state);
 }
 
 bool
