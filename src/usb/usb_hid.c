@@ -1616,6 +1616,12 @@ void *
 usb_hid_device_create(const device_t *info)
 {
     usb_device_hid *hid = calloc(1, sizeof(usb_device_hid));
+    usb_port_t* port = usb_search_for_ports();
+
+    if (!port) {
+        free(hid);
+        return NULL;
+    }
 
     usb_device_create(&hid->device);
     hid->device.type     = USB_HID_TYPE_MOUSE;
@@ -1645,13 +1651,18 @@ usb_hid_device_create(const device_t *info)
     timer_add(&hid->idle_timer, usb_device_hid_idle_timer, hid, 0);
 
     mouse_set_poll(usb_hid_poll_wrapper, hid);
-    mouse_set_buttons(3);
+    mouse_set_buttons(4);
     mouse_set_sample_rate(-1);
+
+    if (!port->connect(port, &hid->device)) {
+        free(hid);
+        return NULL;
+    }
 
     return hid;
 }
 
-static void usb_uhci_close(void* priv)
+static void usb_hid_device_close(void* priv)
 {
     free(priv);
 }
@@ -1662,7 +1673,7 @@ const device_t usb_mouse_device = {
     .flags         = DEVICE_USB,
     .local         = 0,
     .init          = usb_hid_device_create,
-    .close         = usb_uhci_close,
+    .close         = usb_hid_device_close,
     .reset         = NULL,
     { .available = NULL },
     .speed_changed = NULL,

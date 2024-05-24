@@ -30,6 +30,9 @@
 #include "cpu.h"
 #include <86box/plat_unused.h>
 
+usb_port_t registered_ports[16];
+uint8_t usb_ports_num = 0;
+
 #ifdef ENABLE_USB_LOG
 int usb_do_log = ENABLE_USB_LOG;
 
@@ -373,6 +376,30 @@ ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3,
         mem_mapping_set_addr(&dev->ohci_mmio_mapping, dev->ohci_mem_base, 0x1000);
 }
 
+void usb_register_port(uint8_t number, void *priv, int (*is_free)(struct usb_port_t* port), int (*connect)(struct usb_port_t* port, usb_device_c* device))
+{
+    if (usb_ports_num >= 16)
+        return;
+    
+    registered_ports[usb_ports_num].number = number;
+    registered_ports[usb_ports_num].priv = priv;
+    registered_ports[usb_ports_num].is_free = is_free;
+    registered_ports[usb_ports_num].connect = connect;
+    usb_ports_num++;
+    pclog("Register USB\n");
+}
+
+usb_port_t* usb_search_for_ports(void)
+{
+    int i = 0;
+    for (i = 0; i < usb_ports_num; i++) {
+        if (registered_ports[i].priv && registered_ports[i].is_free(&registered_ports[i])) {
+            return &registered_ports[i];
+        }
+    }
+    return NULL;
+}
+
 extern void *
 usb_uhci_init_ext(UNUSED(const device_t *info), void* params);
 extern void
@@ -408,6 +435,8 @@ usb_close(void *priv)
 
     free(dev->usb_uhci_priv);
     free(dev);
+
+    usb_ports_num = 0;
 }
 
 static void *

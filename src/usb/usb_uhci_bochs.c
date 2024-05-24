@@ -219,8 +219,6 @@ usb_uhci_update_irq(bx_uhci_core_t *hub)
         level = 1;
     }
 
-    pclog("level = %d\n", level);
-
     if (hub->pci_conf[0xc1] & (1 << 5))
         pci_irq(*hub->devfunc, PCI_INTD, 0, level, &hub->irq_state);
     else
@@ -1177,6 +1175,33 @@ uhci_update_io_mapping_new(void *priv, uint8_t base_l, uint8_t base_h, int enabl
         io_sethandler(dev->uhci_io_base, 0x20, usb_uhci_read, NULL, NULL, usb_uhci_write, usb_uhci_writew, NULL, dev);
 }
 
+int uhci_port_is_free(usb_port_t* port)
+{
+  bx_uhci_core_t *dev = (bx_uhci_core_t*)port->priv;
+
+  if (port->number >= 2)
+    return 0;
+
+  return !(dev->usb_port[port->number].device);
+}
+
+int uhci_port_connect(usb_port_t* port, usb_device_c* device)
+{
+    if (!uhci_port_is_free(port))
+        return 0;
+
+    usb_uhci_set_port_device(port->priv, port->number, device);
+    return 1;
+}
+
+void uhci_register_usb(usb_t *dev)
+{
+  bx_uhci_core_t *hub = (bx_uhci_core_t*)dev->usb_uhci_priv;
+
+  usb_register_port(0, hub, uhci_port_is_free, uhci_port_connect);
+  usb_register_port(1, hub, uhci_port_is_free, uhci_port_connect);
+}
+
 void *
 usb_uhci_init_ext(UNUSED(const device_t *info), void* params)
 {
@@ -1191,11 +1216,6 @@ usb_uhci_init_ext(UNUSED(const device_t *info), void* params)
       hub->pci_conf = usb_params->pci_conf;
     }
     timer_add(&hub->timer, usb_uhci_timer, hub, 1);
-
-    mouse_device = device_add(&usb_mouse_device);
-
-    if (mouse_device)
-        usb_uhci_set_port_device(hub, 0, (usb_device_c*)mouse_device);
 
     return hub;
 }

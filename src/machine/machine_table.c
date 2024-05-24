@@ -14784,7 +14784,7 @@ const machine_t machines[] = {
             .max_multi = 8.0
         },
         .bus_flags = MACHINE_PS2_AGP,
-        .flags = MACHINE_IDE_DUAL | MACHINE_SOUND | MACHINE_APM | MACHINE_ACPI | MACHINE_USB,
+        .flags = MACHINE_IDE_DUAL | MACHINE_SOUND | MACHINE_APM | MACHINE_ACPI | MACHINE_USB | MACHINE_MOUSE,
         .ram = {
             .min = 8192,
             .max = 786432,
@@ -14828,7 +14828,7 @@ const machine_t machines[] = {
             .max_multi = 8.0
         },
         .bus_flags = MACHINE_PS2_AGP,
-        .flags = MACHINE_IDE_DUAL | MACHINE_APM | MACHINE_ACPI | MACHINE_USB, /* Machine has internal SCSI */
+        .flags = MACHINE_IDE_DUAL | MACHINE_APM | MACHINE_ACPI | MACHINE_USB | MACHINE_MOUSE, /* Machine has internal SCSI */
         .ram = {
             .min = 16384,
             .max = 2097152,
@@ -15080,7 +15080,7 @@ const machine_t machines[] = {
             .min_multi = 1.5,
             .max_multi = 8.0
         },
-        .bus_flags = MACHINE_PS2_AGP,
+        .bus_flags = MACHINE_PS2_AGP | MACHINE_BUS_USB,
         .flags = MACHINE_IDE_DUAL | MACHINE_APM | MACHINE_ACPI | MACHINE_USB,
         .ram = {
             .min = 8192,
@@ -15331,7 +15331,7 @@ const machine_t machines[] = {
             .max_multi = 8.0
         },
         .bus_flags = MACHINE_PS2_NOI97, /* Has Asus-proprietary LAN/SCSI slot */
-        .flags = MACHINE_IDE_DUAL | MACHINE_SOUND | MACHINE_APM | MACHINE_ACPI | MACHINE_GAMEPORT | MACHINE_USB,
+        .flags = MACHINE_IDE_DUAL | MACHINE_SOUND | MACHINE_APM | MACHINE_ACPI | MACHINE_GAMEPORT | MACHINE_USB | MACHINE_MOUSE,
         .ram = {
             .min = 16384,
             .max = 4194304,

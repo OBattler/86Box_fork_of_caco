@@ -1571,8 +1571,10 @@ piix_init(const device_t *info)
     else
         sff_set_irq_mode(dev->bm[1], IRQ_MODE_MIRQ_0);
 
-    if (dev->type >= 3)
+    if (dev->type >= 3) {
         dev->usb   = device_add_parameters(&usb_device, &params);
+        uhci_register_usb(dev->usb);
+    }
 
     if (dev->type > 3) {
         dev->nvr   = device_add(&piix4_nvr_device);
