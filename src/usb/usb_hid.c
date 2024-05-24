@@ -1667,7 +1667,7 @@ static void usb_hid_device_close(void* priv)
     free(priv);
 }
 
-const device_t usb_mouse_device = {
+const device_t mouse_usb_mouse_device = {
     .name          = "USB Mouse",
     .internal_name = "usb_mouse",
     .flags         = DEVICE_USB,
