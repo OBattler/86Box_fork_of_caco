@@ -1664,6 +1664,7 @@ pipc_init(const device_t *info)
 
     dev->usb[0] = device_add_inst_parameters(&usb_device, 1, &usb_params);
     if (dev->local >= VIA_PIPC_686A) {
+        usb_params.pci_conf = &dev->usb_regs[1][0];
         dev->usb[1] = device_add_inst_parameters(&usb_device, 2, &usb_params);
 
         dev->ac97 = device_add(&ac97_via_device);
