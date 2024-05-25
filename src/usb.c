@@ -440,7 +440,7 @@ usb_close(void *priv)
 }
 
 static void *
-usb_init_ext(UNUSED(const device_t *info), void* params)
+usb_init(UNUSED(const device_t *info))
 {
     usb_t *dev;
 
@@ -462,7 +462,7 @@ usb_init_ext(UNUSED(const device_t *info), void* params)
                     ohci_mmio_read, NULL, NULL,
                     ohci_mmio_write, NULL, NULL,
                     NULL, MEM_MAPPING_EXTERNAL, dev);
-    dev->usb_uhci_priv = usb_uhci_init_ext(info, params);
+    dev->usb_uhci_priv = usb_uhci_init_ext(info, (void*)info->local);
     usb_reset(dev);
 
     return dev;
@@ -471,9 +471,9 @@ usb_init_ext(UNUSED(const device_t *info), void* params)
 const device_t usb_device = {
     .name          = "Universal Serial Bus",
     .internal_name = "usb",
-    .flags         = DEVICE_PCI | DEVICE_EXTPARAMS,
+    .flags         = DEVICE_PCI,
     .local         = 0,
-    { .init_ext      = usb_init_ext, },
+    { .init      = usb_init, },
     .close         = usb_close,
     .reset         = usb_reset,
     { .available = NULL },

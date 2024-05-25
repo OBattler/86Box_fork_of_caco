@@ -1662,11 +1662,11 @@ pipc_init(const device_t *info)
         acpi_set_trap_update(dev->acpi, pipc_trap_update_586, dev);
     }
 
-    dev->usb[0] = device_add_inst_parameters(&usb_device, 1, &usb_params);
+    dev->usb[0] = device_add_inst_params(&usb_device, 1, &usb_params);
     uhci_register_usb(dev->usb[0]);
     if (dev->local >= VIA_PIPC_686A) {
         usb_params.pci_conf = &dev->usb_regs[1][0];
-        dev->usb[1] = device_add_inst_parameters(&usb_device, 2, &usb_params);
+        dev->usb[1] = device_add_inst_params(&usb_device, 2, &usb_params);
         uhci_register_usb(dev->usb[1]);
 
         dev->ac97 = device_add(&ac97_via_device);
