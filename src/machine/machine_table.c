@@ -8618,8 +8618,8 @@ const machine_t machines[] = {
             .min_multi = 2.0,
             .max_multi = 2.0
         },
-        .bus_flags = MACHINE_PS2_PCI,
-        .flags = MACHINE_IDE_DUAL | MACHINE_APM,
+        .bus_flags = MACHINE_PS2_PCI | MACHINE_BUS_USB,
+        .flags = MACHINE_IDE_DUAL | MACHINE_APM | MACHINE_USB,
         .ram = {
             .min = 32768,
             .max = 131072,

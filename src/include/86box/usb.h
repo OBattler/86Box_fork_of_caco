@@ -40,6 +40,7 @@ typedef struct usb_t {
     mem_mapping_t ohci_mmio_mapping;
 
     void* usb_uhci_priv;
+    void* usb_ohci_priv;
 } usb_t;
 
 typedef struct usb_port_t {
@@ -58,6 +59,7 @@ extern void uhci_update_io_mapping(usb_t *dev, uint8_t base_l, uint8_t base_h, i
 extern void ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3, int enable);
 
 extern void uhci_register_usb(usb_t *dev);
+extern void ohci_register_usb(usb_t *dev);
 
 /* Returns NULL if none found, else pointer to port. */
 extern usb_port_t* usb_search_for_ports(void);

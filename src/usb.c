@@ -157,6 +157,7 @@ ohci_mmio_read(uint32_t addr, void *priv)
     if (addr == 0x101)
         ret = (ret & 0xfe) | (!!mem_a20_key);
 
+    pclog("addr 0x%X ret 0x%X\n", addr, ret);
     return ret;
 }
 
@@ -168,6 +169,7 @@ ohci_mmio_write(uint32_t addr, uint8_t val, void *priv)
 
     addr &= 0x00000fff;
 
+    pclog("addr 0x%X val 0x%X\n", addr, val);
     switch (addr) {
         case 0x04:
             if ((val & 0xc0) == 0x00) {
@@ -364,7 +366,7 @@ ohci_mmio_write(uint32_t addr, uint8_t val, void *priv)
 }
 
 void
-ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3, int enable)
+ohci_update_mem_mapping_old(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3, int enable)
 {
     if (dev->ohci_enable && (dev->ohci_mem_base != 0x00000000))
         mem_mapping_disable(&dev->ohci_mmio_mapping);
@@ -374,6 +376,14 @@ ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3,
 
     if (dev->ohci_enable && (dev->ohci_mem_base != 0x00000000))
         mem_mapping_set_addr(&dev->ohci_mmio_mapping, dev->ohci_mem_base, 0x1000);
+}
+
+extern void
+ohci_update_mem_mapping_new(void* priv, uint8_t base1, uint8_t base2, uint8_t base3, int enable);
+void
+ohci_update_mem_mapping(usb_t *dev, uint8_t base1, uint8_t base2, uint8_t base3, int enable)
+{
+    ohci_update_mem_mapping_new(dev->usb_ohci_priv, base1, base2, base3, enable);
 }
 
 void usb_register_port(uint8_t number, void *priv, int (*is_free)(struct usb_port_t* port), int (*connect)(struct usb_port_t* port, usb_device_c* device))
@@ -402,8 +412,12 @@ usb_port_t* usb_search_for_ports(void)
 
 extern void *
 usb_uhci_init_ext(UNUSED(const device_t *info), void* params);
+extern void *
+usb_ohci_init_ext(UNUSED(const device_t *info), void* params);
 extern void
 usb_uhci_reset(void *priv);
+extern void
+usb_ohci_reset(void *priv);
 
 static void
 usb_reset(void *priv)
@@ -439,6 +453,7 @@ usb_close(void *priv)
     usb_ports_num = 0;
 }
 
+extern const device_t usb_ohci_device;
 static void *
 usb_init(UNUSED(const device_t *info))
 {
@@ -463,6 +478,7 @@ usb_init(UNUSED(const device_t *info))
                     ohci_mmio_write, NULL, NULL,
                     NULL, MEM_MAPPING_EXTERNAL, dev);
     dev->usb_uhci_priv = usb_uhci_init_ext(info, (void*)info->local);
+    dev->usb_ohci_priv = device_add_params(&usb_ohci_device, (void*)info->local);
     usb_reset(dev);
 
     return dev;

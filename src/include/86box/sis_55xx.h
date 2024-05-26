@@ -19,6 +19,7 @@
 typedef struct
 {
     uint8_t     sb_pci_slot;
+    uint8_t    *sb_southbridge_slot;
     uint8_t     ide_bits_1_3_writable;
     uint8_t     usb_enabled;
 

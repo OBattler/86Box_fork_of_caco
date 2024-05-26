@@ -1157,8 +1157,6 @@ usb_uhci_writew(uint16_t addr, uint16_t value, void *priv)
     }
 }
 
-extern const device_t usb_mouse_device;
-
 void
 uhci_update_io_mapping_new(void *priv, uint8_t base_l, uint8_t base_h, int enable)
 {

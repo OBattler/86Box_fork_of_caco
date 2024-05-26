@@ -267,13 +267,17 @@ static void *
 sis_5572_usb_init(UNUSED(const device_t *info))
 {
     sis_5572_usb_t *dev = (sis_5572_usb_t *) calloc(1, sizeof(sis_5572_usb_t));
+    usb_params_t usb_param = { NULL, NULL };
 
     dev->rev = info->local;
 
     dev->sis = device_get_common_priv();
 
     /* USB */
+    usb_param.pci_conf = dev->pci_conf;
+    usb_param.pci_dev = dev->sis->sb_southbridge_slot;
     dev->usb = device_add(&usb_device);
+    ohci_register_usb(dev->usb);
 
     sis_5572_usb_reset(dev);
 

@@ -1600,6 +1600,7 @@ static void *
 ali1543_init(const device_t *info)
 {
     ali1543_t *dev = (ali1543_t *) malloc(sizeof(ali1543_t));
+    usb_params_t usb_param = { NULL, NULL };
     memset(dev, 0, sizeof(ali1543_t));
 
     /* Device 02: M1533 Southbridge */
@@ -1640,7 +1641,10 @@ ali1543_init(const device_t *info)
     dev->smbus = device_add(&ali7101_smbus_device);
 
     /* USB */
+    usb_param.pci_conf = dev->usb_conf;
+    usb_param.pci_dev = &dev->usb_slot;
     dev->usb = device_add(&usb_device);
+    ohci_register_usb(dev->usb);
 
     dev->type   = info->local & 0xff;
     dev->offset = (info->local >> 8) & 0x7f;

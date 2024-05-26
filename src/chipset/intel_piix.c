@@ -1573,7 +1573,10 @@ piix_init(const device_t *info)
 
     if (dev->type >= 3) {
         dev->usb   = device_add_params(&usb_device, &params);
-        uhci_register_usb(dev->usb);
+        if (dev->type > 4)
+            ohci_register_usb(dev->usb);
+        else
+            uhci_register_usb(dev->usb);
     }
 
     if (dev->type > 3) {
