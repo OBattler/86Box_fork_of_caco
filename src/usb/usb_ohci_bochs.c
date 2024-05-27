@@ -196,6 +196,8 @@ typedef struct {
       bool   oci;               //  1 bit OverCurrentIndicator        = 0b             R   RW
       bool   lps;               //  1 bit LocalPowerStatus(r)         = 0b             RW  R
     } HcRhStatus;               //                                    = 0x00000000
+
+    uint32_t HceInput, HceOutput, HceControl, HceStatus;
   } op_regs;
 
   struct {
@@ -235,6 +237,10 @@ typedef struct {
 
   bool ohci_enable;
   uint32_t ohci_mem_base;
+
+  void (*do_smi_raise)(void *priv);
+  void (*do_pci_irq)(void *priv, int level);
+  void* card_priv;
 } bx_ohci_core_t;
 
 const char *usb_ohci_port_name[] = {
@@ -301,13 +307,19 @@ void usb_ohci_update_irq(bx_ohci_core_t* hub)
       (hub->op_regs.HcInterruptStatus & hub->op_regs.HcInterruptEnable)) {
       level = 1;
   }
-  if (hub->op_regs.HcControl.ir && level)
-    smi_raise();
+  if (hub->op_regs.HcControl.ir && level) {
+    if (hub->do_smi_raise && hub->card_priv)
+      hub->do_smi_raise(hub->card_priv);
+    else        
+      smi_raise();
+  }
   else if (!hub->op_regs.HcControl.ir) {
-    if (level)
+    if (hub->do_pci_irq)
+      hub->do_pci_irq(hub->card_priv, level);
+    else if (level)
       pci_set_irq(*hub->devfunc, hub->pci_conf[0x3d], &hub->irq_state);
     else
-      pci_set_irq(*hub->devfunc, hub->pci_conf[0x3d], &hub->irq_state);
+      pci_clear_irq(*hub->devfunc, hub->pci_conf[0x3d], &hub->irq_state);
   }
 }
 
@@ -767,6 +779,26 @@ uint32_t usb_ohci_mem_read(uint32_t addr, void *priv)
             | (hub->usb_port[p].HcRhPortStatus.ccs       ? (1 <<  0) : 0);
       break;
 
+    case 0x100: {
+      val = (hub->op_regs.HceControl & 0xFF) | ((!!mem_a20_key) << 8);
+      break;
+    }
+
+    case 0x104: {
+      val = hub->op_regs.HceInput;
+      break;
+    }
+
+    case 0x108: {
+      val = hub->op_regs.HceOutput;
+      break;
+    }
+
+    case 0x10C: {
+      val = hub->op_regs.HceStatus;
+      break;
+    }
+
     default:
       BX_ERROR(("unsupported read from address=0x%08X!", (Bit32u)addr));
       break;
@@ -836,7 +868,10 @@ void usb_ohci_mem_write(uint32_t addr, uint32_t value, void* priv)
         hub->op_regs.HcInterruptStatus |= 0x40000000;
         if ((hub->op_regs.HcInterruptEnable & 0xC0000000) == 0xC0000000) {
           pclog("Assert SMI#\n");
-          smi_raise();
+          if (hub->do_smi_raise && hub->card_priv)
+            hub->do_smi_raise(hub->card_priv);
+          else
+            smi_raise();
         }
       }
       if (value & (1<< 2)) hub->op_regs.HcCommandStatus.blf = 1;
@@ -1094,6 +1129,25 @@ void usb_ohci_mem_write(uint32_t addr, uint32_t value, void* priv)
       break;
     }
 
+    case 0x100: {
+      hub->op_regs.HceControl = value;
+      break;
+    }
+
+    case 0x104: {
+      hub->op_regs.HceInput = value;
+      break;
+    }
+
+    case 0x108: {
+      hub->op_regs.HceOutput = value;
+      break;
+    }
+
+    case 0x10C: {
+      hub->op_regs.HceStatus = value;
+      break;
+    }
 
     default:
       BX_ERROR(("unsupported write to address=0x%08X, val = 0x%08X!", (Bit32u)addr, value));
@@ -1593,6 +1647,9 @@ usb_ohci_init(UNUSED(const device_t *info))
     if (usb_params) {
       hub->devfunc = usb_params->pci_dev;
       hub->pci_conf = usb_params->pci_conf;
+      hub->do_smi_raise = usb_params->do_smi_raise;
+      hub->card_priv = usb_params->priv;
+      hub->do_pci_irq = usb_params->do_pci_irq;
     }
     timer_add(&hub->timer, usb_ohci_timer, hub, 0);
     timer_on_auto(&hub->timer, 1000);

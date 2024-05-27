@@ -28,6 +28,10 @@ typedef struct usb_device_c usb_device_c;
 typedef struct usb_params_t {
     uint8_t* pci_dev;
     uint8_t* pci_conf;
+
+    void* priv; /* Implementation-specific behaviour. */
+    void (*do_smi_raise)(void* priv);
+    void (*do_pci_irq)(void* priv, int level);
 } usb_params_t;
 
 typedef struct usb_t {

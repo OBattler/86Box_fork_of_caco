@@ -22,6 +22,7 @@ typedef struct
     uint8_t    *sb_southbridge_slot;
     uint8_t     ide_bits_1_3_writable;
     uint8_t     usb_enabled;
+    uint8_t     test_mode_reg; /* USB SMI control. */
 
     uint8_t    *pmu_regs;
 

@@ -66,7 +66,7 @@ sis_5572_usb_log(const char *fmt, ...)
 #endif
 
 typedef struct sis_5572_usb_t {
-    uint8_t     rev;
+    uint8_t     rev, irq_state;
 
     uint8_t     usb_unk_regs[256];
     uint8_t     pci_conf[256];
@@ -77,6 +77,30 @@ typedef struct sis_5572_usb_t {
 
     sis_55xx_common_t *sis;
 } sis_5572_usb_t;
+
+void
+sis_5572_usb_smi_raise(void* priv)
+{
+    sis_5572_usb_t *dev = (sis_5572_usb_t *) priv;
+    
+    if (dev->sis->usb_enabled && (dev->sis->test_mode_reg & 0x10)) {
+        dev->sis->test_mode_reg |= 0x8;
+        smi_raise();
+    }
+}
+
+void
+sis_5572_usb_pci_irq(void *priv, int level)
+{
+    sis_5572_usb_t *dev = (sis_5572_usb_t *) priv;
+    
+    if (dev->sis->usb_enabled) {
+        if (level)
+            pci_set_mirq(PCI_MIRQ3, level, &dev->irq_state);
+        else
+            pci_clear_mirq(PCI_MIRQ3, level, &dev->irq_state);
+    }
+}
 
 /* SiS 5572 unknown I/O port (second USB PCI BAR). */
 static void
@@ -275,8 +299,11 @@ sis_5572_usb_init(UNUSED(const device_t *info))
 
     /* USB */
     usb_param.pci_conf = dev->pci_conf;
-    usb_param.pci_dev = dev->sis->sb_southbridge_slot;
-    dev->usb = device_add(&usb_device);
+    usb_param.pci_dev  = dev->sis->sb_southbridge_slot;
+    usb_param.priv     = dev;
+    usb_param.do_smi_raise = sis_5572_usb_smi_raise;
+    usb_param.do_pci_irq = sis_5572_usb_pci_irq;
+    dev->usb = device_add_params(&usb_device, &usb_param);
     ohci_register_usb(dev->usb);
 
     sis_5572_usb_reset(dev);

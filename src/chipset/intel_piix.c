@@ -1535,6 +1535,19 @@ piix_speed_changed(void *priv)
         timer_on_auto(&dev->fast_off_timer, ((double) cpu_fast_off_val + 1) * dev->fast_off_period);
 }
 
+static void
+piix_smsc_usb_smi_raise(void* priv)
+{
+    piix_t *dev = (piix_t *) priv;
+    if (!dev)
+        return;
+
+    if ((dev->acpi->regs.glben & 1)) {
+        dev->acpi->regs.glbsts |= 2;
+        acpi_raise_smi(dev->acpi, 1);
+    }
+}
+
 static void *
 piix_init(const device_t *info)
 {
@@ -1554,6 +1567,9 @@ piix_init(const device_t *info)
     piix_log("PIIX%i: Added to slot: %02X\n", dev->type, dev->pci_slot);
     params.pci_dev = &dev->pci_slot;
     params.pci_conf = &dev->regs[2][0];
+    params.do_smi_raise = piix_smsc_usb_smi_raise;
+    params.priv = dev;
+    params.do_pci_irq = 0;
 
     dev->bm[0] = device_add_inst(&sff8038i_device, 1);
     dev->bm[1] = device_add_inst(&sff8038i_device, 2);

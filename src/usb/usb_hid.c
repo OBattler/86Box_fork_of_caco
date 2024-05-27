@@ -1235,7 +1235,7 @@ usb_hid_poll_wrapper(void *priv)
 
     mouse_subtract_coords(&delta_x, &delta_y, &overflow_x, &overflow_y,
                           -128, 127, 1, 0);
-    mouse_subtract_z(&delta_z, -8, 7, 1);
+    mouse_subtract_z(&delta_z, -8, 7, 0);
     mouse_enq(hid, delta_x, delta_y, delta_z, b, 0);
     return 1;
 }
@@ -1505,7 +1505,7 @@ usb_device_hid_handle_data(usb_device_c *device, USBPacket *p)
         case USB_TOKEN_IN:
             if (p->devep == 1) {
                 if ((device->type == USB_HID_TYPE_MOUSE) || (device->type == USB_HID_TYPE_TABLET)) {
-                    pclog("USB MOUSE POLLING\n");
+                    //pclog("USB MOUSE POLLING\n");
                     ret = usb_mouse_poll((usb_device_hid *) device, p->data, 0);
                 } else {
                     goto fail;
