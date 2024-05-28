@@ -26,11 +26,15 @@ struct usb_device_c;
 typedef struct usb_device_c usb_device_c;
 
 typedef struct usb_params_t {
+    /* Pointer to PCI device slot. */
     uint8_t* pci_dev;
+    /* PCI configuration space array. */
     uint8_t* pci_conf;
 
-    void* priv; /* Implementation-specific behaviour. */
+    void* priv; /* The implementation. */
+    /* Raises SMI with also setting implementation-specific bits. */
     void (*do_smi_raise)(void* priv);
+    /* Asserts PCI interrupt. */
     void (*do_pci_irq)(void* priv, int level);
 } usb_params_t;
 
