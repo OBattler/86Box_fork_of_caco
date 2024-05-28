@@ -60,6 +60,7 @@ typedef struct ali1543_t {
     uint8_t ide_dev_enable;
     uint8_t pmu_dev_enable;
     uint8_t type;
+    uint8_t usb_irq_state;
     int     offset;
 
     apm_t           *apm;
@@ -1090,7 +1091,7 @@ ali7101_write(int func, int addr, uint8_t val, void *priv)
             dev->pmu_conf[addr] = val & 0x9f;
             break;
         case 0x46:
-            dev->pmu_conf[addr] = val & 0x18;
+            dev->pmu_conf[addr] = (val & 0x18) | 0x20;
             break;
 
         /* TODO: Is the status R/W or R/WC? */
@@ -1596,6 +1597,23 @@ ali1543_close(void *priv)
     free(dev);
 }
 
+void
+ali5237_usb_raise_smi(void *priv)
+{
+    ali1543_t *dev = priv;
+
+    dev->pmu_conf[0x4A] |= 0x20;
+    smi_raise();
+}
+
+void
+ali5237_usb_pci_irq(void *priv, int level)
+{
+    ali1543_t *dev = priv;
+
+    pci_set_mirq(PCI_MIRQ4, level, &dev->usb_irq_state);
+}
+
 static void *
 ali1543_init(const device_t *info)
 {
@@ -1643,7 +1661,10 @@ ali1543_init(const device_t *info)
     /* USB */
     usb_param.pci_conf = dev->usb_conf;
     usb_param.pci_dev = &dev->usb_slot;
-    dev->usb = device_add(&usb_device);
+    usb_param.do_smi_raise = ali5237_usb_raise_smi;
+    usb_param.do_pci_irq = ali5237_usb_pci_irq;
+    usb_param.priv = dev;
+    dev->usb = device_add_params(&usb_device, &usb_param);
     ohci_register_usb(dev->usb);
 
     dev->type   = info->local & 0xff;

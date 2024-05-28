@@ -272,9 +272,27 @@ const char *usb_ohci_port_name[] = {
   "  **unknown**     "
 };
 
-#define BX_ERROR(x) pclog x ; pclog ("\n")
-#define BX_INFO(x)  pclog x ; pclog ("\n")
-#define BX_DEBUG(x) pclog x ; pclog ("\n")
+#ifdef ENABLE_OHCI_LOG
+int ohci_do_log = ENABLE_OHCI_LOG;
+
+static void
+ohci_log(const char *fmt, ...)
+{
+    va_list ap;
+
+    if (ohci_do_log) {
+        va_start(ap, fmt);
+        pclog_ex(fmt, ap);
+        va_end(ap);
+    }
+}
+#else
+#    define ohci_log(fmt, ...)
+#endif
+
+#define BX_ERROR(x) ohci_log x ; pclog ("\n")
+#define BX_INFO(x)  ohci_log x ; pclog ("\n")
+#define BX_DEBUG(x) ohci_log x ; pclog ("\n")
 #define BX_PANIC(x) fatal x ; pclog ("\n")
 
 #define DEV_MEM_WRITE_PHYSICAL(addr, size, data) dma_bm_write(addr, (uint8_t*)data, size, 4);
@@ -625,7 +643,6 @@ uint32_t usb_ohci_mem_read(uint32_t addr, void *priv)
   uint32_t val = ~0u;
   uint32_t p = 0;
   bx_ohci_core_t* hub = priv;
-  pclog("Register read from addr 0x%X\n", addr);
 
   if (addr & 3)
     return val;
@@ -804,12 +821,12 @@ uint32_t usb_ohci_mem_read(uint32_t addr, void *priv)
       break;
   }
 
+  ohci_log("OHCI: Register read from addr 0x%08X, ret 0x%08X\n", addr, val);
   return val;
 }
 
 void usb_ohci_mem_writeb(uint32_t addr, uint8_t val, void *priv)
 {
-  pclog("byte write 0x%x to 0x%x\n", val, addr);
 }
 
 uint8_t usb_ohci_mem_readb(uint32_t addr, void *priv)
@@ -831,7 +848,7 @@ void usb_ohci_mem_write(uint32_t addr, uint32_t value, void* priv)
     BX_INFO(("Misaligned write at 0x%08X", (Bit32u)addr));
     return;
   }
-  pclog("Write to addr 0x%X val 0x%X\n", addr, value);
+  ohci_log("OHCI: Write to addr 0x%X val 0x%X\n", addr, value);
 
   switch (offset) {
     case 0x00: // HcRevision
