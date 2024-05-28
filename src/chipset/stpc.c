@@ -920,7 +920,15 @@ stpc_init(const device_t *info)
     pci_add_card(PCI_ADD_NORTHBRIDGE, stpc_nb_read, stpc_nb_write, dev, &dev->nb_slot);
     pci_add_card(PCI_ADD_SOUTHBRIDGE, stpc_isab_read, stpc_isab_write, dev, &dev->sb_slot);
     if (dev->local == STPC_ATLAS) {
-        usb_params_t usb_params = { .pci_conf = dev->pci_conf[3], .pci_dev = &dev->usb_slot };
+        usb_params_t usb_params =
+        {
+            .pci_conf = dev->pci_conf[3],
+            .pci_dev = &dev->usb_slot,
+            .priv = dev,
+            .do_smi_ocr_raise = NULL,
+            .do_smi_raise = NULL,
+            .do_pci_irq = NULL
+        };
         pci_add_card(PCI_ADD_SOUTHBRIDGE_IDE, stpc_ide_read, stpc_ide_write, dev, &dev->ide_slot);
 
         dev->usb = device_add_params(&usb_device, &usb_params);

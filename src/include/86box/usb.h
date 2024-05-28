@@ -34,6 +34,8 @@ typedef struct usb_params_t {
     void* priv; /* The implementation. */
     /* Raises SMI with also setting implementation-specific bits. */
     void (*do_smi_raise)(void* priv);
+    /* Raises SMI with also setting implementation-specific bits (on OwnershipChangeRequest). */
+    void (*do_smi_ocr_raise)(void* priv);
     /* Asserts PCI interrupt. */
     void (*do_pci_irq)(void* priv, int level);
 } usb_params_t;

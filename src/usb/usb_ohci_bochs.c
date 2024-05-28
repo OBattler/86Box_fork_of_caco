@@ -239,6 +239,7 @@ typedef struct {
   uint32_t ohci_mem_base;
 
   void (*do_smi_raise)(void *priv);
+  void (*do_smi_ocr_raise)(void *priv);
   void (*do_pci_irq)(void *priv, int level);
   void* card_priv;
 } bx_ohci_core_t;
@@ -884,8 +885,10 @@ void usb_ohci_mem_write(uint32_t addr, uint32_t value, void* priv)
         hub->op_regs.HcCommandStatus.ocr = 1;
         hub->op_regs.HcInterruptStatus |= 0x40000000;
         if ((hub->op_regs.HcInterruptEnable & 0xC0000000) == 0xC0000000) {
-          pclog("Assert SMI#\n");
-          if (hub->do_smi_raise && hub->card_priv)
+          ohci_log("Assert SMI#\n");
+          if (hub->do_smi_ocr_raise && hub->card_priv)
+            hub->do_smi_ocr_raise(hub->card_priv);
+          else if (hub->do_smi_raise && hub->card_priv)
             hub->do_smi_raise(hub->card_priv);
           else
             smi_raise();
@@ -1665,6 +1668,7 @@ usb_ohci_init(UNUSED(const device_t *info))
       hub->devfunc = usb_params->pci_dev;
       hub->pci_conf = usb_params->pci_conf;
       hub->do_smi_raise = usb_params->do_smi_raise;
+      hub->do_smi_ocr_raise = usb_params->do_smi_ocr_raise;
       hub->card_priv = usb_params->priv;
       hub->do_pci_irq = usb_params->do_pci_irq;
     }

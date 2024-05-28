@@ -1570,6 +1570,7 @@ piix_init(const device_t *info)
     params.do_smi_raise = piix_smsc_usb_smi_raise;
     params.priv = dev;
     params.do_pci_irq = 0;
+    params.do_smi_ocr_raise = NULL;
 
     dev->bm[0] = device_add_inst(&sff8038i_device, 1);
     dev->bm[1] = device_add_inst(&sff8038i_device, 2);

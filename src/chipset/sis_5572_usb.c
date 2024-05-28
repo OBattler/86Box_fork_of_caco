@@ -302,6 +302,7 @@ sis_5572_usb_init(UNUSED(const device_t *info))
     usb_param.pci_dev  = dev->sis->sb_southbridge_slot;
     usb_param.priv     = dev;
     usb_param.do_smi_raise = sis_5572_usb_smi_raise;
+    usb_param.do_smi_ocr_raise = NULL;
     usb_param.do_pci_irq = sis_5572_usb_pci_irq;
     dev->usb = device_add_params(&usb_device, &usb_param);
     ohci_register_usb(dev->usb);

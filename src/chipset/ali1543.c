@@ -1662,6 +1662,7 @@ ali1543_init(const device_t *info)
     usb_param.pci_conf = dev->usb_conf;
     usb_param.pci_dev = &dev->usb_slot;
     usb_param.do_smi_raise = ali5237_usb_raise_smi;
+    usb_param.do_smi_ocr_raise = NULL;
     usb_param.do_pci_irq = ali5237_usb_pci_irq;
     usb_param.priv = dev;
     dev->usb = device_add_params(&usb_device, &usb_param);
