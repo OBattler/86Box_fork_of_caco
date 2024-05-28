@@ -1015,10 +1015,9 @@ static const uint8_t bx_keypad_hid_descriptor[] = {
     0x00, /*  u16 len */
 };
 
-#define BX_ERROR(x) pclog x
-#define BX_INFO(x)  pclog x
-#define BX_DEBUG(x) pclog x
-#define BX_PANIC(x) fatal x
+#define BX_ERROR(x) pclog x; pclog ("\n")
+#define BX_INFO(x)  pclog x; pclog ("\n")
+#define BX_DEBUG(x) pclog x; pclog ("\n")
 
 int
 usb_device_hid_create_mouse_packet(usb_device_hid *hid, uint8_t *buf)
