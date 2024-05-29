@@ -1,0 +1,1 @@
+add_library(pcmcia pcmcia_socket_pd6710.c)
