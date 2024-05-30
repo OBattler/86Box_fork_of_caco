@@ -28,6 +28,12 @@ struct pcmcia_socket_t {
     /* Signals card insertion/removal to the socket. */
     void (*card_inserted)(bool inserted, pcmcia_socket_t* socket);
 
+    /* Signals STSCHG to the socket. */
+    void (*status_changed)(bool status, pcmcia_socket_t* socket);
+
+    /* Signals READY to the socket. */
+    void (*ready_changed)(bool ready, pcmcia_socket_t* socket);
+
     /* Opaque pointer to card-specific information. */
     void *card_priv;
 
