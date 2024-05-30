@@ -13,6 +13,9 @@
 #include <86box/timer.h>
 #include <86box/pcmcia.h>
 #include <86box/mem.h>
+#include <86box/pic.h>
+
+#include "cpu.h"
 
 struct pcmcia_socket_pd67xx;
 
@@ -68,6 +71,8 @@ typedef struct pcmcia_socket_pd67xx
 
     pd67xx_memory_map mem_maps[5];
 
+    bool inserted;
+
     pcmcia_socket_t socket;
 } pcmcia_socket_pd67xx;
 
@@ -89,6 +94,40 @@ void pd67xx_mem_recalc(pd67xx_memory_map* mem_map)
     }
 }
 
+void pd67xx_mgmt_interrupt(pcmcia_socket_pd67xx* pd67xx, int set)
+{
+    if ((pd67xx->interrupt_general_control & (1 << 4)) && set) {
+        /* Assume that we are asserting I/O Channel Check low. */
+        nmi_raise();
+    }
+
+    if (set && !!((pd67xx->management_interrupt_conf >> 4) & 0xF))
+        picint(1 << (pd67xx->management_interrupt_conf >> 4));
+}
+
+void pd67xx_card_interrupt(pcmcia_socket_pd67xx* pd67xx, int set)
+{
+    if (set && !!(pd67xx->interrupt_general_control & 0xF))
+        picint(1 << (pd67xx->interrupt_general_control));
+}
+
+void pd67xx_card_inserted(bool inserted, pcmcia_socket_t* socket)
+{
+    pcmcia_socket_pd67xx* pd67xx = socket->socket_priv;
+    bool signal_change = false;
+
+    if (pd67xx->inserted ^ inserted) {
+        signal_change = true;
+    }
+
+    pd67xx->inserted = inserted;
+    pd67xx->cd = inserted ? 0b11 : 0b00;
+
+    if (signal_change && (pd67xx->management_interrupt_conf & (1 << 3))) {
+        pd67xx_mgmt_interrupt(pd67xx, 1);
+    }
+}
+
 uint8_t pd67xx_mem_read(uint32_t addr, void* priv)
 {
     pd67xx_memory_map* pd67xx_mem_map = (pd67xx_memory_map*)priv;
@@ -99,6 +138,11 @@ uint8_t pd67xx_mem_read(uint32_t addr, void* priv)
 
     if (!pd67xx->socket.mem_read)
         return 0xFF;
+
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFF;
+    }
 
     addr += (pd67xx_mem_map->offset.addr & 0x3fff) * 4096;
     addr &= 0x3FFFFFF;
@@ -119,6 +163,11 @@ void pd67xx_mem_write(uint32_t addr, uint8_t val, void* priv)
     if (pd67xx_mem_map->offset.addr & 0x8000) /* write-protected? */
         return;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
+
     addr += (pd67xx_mem_map->offset.addr & 0x3fff) * 4096;
     addr &= 0x3FFFFFF;
     return pd67xx->socket.mem_write(addr, val, !(pd67xx_mem_map->offset.addr & (1 << 14)), pd67xx->socket.card_priv);
@@ -134,6 +183,11 @@ uint16_t pd67xx_mem_readw(uint32_t addr, void* priv)
 
     if (!pd67xx->socket.mem_readw)
         return 0xFF;
+
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFFFF;
+    }
 
     addr += (pd67xx_mem_map->offset.addr & 0x3fff) * 4096;
     addr &= 0x3FFFFFF;
@@ -154,6 +208,11 @@ void pd67xx_mem_writew(uint32_t addr, uint16_t val, void* priv)
     if (pd67xx_mem_map->offset.addr & 0x8000) /* write-protected? */
         return;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
+
     addr += (pd67xx_mem_map->offset.addr & 0x3fff) * 4096;
     addr &= 0x3FFFFFF;
     return pd67xx->socket.mem_writew(addr, val, !(pd67xx_mem_map->offset.addr & (1 << 14)), pd67xx->socket.card_priv);
@@ -168,6 +227,11 @@ uint8_t pd67xx_io_read_1(uint16_t port, void* priv)
 
     if (!pd67xx->socket.io_read)
         return 0xFF;
+    
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFF;
+    }
 
     port += pd67xx->io_offsets[0];
     return pd67xx->socket.io_read(port, pd67xx->socket.card_priv);
@@ -183,6 +247,11 @@ uint16_t pd67xx_io_readw_1(uint16_t port, void* priv)
     if (!pd67xx->socket.io_read)
         return 0xFF;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFFFF;
+    }
+
     port += pd67xx->io_offsets[0];
     return pd67xx->socket.io_readw(port, pd67xx->socket.card_priv);
 }
@@ -196,6 +265,11 @@ void pd67xx_io_write_1(uint16_t port, uint8_t val, void* priv)
 
     if (!pd67xx->socket.io_write)
         return;
+
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
 
     port += pd67xx->io_offsets[0];
     return pd67xx->socket.io_write(port, val, pd67xx->socket.card_priv);
@@ -211,6 +285,11 @@ void pd67xx_io_writew_1(uint16_t port, uint16_t val, void* priv)
     if (!pd67xx->socket.io_writew)
         return;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
+
     port += pd67xx->io_offsets[0];
     return pd67xx->socket.io_write(port, val, pd67xx->socket.card_priv);
 }
@@ -224,6 +303,11 @@ uint8_t pd67xx_io_read_2(uint16_t port, void* priv)
 
     if (!pd67xx->socket.io_read)
         return 0xFF;
+
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFF;
+    }
 
     port += pd67xx->io_offsets[1];
     return pd67xx->socket.io_read(port, pd67xx->socket.card_priv);
@@ -239,6 +323,11 @@ uint16_t pd67xx_io_readw_2(uint16_t port, void* priv)
     if (!pd67xx->socket.io_read)
         return 0xFF;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return 0xFFFF;
+    }
+
     port += pd67xx->io_offsets[1];
     return pd67xx->socket.io_readw(port, pd67xx->socket.card_priv);
 }
@@ -252,6 +341,11 @@ void pd67xx_io_write_2(uint16_t port, uint8_t val, void* priv)
 
     if (!pd67xx->socket.io_write)
         return;
+
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
 
     port += pd67xx->io_offsets[1];
     return pd67xx->socket.io_write(port, val, pd67xx->socket.card_priv);
@@ -267,6 +361,11 @@ void pd67xx_io_writew_2(uint16_t port, uint16_t val, void* priv)
     if (!pd67xx->socket.io_writew)
         return;
 
+    if (!(pd67xx->power_control & (1 << 7))) {
+        /* No outputs enabled. */
+        return;
+    }
+
     port += pd67xx->io_offsets[1];
     return pd67xx->socket.io_write(port, val, pd67xx->socket.card_priv);
 }
@@ -278,7 +377,13 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
     if (!(port & 1))
         pd67xx->index = val;
     else {
-
+        switch (pd67xx->index) {
+            case 0x02:
+            {
+                pd67xx->power_control = val;
+                break;
+            }
+        }
     }
 }
 
@@ -292,6 +397,10 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
         switch (pd67xx->index) {
             case 0x00:
                 return 0b10000010;
+            case 0x01:
+                return pd67xx->interface_status;
+            case 0x02:
+                return pd67xx->power_control;
             default:
                 return 0xFF;
         }

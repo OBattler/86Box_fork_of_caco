@@ -23,7 +23,7 @@ struct pcmcia_socket_t {
     void (*mem_writew)(uint32_t addr, uint16_t val, int reg, void* priv);
 
     /* Signals power status change to the card. */
-    void (*power_status_change)(pcmcia_socket_t* socket);
+    void (*power_status_change)(int vcc, int vpp, pcmcia_socket_t* socket);
 
     /* Signals card insertion/removal to the socket. */
     void (*card_inserted)(bool inserted, pcmcia_socket_t* socket);
