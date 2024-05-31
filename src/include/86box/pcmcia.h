@@ -34,6 +34,9 @@ struct pcmcia_socket_t {
     /* Signals READY to the socket. */
     void (*ready_changed)(bool ready, pcmcia_socket_t* socket);
 
+    /* Resets the card. */
+    void (*reset)(void *priv);
+
     /* Opaque pointer to card-specific information. */
     void *card_priv;
 

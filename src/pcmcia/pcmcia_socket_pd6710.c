@@ -383,6 +383,15 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
                 pd67xx->power_control = val;
                 break;
             }
+            case 0x03:
+            {
+                bool reset = !(val & (1 << 6)) && (pd67xx->interrupt_general_control & (1 << 6));
+                pd67xx->interrupt_general_control = val;
+                if ((pd67xx->power_control & (1 << 7)) && reset) {
+                    pd67xx->socket.reset(pd67xx->socket.card_priv);
+                }
+                break;
+            }
         }
     }
 }
@@ -401,6 +410,14 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
                 return pd67xx->interface_status;
             case 0x02:
                 return pd67xx->power_control;
+            case 0x03:
+                return pd67xx->interrupt_general_control;
+            case 0x04:
+                {
+                    uint8_t ret = pd67xx->card_status;
+                    pd67xx->card_status = 0;
+                    return ret;
+                }
             default:
                 return 0xFF;
         }
