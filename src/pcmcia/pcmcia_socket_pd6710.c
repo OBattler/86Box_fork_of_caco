@@ -80,7 +80,7 @@ void pd67xx_mem_recalc(pd67xx_memory_map* mem_map)
 {
     mem_mapping_disable(&mem_map->mapping);
     if (mem_map->main_ptr->mapping_enable & (1 << mem_map->map_num)) {
-        uint32_t start = mem_map->start.addr << 12;
+        uint32_t start = (mem_map->start.addr & 0x3fff) << 12;
         uint32_t end = (mem_map->end.addr & 0x3fff) << 12;
 
         if (start < (16 << 12)) {
@@ -91,6 +91,15 @@ void pd67xx_mem_recalc(pd67xx_memory_map* mem_map)
             return;
         
         mem_mapping_set_addr(&mem_map->mapping, start, (end - start) + 4096);
+    }
+}
+
+void pd67xx_mem_recalc_all(pcmcia_socket_pd67xx* pd67xx)
+{
+    int i = 0;
+
+    for (i = 0; i < 5; i++) {
+        pd67xx_mem_recalc(&pd67xx->mem_maps[i]);
     }
 }
 
@@ -392,6 +401,24 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
                 }
                 break;
             }
+            case 0x05:
+            {
+                pd67xx->management_interrupt_conf = val;
+                break;
+            }
+            case 0x06:
+            {
+                pd67xx->mapping_enable = val;
+                pd67xx_mem_recalc_all(pd67xx);
+                pd67xx->ranges[0].enable = !!(val & (1 << 6));
+                pd67xx->ranges[1].enable = !!(val & (1 << 7));
+                break;
+            }
+            case 0x07:
+            {
+                pd67xx->io_window_control = val;
+                break;
+            }
         }
     }
 }
@@ -416,8 +443,90 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
                 {
                     uint8_t ret = pd67xx->card_status;
                     pd67xx->card_status = 0;
+                    pd67xx_mgmt_interrupt(pd67xx, 0);
                     return ret;
                 }
+            case 0x05:
+                return pd67xx->management_interrupt_conf;
+            case 0x06:
+                return pd67xx->mapping_enable;
+            case 0x07:
+            {
+                return pd67xx->io_window_control;
+            }
+            case 0x08:
+            {
+                return pd67xx->ranges[0].start & 0xFF;
+            }
+            case 0x09:
+            {
+                return (pd67xx->ranges[0].start >> 8) & 0xFF;
+            }
+            case 0x0a:
+            {
+                return pd67xx->ranges[0].end & 0xFF;
+            }
+            case 0x0b:
+            {
+                return (pd67xx->ranges[0].end >> 8) & 0xFF;
+            }
+            case 0x0c:
+            {
+                return pd67xx->ranges[1].start & 0xFF;
+            }
+            case 0x0d:
+            {
+                return (pd67xx->ranges[1].start >> 8) & 0xFF;
+            }
+            case 0x0e:
+            {
+                return pd67xx->ranges[1].end & 0xFF;
+            }
+            case 0x0f:
+            {
+                return (pd67xx->ranges[1].end >> 8) & 0xFF;
+            }
+            
+            case 0x10 ... 0x15:
+            case 0x18 ... 0x1D:
+            case 0x20 ... 0x25:
+            case 0x28 ... 0x2D:
+            case 0x30 ... 0x35:
+            {
+                uint8_t mem_map_num = ((pd67xx->index - 0x10) >> 3);
+                pd67xx_memory_map *mem_map = &pd67xx->mem_maps[mem_map_num];
+
+                switch (pd67xx->index & 0xF) {
+                    case 0: {
+                        return mem_map->start.addr_b[0];
+                    }
+                    case 1: {
+                        return mem_map->start.addr_b[1];
+                    }
+                    case 2: {
+                        return mem_map->end.addr_b[0];
+                    }
+                    case 3: {
+                        return mem_map->end.addr_b[1];
+                    }
+                    case 4: {
+                        return mem_map->offset.addr_b[0];
+                    }
+                    case 5: {
+                        return mem_map->offset.addr_b[1];
+                    }
+                }
+                break;
+            }
+            
+            case 0x36:
+            case 0x37:
+                return (pd67xx->io_offsets[0] >> (8 * (pd67xx->index & 1))) & 0xFF;
+            case 0x38:
+            case 0x39:
+                return (pd67xx->io_offsets[1] >> (8 * (pd67xx->index & 1))) & 0xFF;
+
+
             default:
                 return 0xFF;
         }
