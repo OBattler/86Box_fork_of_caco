@@ -419,6 +419,106 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
                 pd67xx->io_window_control = val;
                 break;
             }
+            case 0x08:
+            {
+                pd67xx->ranges[0].start = (pd67xx->ranges[0].start & 0xFF00) | val;
+                break;
+            }
+            case 0x09:
+            {
+                pd67xx->ranges[0].start = (pd67xx->ranges[0].start & 0xFF) | (val << 8);
+                break;
+            }
+            case 0x0a:
+            {
+                pd67xx->ranges[0].end = (pd67xx->ranges[0].start & 0xFF00) | val;
+                break;
+            }
+            case 0x0b:
+            {
+                pd67xx->ranges[0].end = (pd67xx->ranges[0].start & 0xFF) | (val << 8);
+                break;
+            }
+            case 0x0c:
+            {
+                pd67xx->ranges[1].start = (pd67xx->ranges[1].start & 0xFF00) | val;
+                break;
+            }
+            case 0x0d:
+            {
+                pd67xx->ranges[1].start = (pd67xx->ranges[1].start & 0xFF) | (val << 8);
+                break;
+            }
+            case 0x0e:
+            {
+                pd67xx->ranges[1].end = (pd67xx->ranges[1].start & 0xFF00) | val;
+                break;
+            }
+            case 0x0f:
+            {
+                pd67xx->ranges[1].end = (pd67xx->ranges[1].start & 0xFF) | (val << 8);
+                break;
+            }
+            case 0x10 ... 0x15:
+            case 0x18 ... 0x1D:
+            case 0x20 ... 0x25:
+            case 0x28 ... 0x2D:
+            case 0x30 ... 0x35:
+            {
+                uint8_t mem_map_num = ((pd67xx->index - 0x10) >> 3);
+                pd67xx_memory_map *mem_map = &pd67xx->mem_maps[mem_map_num];
+
+                switch (pd67xx->index & 0xF) {
+                    case 0: {
+                        mem_map->start.addr_b[0] = val;
+                        break;
+                    }
+                    case 1: {
+                        mem_map->start.addr_b[1] = val;
+                        break;
+                    }
+                    case 2: {
+                        mem_map->end.addr_b[0] = val;
+                        break;
+                    }
+                    case 3: {
+                        mem_map->end.addr_b[1] = val;
+                        break;
+                    }
+                    case 4: {
+                        mem_map->offset.addr_b[0] = val;
+                        break;
+                    }
+                    case 5: {
+                        mem_map->offset.addr_b[1] = val;
+                        break;
+                    }
+                }
+                pd67xx_mem_recalc(mem_map);
+                break;
+            }
+
+            
+            case 0x36:
+            {
+                pd67xx->io_offsets[0] = (pd67xx->io_offsets[0] & 0xFF00) | val;
+                break;
+            }
+            case 0x37:
+            {
+                pd67xx->io_offsets[0] = (pd67xx->io_offsets[0] & 0xFF) | (val << 8);
+                break;
+            }
+            case 0x38:
+            {
+                pd67xx->io_offsets[1] = (pd67xx->io_offsets[1] & 0xFF00) | val;
+                break;
+            }
+            case 0x39:
+            {
+                pd67xx->io_offsets[1] = (pd67xx->io_offsets[1] & 0xFF) | (val << 8);
+                break;
+            }
         }
     }
 }
@@ -531,4 +631,5 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
                 return 0xFF;
         }
     }
+    return 0xFF;
 }
