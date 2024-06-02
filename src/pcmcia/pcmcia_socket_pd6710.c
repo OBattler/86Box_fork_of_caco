@@ -66,12 +66,20 @@ typedef struct pcmcia_socket_pd67xx
     uint8_t mapping_enable;
     uint8_t io_window_control;
 
+    uint8_t misc_control_1;
+    uint8_t misc_control_2;
+    uint8_t fifo_control;
+
     io_range_t ranges[2];
     uint16_t io_offsets[2];
 
     pd67xx_memory_map mem_maps[5];
 
+    uint8_t regs[0x40]; /* Only used for ignored registers. */
+
     bool inserted;
+    bool read_seq;
+    uint8_t irq_state;
 
     pcmcia_socket_t socket;
 } pcmcia_socket_pd67xx;
@@ -114,10 +122,16 @@ void pd67xx_mgmt_interrupt(pcmcia_socket_pd67xx* pd67xx, int set)
         picint(1 << (pd67xx->management_interrupt_conf >> 4));
 }
 
-void pd67xx_card_interrupt(pcmcia_socket_pd67xx* pd67xx, int set)
+void pd67xx_card_interrupt(bool set, bool level, pcmcia_socket_t* socket)
 {
-    if (set && !!(pd67xx->interrupt_general_control & 0xF))
-        picint(1 << (pd67xx->interrupt_general_control));
+    pcmcia_socket_pd67xx* pd67xx = socket->socket_priv;
+    if (set && !!(pd67xx->interrupt_general_control & 0xF)) {
+        if (level)
+            picintlevel(1 << (pd67xx->interrupt_general_control), &pd67xx->irq_state);
+        else
+            picint(1 << (pd67xx->interrupt_general_control));
+    } else if (!set && level)
+        picintclevel(1 << (pd67xx->interrupt_general_control), &pd67xx->irq_state);
 }
 
 void pd67xx_card_inserted(bool inserted, pcmcia_socket_t* socket)
@@ -519,6 +533,26 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
                 pd67xx->io_offsets[1] = (pd67xx->io_offsets[1] & 0xFF) | (val << 8);
                 break;
             }
+            case 0x3A ... 0x3F: /* Timing registers. */
+            case 0x27: /* Scratchpad */
+                pd67xx->regs[pd67xx->index] = val;
+                break;
+            
+            case 0x16:
+                pd67xx->misc_control_1 = val;
+                break;
+            
+            case 0x17:
+                pd67xx->fifo_control = val & 0x7f;
+                break;
+            
+            case 0x1E:
+                pd67xx->misc_control_2 = val & ~(1 << 6); /* Bit 6 is reserved. */
+                break;
+            
+            case 0x1F:
+                pd67xx->read_seq = 0;
+                break;
         }
     }
 }
@@ -626,6 +660,29 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
             case 0x39:
                 return (pd67xx->io_offsets[1] >> (8 * (pd67xx->index & 1))) & 0xFF;
 
+            /* Timing registers, not so relevant here right now. */
+            case 0x3A ... 0x3F:
+            case 0x27:
+                return pd67xx->regs[pd67xx->index];
+
+            /* All cards are 5 volts for now. */
+            case 0x16:
+                return pd67xx->misc_control_1 | 1;
+            
+            case 0x17:
+                return pd67xx->fifo_control;
+
+            case 0x1E:
+                return pd67xx->misc_control_2;
+
+            case 0x1F:
+                {
+                    uint8_t ret = 0b01110;
+                    if (pd67xx->read_seq == false)
+                        ret |= 0xC0;
+                    pd67xx->read_seq ^= 1;
+                    return ret;
+                }
 
             default:
                 return 0xFF;

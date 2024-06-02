@@ -40,6 +40,9 @@ struct pcmcia_socket_t {
     /* Resets the card. */
     void (*reset)(void *priv);
 
+    /* Notifies the card of a ATA mode. */
+    void (*ata_mode)(bool ata, pcmcia_socket_t* socket);
+
     /* Opaque pointer to card-specific information. */
     void *card_priv;
 
