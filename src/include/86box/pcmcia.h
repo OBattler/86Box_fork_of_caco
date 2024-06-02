@@ -35,7 +35,7 @@ struct pcmcia_socket_t {
     void (*ready_changed)(bool ready, pcmcia_socket_t* socket);
 
     /* Signals interrupt to the socket. */
-    void (*interrupt)(bool set, bool level, pcmcia_socket_t* socket);
+    void (*interrupt)(bool set, pcmcia_socket_t* socket);
 
     /* Resets the card. */
     void (*reset)(void *priv);
@@ -58,4 +58,5 @@ typedef struct pcmcia_socket_t pcmcia_socket_t;
 bool pcmcia_socket_is_free(pcmcia_socket_t* socket);
 pcmcia_socket_t* pcmcia_search_for_slots(void);
 void pcmcia_socket_insert_card(pcmcia_socket_t* socket);
-
+void pcmcia_reset(void);
+void pcmcia_register_socket(pcmcia_socket_t *socket);

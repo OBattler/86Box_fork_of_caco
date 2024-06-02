@@ -14,6 +14,7 @@
 #include <86box/pcmcia.h>
 #include <86box/mem.h>
 #include <86box/pic.h>
+#include <86box/device.h>
 
 #include "cpu.h"
 
@@ -46,7 +47,6 @@ typedef struct pcmcia_socket_pd67xx
 {
     uint8_t index;
 
-    uint8_t chip_rev;
     union
     {
         uint8_t interface_status;
@@ -70,7 +70,7 @@ typedef struct pcmcia_socket_pd67xx
     uint8_t misc_control_2;
     uint8_t fifo_control;
 
-    io_range_t ranges[2];
+    io_range_t* ranges[2];
     uint16_t io_offsets[2];
 
     pd67xx_memory_map mem_maps[5];
@@ -78,8 +78,9 @@ typedef struct pcmcia_socket_pd67xx
     uint8_t regs[0x40]; /* Only used for ignored registers. */
 
     bool inserted;
+    bool status;
     bool read_seq;
-    uint8_t irq_state;
+    uint8_t irq_state, mgmt_irq_state;
 
     pcmcia_socket_t socket;
 } pcmcia_socket_pd67xx;
@@ -113,18 +114,28 @@ void pd67xx_mem_recalc_all(pcmcia_socket_pd67xx* pd67xx)
 
 void pd67xx_mgmt_interrupt(pcmcia_socket_pd67xx* pd67xx, int set)
 {
+    bool level = !!(pd67xx->misc_control_1 & (1 << 3));
     if ((pd67xx->interrupt_general_control & (1 << 4)) && set) {
         /* Assume that we are asserting I/O Channel Check low. */
         nmi_raise();
+        return;
+    }
+
+    if (level) {
+        if (set && !!((pd67xx->management_interrupt_conf >> 4) & 0xF))
+            picintlevel(1 << (pd67xx->management_interrupt_conf >> 4), &pd67xx->mgmt_irq_state);
+        else
+            picintclevel(1 << (pd67xx->management_interrupt_conf >> 4), &pd67xx->mgmt_irq_state);
     }
 
     if (set && !!((pd67xx->management_interrupt_conf >> 4) & 0xF))
         picint(1 << (pd67xx->management_interrupt_conf >> 4));
 }
 
-void pd67xx_card_interrupt(bool set, bool level, pcmcia_socket_t* socket)
+void pd67xx_card_interrupt(bool set, pcmcia_socket_t* socket)
 {
     pcmcia_socket_pd67xx* pd67xx = socket->socket_priv;
+    bool level = !!(pd67xx->misc_control_1 & (1 << 3));
     if (set && !!(pd67xx->interrupt_general_control & 0xF)) {
         if (level)
             picintlevel(1 << (pd67xx->interrupt_general_control), &pd67xx->irq_state);
@@ -146,7 +157,49 @@ void pd67xx_card_inserted(bool inserted, pcmcia_socket_t* socket)
     pd67xx->inserted = inserted;
     pd67xx->cd = inserted ? 0b11 : 0b00;
 
-    if (signal_change && (pd67xx->management_interrupt_conf & (1 << 3))) {
+    if (signal_change && (pd67xx->management_interrupt_conf & 8)) {
+        pd67xx->card_status |= 0x8;
+        pd67xx_mgmt_interrupt(pd67xx, 1);
+    }
+}
+
+void pd67xx_status_changed(bool status, pcmcia_socket_t* socket)
+{
+    pcmcia_socket_pd67xx* pd67xx = socket->socket_priv;
+    bool signal_change = false;
+
+    if (pd67xx->status ^ status) {
+        signal_change = true;
+    }
+
+    pd67xx->status = status;
+    pd67xx->bvd &= ~1;
+    pd67xx->bvd |= status ? 0b1 : 0b0;
+
+    if (signal_change && (pd67xx->management_interrupt_conf & 1)) {
+        pd67xx->card_status |= 0x1;
+        pd67xx_mgmt_interrupt(pd67xx, 1);
+    }
+}
+
+void pd67xx_ready_changed(bool status, pcmcia_socket_t* socket)
+{
+    pcmcia_socket_pd67xx* pd67xx = socket->socket_priv;
+    bool signal_change = false;
+
+    if (pd67xx->interrupt_general_control & (1 << 5)) {
+        pd67xx_card_interrupt(!status, socket);
+        return;
+    }
+
+    if (pd67xx->ready ^ status) {
+        signal_change = true;
+    }
+
+    pd67xx->ready = status;
+
+    if (signal_change && (pd67xx->management_interrupt_conf & 4)) {
+        pd67xx->card_status |= 0x4;
         pd67xx_mgmt_interrupt(pd67xx, 1);
     }
 }
@@ -424,8 +477,8 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
             {
                 pd67xx->mapping_enable = val;
                 pd67xx_mem_recalc_all(pd67xx);
-                pd67xx->ranges[0].enable = !!(val & (1 << 6));
-                pd67xx->ranges[1].enable = !!(val & (1 << 7));
+                pd67xx->ranges[0]->enable = !!(val & (1 << 6));
+                pd67xx->ranges[1]->enable = !!(val & (1 << 7));
                 break;
             }
             case 0x07:
@@ -435,42 +488,42 @@ void pd67xx_port_write(uint16_t port, uint8_t val, void* priv)
             }
             case 0x08:
             {
-                pd67xx->ranges[0].start = (pd67xx->ranges[0].start & 0xFF00) | val;
+                pd67xx->ranges[0]->start = (pd67xx->ranges[0]->start & 0xFF00) | val;
                 break;
             }
             case 0x09:
             {
-                pd67xx->ranges[0].start = (pd67xx->ranges[0].start & 0xFF) | (val << 8);
+                pd67xx->ranges[0]->start = (pd67xx->ranges[0]->start & 0xFF) | (val << 8);
                 break;
             }
             case 0x0a:
             {
-                pd67xx->ranges[0].end = (pd67xx->ranges[0].start & 0xFF00) | val;
+                pd67xx->ranges[0]->end = (pd67xx->ranges[0]->start & 0xFF00) | val;
                 break;
             }
             case 0x0b:
             {
-                pd67xx->ranges[0].end = (pd67xx->ranges[0].start & 0xFF) | (val << 8);
+                pd67xx->ranges[0]->end = (pd67xx->ranges[0]->start & 0xFF) | (val << 8);
                 break;
             }
             case 0x0c:
             {
-                pd67xx->ranges[1].start = (pd67xx->ranges[1].start & 0xFF00) | val;
+                pd67xx->ranges[1]->start = (pd67xx->ranges[1]->start & 0xFF00) | val;
                 break;
             }
             case 0x0d:
             {
-                pd67xx->ranges[1].start = (pd67xx->ranges[1].start & 0xFF) | (val << 8);
+                pd67xx->ranges[1]->start = (pd67xx->ranges[1]->start & 0xFF) | (val << 8);
                 break;
             }
             case 0x0e:
             {
-                pd67xx->ranges[1].end = (pd67xx->ranges[1].start & 0xFF00) | val;
+                pd67xx->ranges[1]->end = (pd67xx->ranges[1]->start & 0xFF00) | val;
                 break;
             }
             case 0x0f:
             {
-                pd67xx->ranges[1].end = (pd67xx->ranges[1].start & 0xFF) | (val << 8);
+                pd67xx->ranges[1]->end = (pd67xx->ranges[1]->start & 0xFF) | (val << 8);
                 break;
             }
             case 0x10 ... 0x15:
@@ -590,35 +643,35 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
             }
             case 0x08:
             {
-                return pd67xx->ranges[0].start & 0xFF;
+                return pd67xx->ranges[0]->start & 0xFF;
             }
             case 0x09:
             {
-                return (pd67xx->ranges[0].start >> 8) & 0xFF;
+                return (pd67xx->ranges[0]->start >> 8) & 0xFF;
             }
             case 0x0a:
             {
-                return pd67xx->ranges[0].end & 0xFF;
+                return pd67xx->ranges[0]->end & 0xFF;
             }
             case 0x0b:
             {
-                return (pd67xx->ranges[0].end >> 8) & 0xFF;
+                return (pd67xx->ranges[0]->end >> 8) & 0xFF;
             }
             case 0x0c:
             {
-                return pd67xx->ranges[1].start & 0xFF;
+                return pd67xx->ranges[1]->start & 0xFF;
             }
             case 0x0d:
             {
-                return (pd67xx->ranges[1].start >> 8) & 0xFF;
+                return (pd67xx->ranges[1]->start >> 8) & 0xFF;
             }
             case 0x0e:
             {
-                return pd67xx->ranges[1].end & 0xFF;
+                return pd67xx->ranges[1]->end & 0xFF;
             }
             case 0x0f:
             {
-                return (pd67xx->ranges[1].end >> 8) & 0xFF;
+                return (pd67xx->ranges[1]->end >> 8) & 0xFF;
             }
             
             case 0x10 ... 0x15:
@@ -690,3 +743,88 @@ uint8_t pd67xx_port_read(uint16_t port, void* priv)
     }
     return 0xFF;
 }
+
+void pd67xx_reset(void *priv)
+{
+    pcmcia_socket_pd67xx* pd67xx = priv;
+    int i = 0;
+
+    pd67xx_card_interrupt(false, &pd67xx->socket);
+    pd67xx_mgmt_interrupt(pd67xx, false);
+
+    pd67xx->mapping_enable = 0;
+    for (i = 0; i < 5; i++) {
+        pd67xx->mem_maps[i].start.addr = pd67xx->mem_maps[i].end.addr = pd67xx->mem_maps[i].offset.addr = 0;
+        pd67xx->mem_maps[i].map_num = i;
+    }
+    pd67xx_mem_recalc_all(pd67xx);
+
+    pd67xx->power_control = 0;
+    pd67xx->misc_control_1 = 0;
+    pd67xx->misc_control_2 = 0;
+    pd67xx->fifo_control = 0;
+    pd67xx->interrupt_general_control = 0;
+    pd67xx->management_interrupt_conf = 0;
+    pd67xx->io_window_control = 0;
+    pd67xx->power_control = 0;
+
+    memset(pd67xx->regs, 0, sizeof(pd67xx->regs));
+
+    pd67xx->io_offsets[0] = pd67xx->io_offsets[1] = 0x0000;
+    pd67xx->ranges[0]->enable = 0;
+    pd67xx->ranges[1]->enable = 0;
+    pd67xx->ranges[0]->start = 0;
+    pd67xx->ranges[0]->end = 0;
+    pd67xx->ranges[1]->start = 0;
+    pd67xx->ranges[1]->end = 0;
+
+    if (pd67xx->socket.reset && pd67xx->socket.card_priv)
+        pd67xx->socket.reset(pd67xx->socket.card_priv);
+}
+
+void* pd6710_init(const device_t* info)
+{
+    pcmcia_socket_pd67xx* pd67xx = calloc(1, sizeof(pcmcia_socket_pd67xx));
+    int i = 0;
+
+    pd67xx->ranges[0] = io_range_addhandler(0, 0, pd67xx_io_read_1, pd67xx_io_readw_1, NULL, pd67xx_io_write_1, pd67xx_io_writew_1, NULL, 0, pd67xx);
+    pd67xx->ranges[1] = io_range_addhandler(0, 0, pd67xx_io_read_2, pd67xx_io_readw_2, NULL, pd67xx_io_write_2, pd67xx_io_writew_2, NULL, 0, pd67xx);
+
+    for (i = 0; i < 5; i++) {
+        pd67xx->mem_maps[i].map_num = i;
+        pd67xx->mem_maps[i].main_ptr = pd67xx;
+        mem_mapping_add(&pd67xx->mem_maps[i].mapping, 0, 0, pd67xx_mem_read, pd67xx_mem_readw, NULL, pd67xx_mem_write, pd67xx_mem_writew, NULL, NULL, MEM_MAPPING_EXTERNAL, &pd67xx->mem_maps[i]);
+    }
+
+    pd67xx->socket.socket_num = 0;
+    pd67xx->socket.powered_on = 0;
+    pd67xx->socket.interrupt = pd67xx_card_interrupt;
+    pd67xx->socket.card_inserted = pd67xx_card_inserted;
+    pd67xx->socket.ready_changed = pd67xx_ready_changed;
+    pd67xx->socket.status_changed = pd67xx_status_changed;
+
+    pcmcia_register_socket(&pd67xx->socket);
+
+    pd67xx_reset(pd67xx);
+
+    return pd67xx;
+}
+
+void pd6710_close(void* priv)
+{
+    free(priv);
+}
+
+const device_t pd6710_device = {
+    .name          = "Cirrus Logic CL-PD6710",
+    .internal_name = "pd6710",
+    .flags         = DEVICE_ISA | DEVICE_AT,
+    .local         = 0,
+    .init          = pd6710_init,
+    .close         = pd6710_close,
+    .reset         = NULL,
+    { .available = NULL },
+    .speed_changed = NULL,
+    .force_redraw  = NULL,
+    .config        = NULL
+};

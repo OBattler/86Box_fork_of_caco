@@ -11,8 +11,18 @@
 #include <86box/timer.h>
 #include <86box/pcmcia.h>
 
-static pcmcia_socket_t pcmcia_sockets[4];
+static pcmcia_socket_t* pcmcia_sockets[4];
 static uint8_t pcmcia_registered_sockets_num = 0;
+
+void pcmcia_reset(void)
+{
+    pcmcia_registered_sockets_num = 0;
+}
+
+void pcmcia_register_socket(pcmcia_socket_t *socket)
+{
+    pcmcia_sockets[pcmcia_registered_sockets_num++] = socket;
+}
 
 bool pcmcia_socket_is_free(pcmcia_socket_t *socket)
 {
@@ -22,8 +32,8 @@ bool pcmcia_socket_is_free(pcmcia_socket_t *socket)
 pcmcia_socket_t* pcmcia_search_for_slots(void)
 {
     for (int i = 0; i < pcmcia_registered_sockets_num; i++) {
-        if (!pcmcia_sockets[i].card_priv)
-            return &pcmcia_sockets[i];
+        if (pcmcia_sockets[i] && !pcmcia_sockets[i]->card_priv)
+            return pcmcia_sockets[i];
     }
     return NULL;
 }
