@@ -63,6 +63,7 @@ typedef struct pcmcia_socket_pd67xx {
     uint8_t misc_control_1;
     uint8_t misc_control_2;
     uint8_t fifo_control;
+    uint8_t ata_control;
 
     io_range_t *ranges[2];
     uint16_t    io_offsets[2];
@@ -78,6 +79,8 @@ typedef struct pcmcia_socket_pd67xx {
 
     pcmcia_socket_t socket;
 } pcmcia_socket_pd67xx;
+
+void pd67xx_power_recalc(pcmcia_socket_pd67xx* pd67xx);
 
 void
 pd67xx_mem_recalc(pd67xx_memory_map *mem_map)
@@ -165,6 +168,7 @@ pd67xx_card_inserted(bool inserted, pcmcia_socket_t *socket)
         pd67xx->card_status |= 0x8;
         pd67xx_mgmt_interrupt(pd67xx, 1);
     }
+    pd67xx_power_recalc(pd67xx);
 }
 
 void
@@ -465,6 +469,34 @@ pd67xx_io_writew_2(uint16_t port, uint16_t val, void *priv)
 }
 
 void
+pd67xx_power_recalc(pcmcia_socket_pd67xx* pd67xx)
+{
+    if (pd67xx->socket.card_priv && (pd67xx->power_control & (1 << 4)) && (!(pd67xx->power_control & (1 << 5)) || ((pd67xx->power_control & (1 << 5)) && pd67xx->inserted))) {
+        pd67xx->interface_status |= (1 << 6);
+    } else {
+        pd67xx->interface_status &= ~(1 << 6);
+    }
+    if (pd67xx->socket.card_priv && pd67xx->socket.power_status_change) {
+        if (pd67xx->interface_status & (1 << 6)) {
+            int vpp = 5;
+            int vcc = (pd67xx->misc_control_1 & (1 << 1)) ? 3 : 5;
+
+            switch (pd67xx->power_control & 3) {
+                case 1:
+                    vpp = 12;
+                    break;
+                case 2:
+                    vpp = vcc;
+                    break;
+            }
+            pd67xx->socket.power_status_change(vcc, vpp, &pd67xx->socket);
+        }
+        else if (pd67xx->socket.card_priv)
+            pd67xx->socket.power_status_change(0, 0, &pd67xx->socket);
+    }
+}
+
+void
 pd67xx_port_write(uint16_t port, uint8_t val, void *priv)
 {
     pcmcia_socket_pd67xx *pd67xx = priv;
@@ -476,6 +508,7 @@ pd67xx_port_write(uint16_t port, uint8_t val, void *priv)
             case 0x02:
                 {
                     pd67xx->power_control = val;
+                    pd67xx_power_recalc(pd67xx);
                     break;
                 }
             case 0x03:
@@ -630,6 +663,16 @@ pd67xx_port_write(uint16_t port, uint8_t val, void *priv)
             case 0x1F:
                 pd67xx->read_seq = 0;
                 break;
+            
+            case 0x26:
+                {
+                    bool changed = (val ^ pd67xx->ata_control) & 1;
+                    pd67xx->ata_control = val;
+                    if (changed && pd67xx->socket.ata_mode && pd67xx->socket.card_priv) {
+                        pd67xx->socket.ata_mode(changed, &pd67xx->socket);
+                    }
+                    break;
+                }
         }
     }
 }
@@ -746,7 +789,7 @@ pd67xx_port_read(uint16_t port, void *priv)
 
             /* Timing registers, not so relevant here right now. */
             case 0x3A ... 0x3F:
-            case 0x27:
+            case 0x27: /* Scratchpad. */
                 return pd67xx->regs[pd67xx->index];
 
             /* All cards are 5 volts for now. */
@@ -767,6 +810,9 @@ pd67xx_port_read(uint16_t port, void *priv)
                     pd67xx->read_seq ^= 1;
                     return ret;
                 }
+            
+            case 0x26:
+                return pd67xx->ata_control;
 
             default:
                 return 0xFF;
