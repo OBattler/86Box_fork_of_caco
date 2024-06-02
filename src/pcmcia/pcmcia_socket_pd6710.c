@@ -836,6 +836,8 @@ pd6710_init(const device_t *info)
     pd67xx->socket.ready_changed  = pd67xx_ready_changed;
     pd67xx->socket.status_changed = pd67xx_status_changed;
 
+    io_sethandler(0x3e0, 2, pd67xx_port_read, NULL, NULL, pd67xx_port_write, NULL, NULL, pd67xx);
+
     pcmcia_register_socket(&pd67xx->socket);
 
     pd67xx_reset(pd67xx);
